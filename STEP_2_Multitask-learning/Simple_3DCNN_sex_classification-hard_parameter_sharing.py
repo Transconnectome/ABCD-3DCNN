@@ -127,7 +127,7 @@ def partition(imageFiles_labels,args):
         image = imageFile_label['subjectkey']
         label = {}
 
-        for label_name in args.target[:len(args.target)]:
+        for label_name in target[:len(target)]:
             label[label_name]=imageFile_label[label_name]
         
         images.append(image)
