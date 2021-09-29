@@ -232,7 +232,8 @@ class CNN3D(nn.Module):
             self.fc = nn.Sequential(nn.Linear(6**3*256,25),
                                     nn.Sigmoid(),
                                     nn.Dropout(),
-                                    nn.Linear(25,self.out_dim)) 
+                                    nn.Linear(25,self.out_dim),
+                                    nn.Softmax(dim=1)) 
             self.FClayer.append(self.fc)
         
         self.FClayer = nn.ModuleList(self.FClayer) # must store list of multihead fc layer as nn.ModuleList to attach FC layer to cuda
