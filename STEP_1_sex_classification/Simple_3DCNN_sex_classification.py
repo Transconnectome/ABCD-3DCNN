@@ -475,7 +475,6 @@ def experiment(partition,args): #in_channels,out_dim
             ts = time.time()
             net, train_loss, train_acc = train(net,partition,optimizer,criterion,args)
             val_loss, val_acc = validate(net,partition,criterion,args)
-            test_acc = test(net,partition,args)
             te = time.time()
 
             train_losses.append(train_loss)
