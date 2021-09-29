@@ -180,11 +180,11 @@ class CNN3D_1(nn.Module):
         self.maxpool = nn.MaxPool3d(kernel_size=(2,2,2),stride=(2,2,2)) # 두가지 선택지, 1) padding = 0, kernel = 2; 2) padding = 1, kernel = 3
         self.act = nn.ReLU()
 
-        self.classifier = nn.Sequential(nn.Linear(6**3*256,19),
-                                        nn.BatchNorm1d(19),
+        self.classifier = nn.Sequential(nn.Linear(6**3*256,25),
+                                        nn.BatchNorm1d(25),
                                         nn.Sigmoid(),
                                         nn.Dropout(),
-                                        nn.Linear(19,out_dim))
+                                        nn.Linear(25,out_dim))
 
 
     def forward(self,x):
