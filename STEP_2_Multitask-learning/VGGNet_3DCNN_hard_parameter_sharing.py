@@ -563,7 +563,7 @@ def experiment(partition,subject_data,args): #in_channels,out_dim
                 num_target=args.num_target,
                 subject_data=subject_data)
     
-    net = nn.DataParallel(net, device_ids=[1,2,3,4])
+    net = nn.DataParallel(net, device_ids=[0,1,2,3,4,5,6,7])
 
     net.to(f'cuda:{net.device_ids[0]}')
 
@@ -652,8 +652,8 @@ torch.manual_seed(seed)
 
 # Run Experiment and save result
 name_var = 'model_code'
-#list_var = ['VGG11','VGG13','VGG16','VGG19']
-list_var = ['VGG11']
+list_var = ['VGG11','VGG13','VGG16','VGG19']
+
 for var in list_var:
     setattr(args,name_var,var)
     setting, result = experiment(partition, subject_data, deepcopy(args))
