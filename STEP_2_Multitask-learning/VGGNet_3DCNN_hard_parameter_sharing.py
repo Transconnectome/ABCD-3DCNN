@@ -24,7 +24,7 @@ from os import listdir
 from os.path import isfile, join
 import monai
 from monai.data import CSVSaver, ImageDataset, DistributedWeightedRandomSampler
-from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor
+from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, RandFlip, ToTensor
 from monai.utils import set_determinism
 from monai.apps import CrossValidation
 
@@ -139,19 +139,21 @@ def partition(imageFiles_labels,args):
         
     
     resize = args.resize
-    train_transform = Compose([ScaleIntensity(),
+    train_transform = Compose([NormalizeIntensity(),
+                               RandFlip(),
+                               RandRotate90(),
                                AddChannel(),
                                Resize(resize),
                                ToTensor()])
     
-    val_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
-                               Resize(resize),
-                              ToTensor()])
+    val_transform = Compose([NormalizeIntensity(),
+                             AddChannel(),
+                             Resize(resize),
+                             ToTensor()])
     
-    test_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
-                               Resize(resize),
+    test_transform = Compose([NormalizeIntensity(),
+                              AddChannel(),
+                              Resize(resize),
                               ToTensor()])
     
     
