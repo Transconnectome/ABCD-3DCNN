@@ -42,15 +42,25 @@ ABCD release 2.0 T1w data (n_subject = 7088)
 
 ## 결과 
 ### STEP 1. Sex Classification
-#
-<p align="center">
-  <img src="./figures/simple_CNN_results.png" alt="text" width="number"/>
+### Abstract  (300 words)
+ * **Background**  
+Sex differences in human cognition and behaviors originate from the differences of brain structure. Conventional neuroscience studies rarely support a clear-cut sex difference in the human brain. On the stark contrast, recent computational neuroimaging (e.g., convolutional neural networks (CNN)) shows an accurate classification of sex based on the brain anatomical images (e.g., T1-weighted MRI), supporting a strong case for the brain sex differences. Since these studies are based on adults, an important question is the developmental window in which the sex differences in the brain emerge. I.e., can neural networks classify a sex of a preadolescent brain of which the organizational effect of sex steroids have yet to be full blown?
+To test this, we trained multiple neural network architectures to learn sex differences of the brain with T1-weighted brain images in prepubertal children.  
+
+ * **Methods**  
+We used T1w images of 7,088 (male: 3,694, female: 3,356) children ages 9 to 10 from the Adolescent Brain Cognitive Development study. Each image was skull-stripped and spatially normalized to the ICBM pediatric asymmetrical template. The input size of images was resized for (96, 96, 96). We built simple CNN architecture as a baseline model and compared two different CNN architectures: VGGNet-19 and DenseNet-121.
+
+ * **Results**  
+VGGNet-19 outperformed to predict sex (Accuracy=0.94; F1-score=0.95). Baseline model and DesNet-121 also show over 90% accuracy. Of note, our models show a higher accuracy with the smaller samples than the prior CNN studies with adults.
+
+ * **Conclusions**  
+In summary, this study shows CNN can predict sex from T1w images. The results not only support sex differences in brain structure in preadolescent, but also show the capability of CNN to learn latent features from brain images. Considering the important role of sex differences in human, pre-trained CNN models with sex could be utilized for predicting more complex cognition and behavior by transfer learning.
+
+
+
+
   
-  <p align="center">
-   Figure 1. Simple CNN results
-#  
-  
-간단한 CNN의 경우 잘 학습 됨. 적절한 epoch은 100~150. 
+ 
 
 ### STEP 2. Multitask Learning
 
