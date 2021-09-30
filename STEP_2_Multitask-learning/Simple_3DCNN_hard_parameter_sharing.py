@@ -655,5 +655,5 @@ torch.manual_seed(seed)
 
 # Run Experiment and save result
 setting, result = experiment(partition, subject_data, deepcopy(args))
-#save_exp_result(setting,result)
+save_exp_result(setting,result)
 ## ==================================================== ##
