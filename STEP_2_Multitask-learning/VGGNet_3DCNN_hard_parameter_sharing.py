@@ -657,6 +657,6 @@ list_var = ['VGG11','VGG13','VGG16','VGG19']
 for var in list_var:
     setattr(args,name_var,var)
     setting, result = experiment(partition, subject_data, deepcopy(args))
-    #save_exp_result(setting,result)
+    save_exp_result(setting,result)
     torch.cuda.empty_cache()
 ## ==================================================== ##
