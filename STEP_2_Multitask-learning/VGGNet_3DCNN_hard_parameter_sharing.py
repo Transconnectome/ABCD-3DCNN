@@ -261,8 +261,7 @@ class VGG3D(nn.Module):
                                     nn.Linear(4096,25),
                                     nn.ReLU(),
                                     nn.Dropout(),
-                                    nn.Linear(25,self.out_dim),
-                                    nn.Softmax(dim=1))
+                                    nn.Linear(25,self.out_dim))
              
             self.FClayer.append(self.fc)
         
