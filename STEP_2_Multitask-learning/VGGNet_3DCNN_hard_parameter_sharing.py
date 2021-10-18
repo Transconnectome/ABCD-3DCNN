@@ -429,6 +429,7 @@ def train(net,partition,optimizer,args):
     if args.num_target:
         for num_label in args.num_target:
             train_acc[num_label] = train_acc[num_label] / len(trainloader)
+            train_loss[num_label] = train_loss[num_label] / len(trainloader)
 
     
     return net, train_loss, train_acc    
@@ -481,6 +482,7 @@ def validate(net,partition,args):
     if args.num_target:
         for num_label in args.num_target:
             val_acc[num_label] = val_acc[num_label] / len(valloader)
+            val_loss[num_label] = val_loss[num_label] / len(valloader)
 
     return val_loss, val_acc
 
