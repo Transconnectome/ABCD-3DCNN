@@ -335,7 +335,7 @@ def calculating_loss_acc(targets, output, cat_target, num_target, correct, total
                 
         # restoring train loss and accuracy for each task (target variable) 
         loss_dict[num_label] += tmp_loss.item()     # train_loss is for restoring loss from predicting each target variable
-        acc_dict[num_label] += tmp_loss.item() # rsquare for evaluating continuous variable
+        acc_dict[num_label] += tmp_loss.item() # RMSE for evaluating continuous variable
                 
 
     return loss, correct, total, loss_dict,acc_dict 
@@ -367,7 +367,7 @@ def calculating_acc(targets, output, cat_target, num_target, correct, total, acc
 
                 
         # restoring train loss and accuracy for each task (target variable) 
-        acc_dict[num_label] += tmp_loss.item() # rsquare for evaluating continuous variable
+        acc_dict[num_label] += tmp_loss.item() # RMSE for evaluating continuous variable
                 
 
     return correct, total, acc_dict 
@@ -542,14 +542,14 @@ def CLIreporter(target, train_loss, train_acc, val_loss, val_acc):
     var_column = []
     visual_report = {}
     visual_report['Loss (train/val)'] = []
-    visual_report['R2 or ACC (train/val)'] = []
+    visual_report['RMSE or ACC (train/val)'] = []
     for label_name in target:
         var_column.append(label_name)
             
         loss_value = '{:2.2f} / {:2.2f}'.format(train_loss[label_name],val_loss[label_name])
         acc_value = '{:2.2f} / {:2.2f}'.format(train_acc[label_name],val_acc[label_name])
         visual_report['Loss (train/val)'].append(loss_value)
-        visual_report['R2 or ACC (train/val)'].append(acc_value)
+        visual_report['RMSE or ACC (train/val)'].append(acc_value)
     
     print(pd.DataFrame(visual_report, index=var_column))
 
