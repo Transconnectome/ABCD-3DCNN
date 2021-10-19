@@ -326,7 +326,7 @@ def calculating_loss_acc(targets, output, cat_target, num_target, correct, total
                 
         criterion =nn.MSELoss()
                 
-        tmp_loss = torch.sqrt(criterion(tmp_output.float(),y_true.float().unsqueeze(1)))
+        tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
         loss +=tmp_loss
                 #print(tmp_loss)
                 
@@ -359,7 +359,7 @@ def calculating_acc(targets, output, cat_target, num_target, correct, total, acc
                 
         criterion =nn.MSELoss()
                 
-        tmp_loss = torch.sqrt(criterion(tmp_output.float(),y_true.float().unsqueeze(1)))
+        tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
 
 
                 
@@ -542,14 +542,14 @@ def CLIreporter(target, train_loss, train_acc, val_loss, val_acc):
     var_column = []
     visual_report = {}
     visual_report['Loss (train/val)'] = []
-    visual_report['RMSE or ACC (train/val)'] = []
+    visual_report['MSE or ACC (train/val)'] = []
     for label_name in target:
         var_column.append(label_name)
             
         loss_value = '{:2.2f} / {:2.2f}'.format(train_loss[label_name],val_loss[label_name])
         acc_value = '{:2.2f} / {:2.2f}'.format(train_acc[label_name],val_acc[label_name])
         visual_report['Loss (train/val)'].append(loss_value)
-        visual_report['RMSE or ACC (train/val)'].append(acc_value)
+        visual_report['MSE or ACC (train/val)'].append(acc_value)
     
     print(pd.DataFrame(visual_report, index=var_column))
 
