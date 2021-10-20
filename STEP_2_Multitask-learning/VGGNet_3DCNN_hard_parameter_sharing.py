@@ -97,9 +97,11 @@ subject_data = subject_data.reset_index(drop=True) # removing subject have NA va
 
 # defining functinos for data preprocesing categorical variable and numerical variables 
 def preprocessing_cat():
-    if 'sex' in target:
-        for cat in args.cat_target:
-            subject_data[cat] = subject_data[cat] - 1 
+    for cat in args.cat_target:
+        if not 0 in list(subject_data.loc[:,cat]):
+            subject_data[cat] = subject_data[cat] - 1
+        else:
+            continue
 
 def preprocessing_num():
     for num in args.num_target:
