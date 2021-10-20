@@ -77,7 +77,9 @@ image_files = image_files[:100]
 if not args.cat_target:
     args.cat_target = []
 elif not args.num_target:
-     args.num_target = []
+    args.num_target = []
+elif not args.cat_target and args.num_target:
+    raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
 target = args.cat_target + args.num_target
 
