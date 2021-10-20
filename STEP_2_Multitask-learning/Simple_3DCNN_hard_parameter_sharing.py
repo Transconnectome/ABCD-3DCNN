@@ -75,11 +75,11 @@ image_files = image_files[:100]
 
 # getting subject ID and target variables
 if not args.cat_target:
-    target = args.num_target
+    args.cat_target = []
 elif not args.num_target:
-    target = args.cat_target
-else:
-    target = args.cat_target + args.num_target
+     args.num_target = []
+
+target = args.cat_target + args.num_target
 
 col_list = target + ['subjectkey'] 
 
