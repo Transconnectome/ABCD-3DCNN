@@ -45,8 +45,8 @@ parser.add_argument("--lr",default=1e-5,type=float,required=False,help='')
 parser.add_argument("--l2",default=5*1e-4,type=float,required=False,help='')
 parser.add_argument("--epoch",type=int,required=True,help='')
 parser.add_argument("--exp_name",type=str,required=True,help='')
-parser.add_argument("--cat_target", type=str,nargs='*', required=True, help='')
-parser.add_argument("--num_target", type=str,nargs='*', required=True, help='')
+parser.add_argument("--cat_target", type=str,nargs='*', required=False, help='')
+parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
 
 args = parser.parse_args()
 ## ==================================== ##
@@ -73,7 +73,12 @@ image_files = image_files[:100]
 
 
 # getting subject ID and target variables
-target = args.cat_target + args.num_target
+if not args.cat_target:
+    target = args.num_target
+elif not args.num_target:
+    target = args.cat_target
+else:
+    target = args.cat_target + args.num_target
 
 col_list = target + ['subjectkey'] 
 
