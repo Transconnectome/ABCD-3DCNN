@@ -151,7 +151,6 @@ def partition(imageFiles_labels,args):
     
     resize = args.resize
     train_transform = Compose([NormalizeIntensity(),
-                               RandFlip(),
                                RandRotate90(),
                                AddChannel(),
                                Resize(resize),
