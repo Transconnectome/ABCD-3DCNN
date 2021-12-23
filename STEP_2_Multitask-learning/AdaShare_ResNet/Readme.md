@@ -1,3 +1,8 @@
+## 테스트 커맨드  
+  ```{.python} 
+python3 AdaShare_ResNet/AdaShare_ResNet_run.py --model resnet3D50 --train_batch_size 8 --optim Adam --epoch 10 --exp_name AdaShare_test --cat_target sex --num_target age 
+ ```
+  
 ## script flow 
   
 데이터 로딩 
