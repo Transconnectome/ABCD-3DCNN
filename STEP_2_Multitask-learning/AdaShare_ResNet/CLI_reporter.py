@@ -22,7 +22,7 @@ def CLIblockdropping(targets, policys):
     visual_report = {}
 
     for t_id in range(len(targets)):
-        visual_report['blockdropping_%s' % targets[t_id]] = policys[t_id]
+        visual_report['skip layer_%s [yes, no]' % targets[t_id]] = policys[t_id]
 
     print(pd.DataFrame(visual_report))
 ## ============================================ ##
