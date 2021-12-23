@@ -380,7 +380,7 @@ def validate(net,partition,scheduler,input_dict):
 
 
 # define test step
-def test(net,partition,input_dict):
+def test(net,partition,input_dict, args):
     """input_dict['mode'] == fix_policy means that model is on the learning phase. 
     test function is used only in learning phase."""
 
@@ -491,7 +491,6 @@ def experiment_warmup(partition, subject_data, args) -> dict: #in_channels,out_d
 
         # checkpoint saving(only if current model shows better mean validation accuracy across tasks than previous epochs)
         torch.save({'model_state_dict': net.state_dict(),'optimizer_state_dict': optimizer.state_dict()}, str(base_dir+'/checkpoint/AdaShare_ResNet.pt'))            
-        print(net.backbone.module.conv1.weight)
 
     # summarize results
     result = {}
@@ -613,8 +612,11 @@ def save_exp_result(setting, result):
     del setting['test_batch_size']
 
     hash_key = hashlib.sha1(str(setting).encode()).hexdigest()[:6]
-    filename = str(base_dir + '/results/{}-{}.json').format(exp_name, hash_key)
     result.update(setting)
+    if result['curriculum learning'] == 'Warming Up Phase':
+        filename = str(base_dir + '/results/{}-{}_WarmingUp.json').format(exp_name, hash_key)
+    else:
+        filename = str(base_dir + '/results/{}-{}_Learning.json').format(exp_name, hash_key)
 
     with open(filename, 'w') as f:
         json.dump(result, f)
@@ -627,9 +629,12 @@ torch.manual_seed(seed)
 
 # Run wraming up Experiment and save result
 setting, result = experiment_warmup(partition, subject_data,deepcopy(args))
+result['curriculum learning'] = 'Warming Up Phase'
 save_exp_result(setting,result)
+
 print('===================== Warming Up Phase Done ===================== ')
 print('===================== Now We Start Learning Phase ===================== ')
+
 # based on the results from warming up phase, fix policy for block dropping in further learning phase 
 policys = []
 for t_id in range(len(targets)):
@@ -643,4 +648,5 @@ CLIblockdropping(targets, policys.tolist())
 
 
 setting, result = experiment_learning(partition, subject_data, policys, deepcopy(args))
+result['curriculum learning'] = 'Learning Phase'
 save_exp_result(setting,result)
