@@ -632,8 +632,10 @@ torch.manual_seed(seed)
 setting, result = experiment_warmup(partition, subject_data,deepcopy(args))
 save_exp_result(setting,result)
 
-# based on the results from warming up phase, fix policy for block dropping in further learning phase 
+print('===================== Warming Up Phase Done ===================== ')
+print('===================== Now We Start Learning Phase ===================== ')
 
+# based on the results from warming up phase, fix policy for block dropping in further learning phase 
 policys = []
 for t_id in range(len(targets)):
     policy = np.array(result['%s_policy' % targets[t_id]])
