@@ -279,9 +279,7 @@ class MTL(nn.Module):
         for target in self.targets:
             policy = F.gumbel_softmax(getattr(self, 'task%s_logits' % target), temperature, hard=hard_sampling)
             policys.append(policy)
-            #for count in range(len(policy)):
-            #    print('For {}, the possibility of importance of layer {} is {:2f}'.format(target, count+1, policy[count, 1]))
-
+ 
         return policys 
 
     

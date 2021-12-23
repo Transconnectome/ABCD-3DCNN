@@ -138,7 +138,6 @@ def calculating_loss_acc(labels, output, cat_target, num_target, correct, total,
         _, predicted = torch.max(tmp_output.data,1)
         correct[cat_label] += (predicted == label).sum().item()
         total[cat_label] += label.size(0)
-        #print(label.size(0))
 
     for num_label in num_target:
         y_true = labels[num_label]
@@ -149,7 +148,6 @@ def calculating_loss_acc(labels, output, cat_target, num_target, correct, total,
 
         tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
         loss +=tmp_loss
-                #print(tmp_loss)
 
         # restoring train loss and accuracy for each task (target variable)
         loss_dict[num_label] += tmp_loss.item()     # train_loss is for restoring loss from predicting each target variable
@@ -228,8 +226,7 @@ def warmup(net,partition,optimizer,input_dict):
         image, labels = data
         image = image.to(f'cuda:{net.backbone.device_ids[0]}')
         output, policys = net(image, **input_dict)
-        #print(output)
-        #print(policys)
+
         loss, correct, total, train_warmup_loss,train_warmup_acc = calculating_loss_acc(labels, output, args.cat_target, args.num_target, correct, total, train_warmup_loss, train_warmup_acc,net)
 
         scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
@@ -494,7 +491,7 @@ def experiment_warmup(partition, subject_data, args) -> dict: #in_channels,out_d
 
         # checkpoint saving(only if current model shows better mean validation accuracy across tasks than previous epochs)
         torch.save({'model_state_dict': net.state_dict(),'optimizer_state_dict': optimizer.state_dict()}, str(base_dir+'/checkpoint/AdaShare_ResNet.pt'))            
-
+        print(net.backbone.module.conv1.weight)
 
     # summarize results
     result = {}
@@ -540,7 +537,6 @@ def experiment_learning(partition, subject_data, policys, args): #in_channels,ou
 
 
     # load the model on the cuda device
-    #net = nn.DataParallel(net, device_ids=[1])
     net.to(f'cuda:{net.backbone.device_ids[0]}')
 
     # load estimated policys from warmingup phase
@@ -590,6 +586,7 @@ def experiment_learning(partition, subject_data, policys, args): #in_channels,ou
     checkpoint = torch.load(str(base_dir+'/checkpoint/AdaShare_ResNet.pt'))
     net.load_state_dict(checkpoint['model_state_dict'],strict= False)
 
+
     # test
     test_acc = test(net, partition, input_dict_val, args)
 
@@ -631,10 +628,8 @@ torch.manual_seed(seed)
 # Run wraming up Experiment and save result
 setting, result = experiment_warmup(partition, subject_data,deepcopy(args))
 save_exp_result(setting,result)
-
 print('===================== Warming Up Phase Done ===================== ')
 print('===================== Now We Start Learning Phase ===================== ')
-
 # based on the results from warming up phase, fix policy for block dropping in further learning phase 
 policys = []
 for t_id in range(len(targets)):
@@ -645,6 +640,7 @@ for t_id in range(len(targets)):
 policys = torch.from_numpy(np.array(policys))
 
 CLIblockdropping(targets, policys.tolist())
+
 
 setting, result = experiment_learning(partition, subject_data, policys, deepcopy(args))
 save_exp_result(setting,result)
