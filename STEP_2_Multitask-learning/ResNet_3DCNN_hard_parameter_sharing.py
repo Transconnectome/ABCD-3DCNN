@@ -546,7 +546,7 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
             net, train_loss, train_acc = train(net,partition,optimizer,args)
             val_loss, val_acc = validate(net,partition,scheduler,args)
             te = time.time()
-            print('Epoch {}. Took {:2.2f} sec'.format(epoch, te-ts))
+            print('Epoch {}. Current LR {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
             # sorting the results
             for target_name in targets:
@@ -610,7 +610,7 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
             val_loss, val_acc = validate(net,partition,scheduler,args)
             test_acc = test(net,partition,args)
             te = time.time()
-            print('Epoch {}. Took {:2.2f} sec'.format(epoch, te-ts))
+            print('Epoch {}. Current LR {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
             # sorting the results
             for target_name in targets:
@@ -675,7 +675,7 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
             val_loss, val_acc = validate(net,partition,scheduler,args)
             test_acc = test(net,partition,args)
             te = time.time()
-            print('Epoch {}. Took {:2.2f} sec'.format(epoch, te-ts))
+            print('Epoch {}. Current LR {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
             # sorting the results
             for target_name in targets:
@@ -714,7 +714,7 @@ def save_exp_result(setting, result):
     del setting['test_batch_size']
 
     hash_key = hashlib.sha1(str(setting).encode()).hexdigest()[:6]
-    filename = '/scratch/3DCNN/VGGNet_results/{}-{}.json'.format(exp_name, hash_key)
+    filename = '/scratch/3DCNN/ResNet_results/{}-{}.json'.format(exp_name, hash_key)
     result.update(setting)
 
     with open(filename, 'w') as f:
