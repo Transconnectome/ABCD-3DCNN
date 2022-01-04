@@ -566,7 +566,7 @@ def experiment_learning(partition, subject_data, policys, args): #in_channels,ou
         net, train_loss, train_acc = train(net,partition,optimizer,input_dict_train)
         val_loss, val_acc = validate(net,partition,scheduler,input_dict_val)
         te = time.time()
-        print('Epoch {}. Took {:2.2f} sec'.format(epoch, te-ts))
+        print('Epoch {}. Current LR {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
         # sorting the results
         for target_name in targets:
