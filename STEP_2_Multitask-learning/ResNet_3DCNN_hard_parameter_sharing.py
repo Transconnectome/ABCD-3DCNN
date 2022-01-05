@@ -519,9 +519,9 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
         net.to(f'cuda:{net.device_ids[0]}')
 
         if args.optim == 'SGD':
-            optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.5)
+            optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.5)
         elif args.optim == 'Adam':
-            optimizer = optim.Adam(net.parameters(),lr=0.001,weight_decay=args.weight_decay)
+            optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
         else:
             raise ValueError('In-valid optimizer choice')
 
@@ -583,9 +583,9 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
 
 
         if args.optim == 'SGD':
-            optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.5)
+            optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.5)
         elif args.optim == 'Adam':
-            optimizer = optim.Adam(net.parameters(),lr=0.001,weight_decay=0.001)
+            optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
         else:
             raise ValueError('In-valid optimizer choice')
 
@@ -648,9 +648,9 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
 
 
         if args.optim == 'SGD':
-            optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.5)
+            optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.5)
         elif args.optim == 'Adam':
-            optimizer = optim.Adam(net.parameters(),lr=0.001,weight_decay=0.001)
+            optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weigth_decay)
         else:
             raise ValueError('In-valid optimizer choice')
 
