@@ -232,6 +232,7 @@ def train():
         image_files_val = glob.glob('*.npy')
         image_files_val = sorted(image_files_val)
         image_files_val = image_files_val[:30]
+        
 
     if not opt['task']['cat_target'] and opt['task']['num_target']:
         raise ValueError('YOU SHOULD SELECT THE TARGET!')
@@ -274,8 +275,6 @@ def train():
     print('size of training set2: ', len(partition['train2']))
     print('size of validation set: ', len(partition['val']))
 
-    ## ====================================== ##  
-
     warminguploader = DataLoader(partition['train_warmup'],batch_size=opt['data_split']['train_batch_size'], drop_last=True, num_workers=24, shuffle=True)
     trainloader1 = DataLoader(partition['train1'], batch_size=opt['data_split']['train_batch_size'], drop_last=True, num_workers=24, shuffle=True)
     trainloader2 = DataLoader(partition['train2'], batch_size=opt['data_split']['train_batch_size'], drop_last=True, num_workers=24, shuffle=True)
@@ -287,6 +286,7 @@ def train():
     이떄 전환 시점을 알려주는 option이 weight_iter_alternate와 alpha_iter_alternate이다. """
     opt['train']['weight_iter_alternate'] = opt['train'].get('weight_iter_alternate', len(trainloader1))  
     opt['train']['alpha_iter_alternate'] = opt['train'].get('alpha_iter_alternate', len(valloader))
+
 
     # ********************************************************************
     # ********************Create the environment *************************
@@ -364,12 +364,11 @@ def train():
                 print_separator('END WARMING UP PHASE...') 
                 environ.save('warmup', current_iter)
                 environ.fix_alpha()
+                print_separator('START LEARNING PHASE...') 
                 
                 
             # After the warming up phase, learning phase is starting 
             else:
-                print_separator('START LEARNING PHASE...') 
-                
                 if flag_warmup:
                     environ.define_optimizer(policy_learning=True)
                     environ.define_scheduler(True)
@@ -433,8 +432,9 @@ def train():
                     print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
                     # change the flag from 'update_alpha' to 'update_weight'
-                    flag = 'update_weight'
+                    flag = 'update_w'
                     environ.fix_alpha()
+                    environ.free_w(opt['fix_BN'])
                     environ.decay_temperature()
                     print("## ====================== CHANGING THE LEARNING STATUR FROM **update_alpha** to **update_weight** ====================== ##"  )
 
