@@ -6,9 +6,9 @@ policy_model: task-specific
 
 
 paths:
-  log_dir: ../experiments/logs/
-  result_dir: ../experiments/results
-  checkpoint_dir: ../experiments/checkpoints
+  log_dir: /home/ubuntu/3DCNN/AdaShare/experiments/logs/
+  result_dir: /home/ubuntu/3DCNN/AdaShare/experiments/results
+  checkpoint_dir: /home/ubuntu/3DCNN/AdaShare/experiments/checkpoints
 
 dataload:
   dataset: ABCD
