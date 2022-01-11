@@ -329,7 +329,7 @@ def train():
     else:
         raise ValueError('Backbone %s is invalid' % opt['backbone'])
 
-    with tqdm(total = opt['train']['total_iters']):
+    with tqdm(total = opt['train']['total_iters']) as progress_bar:
         while current_iter < opt['train']['total_iters']:
             current_iter += 1
             if current_iter == 1:
@@ -440,6 +440,7 @@ def train():
 
                 else:
                     raise ValueError('flag %s is not recognized' % flag)
+            progress_bar.update(1)
 
 if __name__ == "__main__":
     train()
