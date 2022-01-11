@@ -1,7 +1,7 @@
 # AdaShare: Learning What To Share For Efficient Deep Multi-Task Learning (NeurIPS 2020)
 
 ## Introduction
-![alt text](figures/model.jpg)
+
 
 AdaShare is a **novel** and **differentiable** approach for efficient multi-task
 learning that learns the feature sharing pattern to achieve the best recognition accuracy, while
@@ -23,48 +23,25 @@ Welcome to cite our work if you find it is helpful to your research.
 }
 ```
 
-##  Experiment Environment
 
-Our implementation is in Pytorch. We train and test our model on 1 `Tesla V100` GPU for `NYU v2 2-task`, `CityScapes 2-task` and use 2 `Tesla V100` GPUs for `NYU v2 3-task` and `Tiny-Taskonomy 5-task`. 
-
-We use `python3.6` and  please refer to [this link](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-with-commands) to create a `python3.6` conda environment.
-
-Install the listed packages in the virual environment:
-```
-conda install pytorch torchvision cudatoolkit=10.2 -c pytorch
-conda install matplotlib
-conda install -c menpo opencv
-conda install pillow
-conda install -c conda-forge tqdm
-conda install -c anaconda pyyaml
-conda install scikit-learn
-conda install -c anaconda scipy
-pip install tensorboardX
-```
-
-# Datasets
-Please download the formatted datasets for `NYU v2` [here](https://drive.google.com/file/d/11pWuQXMFBNMIIB4VYMzi9RPE-nMOBU8g/view?usp=sharing) 
-
-The formatted `CityScapes` can be found [here](https://drive.google.com/file/d/1WrVMA_UZpoj7voajf60yIVaS_Ggl0jrH/view?usp=sharing).
-
-Download `Tiny-Taskonomy` as instructed by its [GitHub](https://github.com/StanfordVL/taskonomy/tree/master/data).
-
-The formatted `DomainNet` can be found [here](https://drive.google.com/file/d/1qVtPnKX_iuNXcR3JoP4llxflIUEw880j/view?usp=sharing).
-
-Remember to change the `dataroot` to your local dataset path in all `yaml` files in the `./yamls/`.
 
 # Training
 ## Policy Learning Phase
 Please execute `train.py` for policy learning, using the command 
 ```
-python train.py --config <yaml_file_name> --gpus <gpu ids>
+python3 train.py --config <yaml_file_name> --gpus <gpu ids> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_name <name of experiments>
 ```
-For example, `python train.py --config yamls/adashare/nyu_v2_2task.yml --gpus 0`.
+For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
 
-Sample `yaml` files are under `yamls/adashare`
-
-**Note:** use `domainnet` branch for experiments on DomainNet, i.e. `python train_domainnet.py --config <yaml_file_name> --gpus <gpu ids>`
-
+If you want to do experiments with only categorical target variables or numerical target variables: `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity --exp_name test`  
+or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name test`. 
+  
+If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_name test`  
+or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name test`.  
+  
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
+  
+  
 ## Retrain Phase
 After Policy Learning Phase, we sample 8 different architectures and execute `re-train.py` for retraining.
 ```
