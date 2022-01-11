@@ -105,7 +105,6 @@ class BaseEnv():
         for targets in self.opt['task']['targets']:
             if torch.cuda.is_available():
                 setattr(self,'ground_truth_%s' % targets, batch[1][targets].to(self.device))
-                check = getattr(self,'ground_truth_%s' % targets)
 
 
         """
@@ -189,27 +188,30 @@ class BaseEnv():
 
         if self.opt['task']['cat_target']:
             for cat_target in self.opt['task']['cat_target']:
+                self.losses[cat_target] = {}
                 predicted = getattr(self, '%s_pred' % cat_target)
                 ground_truth = getattr(self, 'ground_truth_%s' % cat_target)
                 loss = self.cross_entropy(predicted.float(), ground_truth.long())
                 
-
                 _, pred_class = torch.max(predicted.data, 1)
                 correct = (pred_class == ground_truth).sum().item()
                 total = ground_truth.size(0)
 
                 self.results[cat_target]['ACC or MSE'] = 100 * correct / total
                 self.results[cat_target]['loss'] = loss
+                self.losses[cat_target]['total'] = loss
+                
         
         if self.opt['task']['num_target']: 
             for num_target in self.opt['task']['num_target']:
+                self.losses[num_target] = {}
                 predicted = getattr(self, '%s_pred' % num_target)
                 groud_truth = getattr(self,'ground_truth_%s' % num_target)
                 loss = self.mse(predicted.float(), groud_truth.float().unsqueeze(1))
                  
                 self.results[num_target]['ACC or MSE'] = loss.item()
                 self.results[num_target]['loss'] = loss
-
+                self.losses[num_target]['total'] = loss
 
     """    
     def get_seg_loss(self, seg_num_class, instance=False):

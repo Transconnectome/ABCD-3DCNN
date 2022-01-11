@@ -319,7 +319,7 @@ class BlockDropEnv(BaseEnv):
 
         loss = 0
         for t_id, task in enumerate(self.tasks):
-            loss += lambdas[t_id] * self.results[task]['total']
+            loss += lambdas[t_id] * self.losses[task]['total']
 
         if self.opt['is_sharing']:
             self.get_hamming_loss()
@@ -339,10 +339,9 @@ class BlockDropEnv(BaseEnv):
         self.optimizers['weights'].zero_grad()
         loss = 0
         for t_id, task in enumerate(self.tasks):
-            loss += lambdas[t_id] * self.results[task]['loss']
+            loss += lambdas[t_id] * self.losses[task]['total']
         self.losses['total'] = {}
         self.losses['total']['total'] = loss
-        print(loss)
         self.losses['total']['total'].backward()
         self.optimizers['weights'].step()
         if 'weights' in self.schedulers.keys():
