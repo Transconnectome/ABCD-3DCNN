@@ -1,4 +1,5 @@
-# AdaShare: Learning What To Share For Efficient Deep Multi-Task Learning (NeurIPS 2020)
+# AdaShare: Learning What To Share For Efficient Deep Multi-Task Learning (NeurIPS 2020) 
+
 
 ## Introduction
 
@@ -23,6 +24,11 @@ Welcome to cite our work if you find it is helpful to your research.
 }
 ```
 
+# Dataset 
+Please split train/val/test image dataset for running this code. 
+This model adopt curriculum learning framework.  
+Thus, the overall workflow is also splitted as  "Policy Learning Phase", "Retraing Phase", and "Test Phase".  
+Thus, for valid data loading process, please split the dataset.
 
 
 # Training
