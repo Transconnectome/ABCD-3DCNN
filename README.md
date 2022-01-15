@@ -42,9 +42,6 @@ ABCD release 2.0 T1w data (n_subject = 7088)
 
 ## 결과 
 ### STEP 1. Sex Classification
-### Paper 
-https://github.com/Transconnectome/ABCD-3DCNN/blob/main/paper/3DCNN_________.pdf 
-
 ### Abstract  (300 words)
  * **Background**  
 Sex differences in human cognition and behaviors originate from the differences of brain structure. Conventional neuroscience studies rarely support a clear-cut sex difference in the human brain. On the stark contrast, recent computational neuroimaging (e.g., convolutional neural networks (CNN)) shows an accurate classification of sex based on the brain anatomical images (e.g., T1-weighted MRI), supporting a strong case for the brain sex differences. Since these studies are based on adults, an important question is the developmental window in which the sex differences in the brain emerge. I.e., can neural networks classify a sex of a preadolescent brain of which the organizational effect of sex steroids have yet to be full blown?
@@ -59,6 +56,8 @@ VGGNet-19 outperformed to predict sex (Accuracy=0.94; F1-score=0.95). Baseline m
  * **Conclusions**  
 In summary, this study shows CNN can predict sex from T1w images. The results not only support sex differences in brain structure in preadolescent, but also show the capability of CNN to learn latent features from brain images. Considering the important role of sex differences in human, pre-trained CNN models with sex could be utilized for predicting more complex cognition and behavior by transfer learning.
 
+### Paper 
+https://github.com/Transconnectome/ABCD-3DCNN/blob/main/paper/3DCNN_________.pdf 
 
 
 
