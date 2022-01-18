@@ -76,10 +76,10 @@ class Deeplab_ResNet_Backbone(nn.Module):
 
         return layers, downsample
 
+
     def forward(self, x, policy=None):
         """In this forward function, the operation is finished at the right before classifiers. 
         Average pooling and flatten are done here."""
-        
         # stem layers
         x = self.conv1(x)
         x = self.bn1(x)
@@ -122,7 +122,7 @@ class MTL(nn.Module):
         # about target label names and the number of targets
         self.cat_target = opt['task']['cat_target']
         self.num_target = opt['task']['num_target']
-        self.targets = opt['task']['targets']
+        self.tasks = opt['task']['targets']
         self.num_tasks = len(opt['task']['tasks_num_class'])
         self.opt = opt
 
@@ -287,7 +287,6 @@ class MTL(nn.Module):
         
         else:
             feats = [self.backbone(img)] * self.num_tasks
-
 
         # Get the output
         outputs = []
