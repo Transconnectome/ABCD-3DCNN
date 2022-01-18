@@ -17,125 +17,11 @@ from dataloaders.data_loading import *
 from envs.blockdrop_env import BlockDropEnv
 
 import torch
-from utils.util import makedir, print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter
+from utils.util import makedir, print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
-"""
-def eval(environ, dataloader, tasks, policy=False, num_train_layers=None, hard_sampling=False, num_seg_cls=-1,
-         eval_iter=10):
-    batch_size = []
-    records = {}
-    val_metrics = {}
-    if 'seg' in tasks:
-        assert (num_seg_cls != -1)
-        records['seg'] = {'mIoUs': [], 'pixelAccs': [],  'errs': [], 'conf_mat': np.zeros((num_seg_cls, num_seg_cls)),
-                          'labels': np.arange(num_seg_cls)}
-    if 'sn' in tasks:
-        records['sn'] = {'cos_similaritys': []}
-    if 'depth' in tasks:
-        records['depth'] = {'abs_errs': [], 'rel_errs': [], 'sq_rel_errs': [], 'ratios': [], 'rms': [], 'rms_log': []}
-    if 'keypoint' in tasks:
-        records['keypoint'] = {'errs': []}
-    if 'edge' in tasks:
-        records['edge'] = {'errs': []}
-
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(dataloader)):
-            #if eval_iter != -1:
-            #    if batch_idx > eval_iter:
-            #        break
-
-            environ.set_inputs(batch)
-            # seg_pred, seg_gt, pixelAcc, cos_similarity = environ.val(policy, num_train_layers, hard_sampling)
-            metrics = environ.val2(policy, num_train_layers, hard_sampling)
-
-            # environ.networks['mtl-net'].task1_logits
-            # mIoUs.append(mIoU)
-            if 'seg' in tasks:
-                new_mat = confusion_matrix(metrics['seg']['gt'], metrics['seg']['pred'], records['seg']['labels'])
-                assert (records['seg']['conf_mat'].shape == new_mat.shape)
-                records['seg']['conf_mat'] += new_mat
-                records['seg']['pixelAccs'].append(metrics['seg']['pixelAcc'])
-                records['seg']['errs'].append(metrics['seg']['err'])
-            if 'sn' in tasks:
-                records['sn']['cos_similaritys'].append(metrics['sn']['cos_similarity'])
-            if 'depth' in tasks:
-                records['depth']['abs_errs'].append(metrics['depth']['abs_err'])
-                records['depth']['rel_errs'].append(metrics['depth']['rel_err'])
-                records['depth']['sq_rel_errs'].append(metrics['depth']['sq_rel_err'])
-                records['depth']['ratios'].append(metrics['depth']['ratio'])
-                records['depth']['rms'].append(metrics['depth']['rms'])
-                records['depth']['rms_log'].append(metrics['depth']['rms_log'])
-            if 'keypoint' in tasks:
-                records['keypoint']['errs'].append(metrics['keypoint']['err'])
-            if 'edge' in tasks:
-                records['edge']['errs'].append(metrics['edge']['err'])
-            batch_size.append(len(batch['img']))
-
-    # overall_mIoU = (np.array(mIoUs) * np.array(batch_size)).sum() / sum(batch_size)
-    if 'seg' in tasks:
-        val_metrics['seg'] = {}
-        jaccard_perclass = []
-        for i in range(num_seg_cls):
-            if not records['seg']['conf_mat'][i, i] == 0:
-                jaccard_perclass.append(records['seg']['conf_mat'][i, i] / (np.sum(records['seg']['conf_mat'][i, :]) +
-                                                                            np.sum(records['seg']['conf_mat'][:, i]) -
-                                                                            records['seg']['conf_mat'][i, i]))
-
-        val_metrics['seg']['mIoU'] = np.sum(jaccard_perclass) / len(jaccard_perclass)
-
-        val_metrics['seg']['Pixel Acc'] = (np.array(records['seg']['pixelAccs']) * np.array(batch_size)).sum() / sum(
-            batch_size)
-
-        val_metrics['seg']['err'] = (np.array(records['seg']['errs']) * np.array(batch_size)).sum() / sum(batch_size)
-
-    if 'sn' in tasks:
-        val_metrics['sn'] = {}
-        overall_cos = np.clip(np.concatenate(records['sn']['cos_similaritys']), -1, 1)
-
-        angles = np.arccos(overall_cos) / np.pi * 180.0
-        val_metrics['sn']['cosine_similarity'] = overall_cos.mean()
-        val_metrics['sn']['Angle Mean'] = np.mean(angles)
-        val_metrics['sn']['Angle Median'] = np.median(angles)
-        val_metrics['sn']['Angle RMSE'] = np.sqrt(np.mean(angles ** 2))
-        val_metrics['sn']['Angle 11.25'] = np.mean(np.less_equal(angles, 11.25)) * 100
-        val_metrics['sn']['Angle 22.5'] = np.mean(np.less_equal(angles, 22.5)) * 100
-        val_metrics['sn']['Angle 30'] = np.mean(np.less_equal(angles, 30.0)) * 100
-        val_metrics['sn']['Angle 45'] = np.mean(np.less_equal(angles, 45.0)) * 100
-
-    if 'depth' in tasks:
-        val_metrics['depth'] = {}
-        records['depth']['abs_errs'] = np.stack(records['depth']['abs_errs'], axis=0)
-        records['depth']['rel_errs'] = np.stack(records['depth']['rel_errs'], axis=0)
-        records['depth']['sq_rel_errs'] = np.stack(records['depth']['sq_rel_errs'], axis=0)
-        records['depth']['ratios'] = np.concatenate(records['depth']['ratios'], axis=0)
-        records['depth']['rms'] = np.concatenate(records['depth']['rms'], axis=0)
-        records['depth']['rms_log'] = np.concatenate(records['depth']['rms_log'], axis=0)
-        records['depth']['rms_log'] = records['depth']['rms_log'][~np.isnan(records['depth']['rms_log'])]
-        val_metrics['depth']['abs_err'] = (records['depth']['abs_errs'] * np.array(batch_size)).sum() / sum(batch_size)
-        val_metrics['depth']['rel_err'] = (records['depth']['rel_errs'] * np.array(batch_size)).sum() / sum(batch_size)
-        val_metrics['depth']['sq_rel_err'] = (records['depth']['sq_rel_errs'] * np.array(batch_size)).sum() / sum(
-            batch_size)
-        val_metrics['depth']['sigma_1.25'] = np.mean(np.less_equal(records['depth']['ratios'], 1.25)) * 100
-        val_metrics['depth']['sigma_1.25^2'] = np.mean(np.less_equal(records['depth']['ratios'], 1.25 ** 2)) * 100
-        val_metrics['depth']['sigma_1.25^3'] = np.mean(np.less_equal(records['depth']['ratios'], 1.25 ** 3)) * 100
-        val_metrics['depth']['rms'] = (np.sum(records['depth']['rms']) / len(records['depth']['rms'])) ** 0.5
-        # val_metrics['depth']['rms_log'] = (np.sum(records['depth']['rms_log']) / len(records['depth']['rms_log'])) ** 0.5
-
-    if 'keypoint' in tasks:
-        val_metrics['keypoint'] = {}
-        val_metrics['keypoint']['err'] = (np.array(records['keypoint']['errs']) * np.array(batch_size)).sum() / sum(
-            batch_size)
-
-    if 'edge' in tasks:
-        val_metrics['edge'] = {}
-        val_metrics['edge']['err'] = (np.array(records['edge']['errs']) * np.array(batch_size)).sum() / sum(
-            batch_size)
-
-    return val_metrics
-"""
 
 def train_and_eval_iter(environ, trainloader, valloader, current_iter, results_iter, optimizing_opt, opt):
     environ.train()
@@ -162,10 +48,6 @@ def train_and_eval_iter(environ, trainloader, valloader, current_iter, results_i
     environ.eval()
     with torch.no_grad():
         for batch_idx, batch in enumerate(valloader):
-            #if eval_iter != -1:
-            #    if batch_idx > eval_iter:
-            #        break
-
             environ.set_inputs(batch)
             environ.val(policy=False, num_train_layers=None, hard_sampling=False)
 
@@ -237,8 +119,8 @@ def train():
     if not opt['task']['cat_target'] and opt['task']['num_target']:
         raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
-    targets = opt['task']['targets']
-    col_list = targets + ['subjectkey']
+    tasks = opt['task']['targets']
+    col_list = tasks + ['subjectkey']
 
     ### get subject ID and target variables
     subject_data = pd.read_csv(opt['dataload']['label_dataroot'])
@@ -316,18 +198,21 @@ def train():
     environ.fix_alpha()
     environ.free_w(opt['fix_BN'])
     
-    best_value, best_iter = 0, 0
-    best_metrics = None
+    # setting the values for comparing results per epoch and the bset results
+    best_value = {}
+    best_iter = 0.0
+    if opt['task']['cat_target']:
+        for cat_target in opt['task']['cat_target']:
+            best_value[cat_target] = 0.0       # best_value[cat_target] is compared to the validation Accuracy  
+    if opt['task']['num_target']:
+        for num_target in opt['task']['num_target']:
+            best_value[num_target] = 100000.0       # best_value[num_target] is compared to the validation MSE Loss. This value should be set according to its cases
+
+    #best_value, best_iter = 0, 0
+    #best_metrics = None
+
     p_epoch = 0
     flag_warmup = True
-    if opt['backbone'] == 'ResNet50':
-        num_blocks = 18
-    elif opt['backbone'] == 'ResNet101':
-        num_blocks = 33
-    elif opt['backbone'] == 'ResNet152':
-        num_blocks = 50
-    else:
-        raise ValueError('Backbone %s is invalid' % opt['backbone'])
 
     with tqdm(total = opt['train']['total_iters']) as progress_bar:
         while current_iter < opt['train']['total_iters']:
@@ -354,9 +239,11 @@ def train():
                 optimizing_opt['num_train_layers'] = None
                 optimizing_opt['hard_sampling'] = False
 
+                # Training
                 results_iter, time= train_and_eval_iter(environ=environ, trainloader=warminguploader, valloader=valloader,current_iter=current_iter, results_iter=results_iter, optimizing_opt=optimizing_opt, opt=opt)
 
-                # summarizing and report results per epoch 
+                # summarizing and report results per epoch
+                results_iter = summarizing_results(results_iter, opt) 
                 CLIreporter(results_iter, opt)
                 print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
@@ -390,10 +277,12 @@ def train():
                     optimizing_opt['flag'] = flag
                     optimizing_opt['num_train_layers'] = num_train_layers
                     optimizing_opt['hard_sampling'] = opt['train']['hard_sampling']
-
+                    
+                    # Training
                     results_iter, time = train_and_eval_iter(environ=environ, trainloader=trainloader1, valloader=valloader, current_iter=current_iter, results_iter=results_iter, optimizing_opt=optimizing_opt, opt=opt)
                     
                     # summarizing and report results per epoch 
+                    results_iter = summarizing_results(results_iter, opt)
                     CLIreporter(results_iter, opt)
                     print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
@@ -401,6 +290,29 @@ def train():
                     flag = 'update_alpha'
                     environ.fix_w()
                     environ.free_alpha()
+
+                    # comparing the current results to best results. If current results are bettter than the best results, then saving the best model 
+                    best_checkpoints_vote = 0
+                    if opt['task']['cat_target']:
+                        for cat_target in opt['task']['cat_target']:
+                            if results_iter[cat_target]['val']['ACC or MSE'] >= best_value[cat_target]:
+                                print(results_iter[cat_target]['val']['ACC or MSE'])
+                                best_checkpoints_vote += 1
+                                best_value[cat_target] = results_iter[cat_target]['val']['ACC or MSE']
+                    if opt['task']['num_target']:
+                        for num_target in opt['task']['num_target']:
+                            if results_iter[num_target]['val']['ACC or MSE'] <= best_value[num_target]:
+                                print(results_iter[num_target]['val']['ACC or MSE'])
+                                best_checkpoints_vote += 1      
+                                best_value[num_target] = results_iter[num_target]['val']['ACC or MSE']
+                    
+
+                    if best_checkpoints_vote == len(opt['task']['targets']):
+                        best_iter = current_iter
+                        environ.save('best', current_iter)
+                        print("Best iteration from now on is %d" % best_iter)
+
+
                     print("## ====================== CHANGING THE LEARNING STATUR FROM **update_weigth** to **update_alpha** ====================== ##"  )
 
                 # update the policy network
@@ -420,6 +332,7 @@ def train():
                     optimizing_opt['num_train_layers'] = num_train_layers
                     optimizing_opt['hard_sampling'] = opt['train']['hard_sampling']
 
+                    # Training
                     results_iter, time = train_and_eval_iter(environ=environ, trainloader=trainloader2, valloader=valloader, current_iter=current_iter, results_iter=results_iter, optimizing_opt=optimizing_opt, opt=opt)
                     
                     # print the distribution
@@ -428,6 +341,7 @@ def train():
                     p_epoch += 1
 
                     # summarizing and report results per epoch 
+                    results_iter = summarizing_results(results_iter, opt)
                     CLIreporter(results_iter, opt)
                     print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
