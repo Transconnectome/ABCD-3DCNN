@@ -78,12 +78,12 @@ def _train(exp_id, opt, gpu_ids):
         os.chdir(opt['dataload']['img_dataroot_train'])
         image_files_train = glob.glob('*.npy')
         image_files_train = sorted(image_files_train)
-        image_files_train = image_files_train[:30]
+        #image_files_train = image_files_train[:30]
 
         os.chdir(opt['dataload']['img_dataroot_val'])
         image_files_val = glob.glob('*.npy')
         image_files_val = sorted(image_files_val)
-        image_files_val = image_files_val[:30]
+        #image_files_val = image_files_val[:30]
 
     if not opt['task']['cat_target'] and opt['task']['num_target']:
         raise ValueError('YOU SHOULD SELECT THE TARGET!')

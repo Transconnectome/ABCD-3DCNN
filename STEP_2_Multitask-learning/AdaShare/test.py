@@ -65,7 +65,7 @@ def test():
         os.chdir(opt['dataload']['img_dataroot_test'])
         image_files_test = glob.glob('*.npy')
         image_files_test = sorted(image_files_test)
-        image_files_test = image_files_test[:30]
+        #image_files_test = image_files_test[:30]
 
     if not opt['task']['cat_target'] and opt['task']['num_target']:
         raise ValueError('YOU SHOULD SELECT THE TARGET!')
