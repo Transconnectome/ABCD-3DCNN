@@ -56,8 +56,6 @@ class Initializer:
 
         model.apply(weights_init)
 
-# ********************************************************************************
-
 
 def print_separator(text, total_len=50):
     print('#' * total_len)
@@ -88,7 +86,7 @@ def read_yaml():
     # read in yaml
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=str, help="Path for the config file")
-    parser.add_argument("--exp_name",type=str,required=True,help='')
+    parser.add_argument("--exp_ids", type=int, nargs='+', default=[0], help="Path for the config file")
     parser.add_argument("--gpus", type=int, nargs='+', default=[0], help="Path for the config file")
 
     parser.add_argument("--cat_target", type=str, nargs='*', required=True, help='')
@@ -129,7 +127,7 @@ def read_yaml():
 
     opt['data_augmentation']['resize'] = args.resize
 
-    return opt, args.gpus, args.exp_name
+    return opt, args.gpus, args.exp_ids
 
 
 def fix_random_seed(seed):
@@ -156,43 +154,80 @@ def parse_config():
     return opt, gpu_ids
 
 
-def CLIreporter(results, opt):
+def summarizing_results(results, opt, test = False):
     # summarizing 
-    if opt['task']['cat_target']:
-        for cat_target in opt['task']['cat_target']:
-            results[cat_target]['train']['loss'] = np.mean(results[cat_target]['train']['loss'])
-            results[cat_target]['train']['ACC or MSE'] = np.mean(results[cat_target]['train']['ACC or MSE']) 
-            results[cat_target]['val']['loss'] = np.mean(results[cat_target]['val']['loss'])           
-            results[cat_target]['val']['ACC or MSE'] = np.mean(results[cat_target]['val']['ACC or MSE'])
-           
-    if opt['task']['num_target']:
-        for num_target in opt['task']['num_target']:
-            results[num_target]['train']['loss'] = np.mean(results[num_target]['train']['loss'])
-            results[num_target]['train']['ACC or MSE'] = np.mean(results[num_target]['train']['ACC or MSE'])
-            results[num_target]['val']['loss'] = np.mean(results[num_target]['val']['loss'])
-            results[num_target]['val']['ACC or MSE'] =  np.mean(results[num_target]['val']['ACC or MSE'])
+    if test:
+        if opt['task']['cat_target']:
+            for cat_target in opt['task']['cat_target']:
+                results[cat_target]['test']['loss'] = np.mean(results[cat_target]['test']['loss'])
+                results[cat_target]['test']['ACC or MSE'] = np.mean(results[cat_target]['test']['ACC or MSE']) 
 
-    '''command line interface reporter per every epoch during experiments'''
-    var_column = []
-    visual_report = {}
-    visual_report['Loss (train/val)'] = []
-    visual_report['MSE or ACC (train/val)'] = []
-
-    if opt['task']['cat_target']:
-        for cat_target in opt['task']['cat_target']:
-            var_column.append(cat_target)
-            loss_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['loss'],results[cat_target]['val']['loss'])
-            acc_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['ACC or MSE'],results[cat_target]['val']['ACC or MSE'])
-            visual_report['Loss (train/val)'].append(loss_value)
-            visual_report['MSE or ACC (train/val)'].append(acc_value)
-    
-    if opt['task']['num_target']:
-        for num_target in opt['task']['num_target']:
+        if opt['task']['num_target']:
+            for num_target in opt['task']['num_target']:
+                results[num_target]['test']['loss'] = np.mean(results[num_target]['test']['loss'])
+                results[num_target]['test']['ACC or MSE'] = np.mean(results[num_target]['test']['ACC or MSE'])
+    else:
+        if opt['task']['cat_target']:
+            for cat_target in opt['task']['cat_target']:
+                results[cat_target]['train']['loss'] = np.mean(results[cat_target]['train']['loss'])
+                results[cat_target]['train']['ACC or MSE'] = np.mean(results[cat_target]['train']['ACC or MSE']) 
+                results[cat_target]['val']['loss'] = np.mean(results[cat_target]['val']['loss'])           
+                results[cat_target]['val']['ACC or MSE'] = np.mean(results[cat_target]['val']['ACC or MSE'])
             
-            var_column.append(num_target)
-            loss_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['loss'],results[num_target]['val']['loss'])           
-            acc_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['ACC or MSE'],results[num_target]['val']['ACC or MSE'])
-            visual_report['Loss (train/val)'].append(loss_value)
-            visual_report['MSE or ACC (train/val)'].append(acc_value)
+        if opt['task']['num_target']:
+            for num_target in opt['task']['num_target']:
+                results[num_target]['train']['loss'] = np.mean(results[num_target]['train']['loss'])
+                results[num_target]['train']['ACC or MSE'] = np.mean(results[num_target]['train']['ACC or MSE'])
+                results[num_target]['val']['loss'] = np.mean(results[num_target]['val']['loss'])
+                results[num_target]['val']['ACC or MSE'] =  np.mean(results[num_target]['val']['ACC or MSE'])
+
+    return results
+
+
+def CLIreporter(results, opt, test= False):
+    '''command line interface reporter per every epoch during experiments'''
+    if test:
+        var_column = []
+        visual_report = {}
+        visual_report['Loss'] = []
+        visual_report['MSE or ACC'] = []
+
+        if opt['task']['cat_target']:
+            for cat_target in opt['task']['cat_target']:
+                var_column.append(cat_target)
+                loss_value = '{:2.2f}'.format(results[cat_target]['test']['loss'])
+                acc_value = '{:2.2f}'.format(results[cat_target]['test']['ACC or MSE'])
+                visual_report['Loss'].append(loss_value)
+                visual_report['MSE or ACC'].append(acc_value)
+        
+        if opt['task']['num_target']:
+            for num_target in opt['task']['num_target']:
+                var_column.append(num_target)
+                loss_value = '{:2.2f}'.format(results[cat_target]['test']['loss'])
+                acc_value = '{:2.2f}'.format(results[cat_target]['test']['ACC or MSE'])                
+                visual_report['Loss'].append(loss_value)
+                visual_report['MSE or ACC'].append(acc_value)
+
+    else:
+        var_column = []
+        visual_report = {}
+        visual_report['Loss (train/val)'] = []
+        visual_report['MSE or ACC (train/val)'] = []
+
+        if opt['task']['cat_target']:
+            for cat_target in opt['task']['cat_target']:
+                var_column.append(cat_target)
+                loss_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['loss'],results[cat_target]['val']['loss'])
+                acc_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['ACC or MSE'],results[cat_target]['val']['ACC or MSE'])
+                visual_report['Loss (train/val)'].append(loss_value)
+                visual_report['MSE or ACC (train/val)'].append(acc_value)
+        
+        if opt['task']['num_target']:
+            for num_target in opt['task']['num_target']:
+                var_column.append(num_target)
+                loss_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['loss'],results[num_target]['val']['loss'])           
+                acc_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['ACC or MSE'],results[num_target]['val']['ACC or MSE'])
+                visual_report['Loss (train/val)'].append(loss_value)
+                visual_report['MSE or ACC (train/val)'].append(acc_value)
 
     print(pd.DataFrame(visual_report, index=var_column))
