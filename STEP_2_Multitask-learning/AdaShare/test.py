@@ -104,29 +104,7 @@ def test():
     print('size of test set: ', len(partition['test']))
 
     testloader = DataLoader(partition['test'], batch_size=opt['data_split']['train_batch_size'], drop_last=True, num_workers=24, shuffle=True)
-    
-    """
-    # ********************************************************************
-    # ******************** Prepare the dataloaders ***********************
-    # ********************************************************************
-    # load the dataloader
-    print_separator('CREATE DATALOADERS')
-    opt_tmp = opt if opt['policy_model'] == 'instance-specific' else None
-    if opt['dataload']['dataset'] == 'NYU_v2':
-        valset = NYU_v2(opt['dataload']['dataroot'], 'test', opt=opt_tmp)
-    elif opt['dataload']['dataset'] == 'CityScapes':
-        num_seg_class = opt['tasks_num_class'][opt['tasks'].index('seg')] if 'seg' in opt['tasks'] else -1
-        valset = CityScapes(opt['dataload']['dataroot'], 'test', num_class=num_seg_class,
-                            small_res=opt['dataload']['small_res'], opt=opt_tmp)
-    elif opt['dataload']['dataset'] == 'Taskonomy':
-        valset = Taskonomy(opt['dataload']['dataroot'], 'test')
-    else:
-        raise NotImplementedError('Dataset %s is not implemented' % opt['dataload']['dataset'])
 
-    print('size of validation set: ', len(valset))
-
-    val_loader = DataLoader(valset, batch_size=1, drop_last=True, num_workers=2, shuffle=False)
-    """
 
     # ********************************************************************
     # ********************Create the environment *************************
