@@ -102,9 +102,9 @@ class BaseEnv():
         if torch.cuda.is_available():
             self.img = self.img.to(self.device)
 
-        for targets in self.opt['task']['targets']:
+        for tasks in self.opt['task']['targets']:
             if torch.cuda.is_available():
-                setattr(self,'ground_truth_%s' % targets, batch[1][targets].to(self.device))
+                setattr(self,'ground_truth_%s' % tasks, batch[1][tasks].to(self.device))
 
 
         """

@@ -33,8 +33,8 @@ class BlockDropEnv(BaseEnv):
         super(BlockDropEnv, self).__init__(log_dir, checkpoint_dir, exp_name, tasks_num_class, device,
                                            is_train, opt)
 
-    # ##################### define networks / optimizers / losses ####################################
 
+    # ##################### define networks / optimizers / losses ####################################
     def define_networks(self, tasks_num_class):
         # construct a deeplab resnet 101
         if self.opt['backbone'].startswith('ResNet'):
@@ -53,14 +53,12 @@ class BlockDropEnv(BaseEnv):
 
             if self.opt['policy_model'] == 'task-specific':
                 self.networks['mtl-net'] = MTL(block, layers, init_method, self.init_neg_logits, self.opt)
-            #elif self.opt['policy_model'] == 'instance-specific':
-            #    self.networks['mtl-net'] = MTL_Instance(block, layers, tasks_num_class, init_method, self.init_neg_logits, self.opt['skip_layer'])
-
             else:
                 raise ValueError('Policy Model = %s is not supported' % self.opt['policy_model'])
 
         else:
             raise NotImplementedError('backbone %s is not implemented' % self.opt['backbone'])
+
 
     def get_task_specific_parameters(self):
         if isinstance(self.networks['mtl-net'], nn.DataParallel):
@@ -70,6 +68,7 @@ class BlockDropEnv(BaseEnv):
 
         return task_specific_params
 
+
     def get_arch_parameters(self):
         if isinstance(self.networks['mtl-net'], nn.DataParallel):
             arch_parameters = self.networks['mtl-net'].module.arch_parameters()
@@ -78,6 +77,7 @@ class BlockDropEnv(BaseEnv):
 
         return arch_parameters
 
+
     def get_network_parameters(self):
         if isinstance(self.networks['mtl-net'], nn.DataParallel):
             network_parameters = self.networks['mtl-net'].module.network_parameters()
@@ -85,12 +85,14 @@ class BlockDropEnv(BaseEnv):
             network_parameters = self.networks['mtl-net'].network_parameters()
         return network_parameters
 
+
     def get_backbone_parameters(self):
         if isinstance(self.networks['mtl-net'], nn.DataParallel):
             backbone_parameters = self.networks['mtl-net'].module.backbone_parameters()
         else:
             backbone_parameters = self.networks['mtl-net'].backbone_parameters()
         return backbone_parameters
+
 
     def define_optimizer(self, policy_learning=False):
         task_specific_params = self.get_task_specific_parameters()
@@ -111,6 +113,7 @@ class BlockDropEnv(BaseEnv):
             self.optimizers['alphas'] = optim.Adam(arch_parameters, lr=self.opt['train']['policy_lr'], weight_decay=5*self.opt['train']['weight_decay'])
         else:
             self.optimizers['alphas'] = optim.Adam(arch_parameters, lr=0.01, weight_decay=5*self.opt['train']['weight_decay'])
+
 
     def define_scheduler(self, policy_learning=False):
         if policy_learning:
@@ -136,15 +139,14 @@ class BlockDropEnv(BaseEnv):
             self.temp *= decay_ratio
         print("Change temperature from %.5f to %.5f" % (tmp, self.temp))
 
+
     def sample_policy(self, hard_sampling):
-        # dist1, dist2 = self.get_policy_prob()
-        # print(np.concatenate((dist1, dist2), axis=-1))
         policys = self.networks['mtl-net'].test_sample_policy(hard_sampling)
         for t_id, p in enumerate(policys):
             setattr(self, 'policy%d' % (t_id+1), p)
 
+
     def optimize(self, lambdas, is_policy=False, flag='update_w', num_train_layers=None, hard_sampling=False):
-        # print('num_train_layers in optimize = ', num_train_layers)
         self.forward(is_policy, num_train_layers, hard_sampling)
         self.calculating_loss_acc()
 
@@ -155,19 +157,10 @@ class BlockDropEnv(BaseEnv):
         else:
             raise NotImplementedError('Training flag %s is not implemented' % flag)
 
+
     def optimize_fix_policy(self, lambdas, num_train_layer=None):
         self.forward_fix_policy(num_train_layer)
-        if 'seg' in self.tasks:
-            seg_num_class = self.tasks_num_class[self.tasks.index('seg')]
-            self.get_seg_loss(seg_num_class)
-        if 'sn' in self.tasks:
-            self.get_sn_loss()
-        if 'depth' in self.tasks:
-            self.get_depth_loss()
-        if 'keypoint' in self.tasks:
-            self.get_keypoint_loss()
-        if 'edge' in self.tasks:
-            self.get_edge_loss()
+        self.calculating_loss_acc()
         self.backward_network(lambdas)
 
 
@@ -180,39 +173,9 @@ class BlockDropEnv(BaseEnv):
 
 
     def val_fix_policy(self, num_train_layers=None):
-        metrics = {}
         self.forward_fix_policy(num_train_layers)
-        self.resize_results()
-        if 'seg' in self.tasks:
-            metrics['seg'] = {}
-            seg_num_class = self.tasks_num_class[self.tasks.index('seg')]
-            pred, gt, pixelAcc, err = self.seg_error(seg_num_class)
-            metrics['seg']['pred'] = pred
-            metrics['seg']['gt'] = gt
-            metrics['seg']['pixelAcc'] = pixelAcc.cpu().numpy()
-            metrics['seg']['err'] = err
-        if 'sn' in self.tasks:
-            metrics['sn'] = {}
-            cos_similarity = self.normal_error()
-            metrics['sn']['cos_similarity'] = cos_similarity
-        if 'depth' in self.tasks:
-            metrics['depth'] = {}
-            abs_err, rel_err, sq_rel_err, ratio, rms, rms_log = self.depth_error()
-            metrics['depth']['abs_err'] = abs_err
-            metrics['depth']['rel_err'] = rel_err
-            metrics['depth']['sq_rel_err'] = sq_rel_err
-            metrics['depth']['ratio'] = ratio
-            metrics['depth']['rms'] = rms
-            metrics['depth']['rms_log'] = rms_log
-        if 'keypoint' in self.tasks:
-            metrics['keypoint'] = {}
-            err = self.keypoint_error()
-            metrics['keypoint']['err'] = err
-        if 'edge' in self.tasks:
-            metrics['edge'] = {}
-            err = self.edge_error()
-            metrics['edge']['err'] = err
-        return metrics
+        self.calculating_loss_acc()
+
 
     def forward(self, is_policy, num_train_layers, hard_sampling):
         outputs, policys, logits = self.networks['mtl-net'](self.img, self.temp, is_policy, num_train_layers=num_train_layers,
@@ -222,6 +185,7 @@ class BlockDropEnv(BaseEnv):
             setattr(self, 'policy%s' % task, policys[t_id])
             setattr(self, 'logit%s' % task, logits[t_id])
 
+
     def forward_eval(self, num_train_layers, hard_sampling):
         outputs,policys, logits = self.networks['mtl-net'](self.img, self.temp, True, num_train_layers=num_train_layers,
                                               hard_sampling=hard_sampling,  mode='eval')
@@ -230,22 +194,16 @@ class BlockDropEnv(BaseEnv):
             setattr(self, 'policy%s' % task, policys[t_id])
             setattr(self, 'logit%s' % task, logits[t_id])
 
-    def forward_fix_policy(self, num_train_layers):
-        if self.opt['policy_model'] == 'instance-specific':
-            policys = []
-            for task in self.opt['tasks']:
-                policys.append(getattr(self, '%s_policy' % task))
 
-            outputs, _, _ = self.networks['mtl-net'](self.img, self.temp, True, policys=policys, num_train_layers=num_train_layers,
-                                                  mode='fix_policy')
-        elif self.opt['policy_model'] == 'task-specific':
+    def forward_fix_policy(self, num_train_layers):
+        if self.opt['policy_model'] == 'task-specific':
             outputs, _, _ = self.networks['mtl-net'](self.img, self.temp, True,  num_train_layers=num_train_layers,
                                                      mode='fix_policy')
         else:
             raise ValueError('policy model = %s is not supported' % self.opt['policy_model'])
-
-        for t_id, task in enumerate(self.tasks):
+        for t_id,  task in enumerate(self.tasks):
             setattr(self, '%s_pred' % task, outputs[t_id])
+
 
     def get_sparsity_loss(self, num_train_layers):
         self.losses['sparsity'] = {}
