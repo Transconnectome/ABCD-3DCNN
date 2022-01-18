@@ -1,4 +1,5 @@
 exp_name: ABCD_multitask
+root_dir:
 seed: [12]
 backbone: ResNet50
 lambdas: [1, 20]
@@ -14,6 +15,7 @@ dataload:
   dataset: ABCD
   img_dataroot_train: /home/ubuntu/HEEHWAN/preprocessed_masked/
   img_dataroot_val: /home/ubuntu/HEEHWAN/preprocessed_masked/
+  img_dataroot_test: /home/ubuntu/HEEHWAN/preprocessed_masked/ 
   label_dataroot: /home/ubuntu/HEEHWAN/ABCD_phenotype_total.csv
 
 task:
@@ -42,8 +44,8 @@ diff_sparsity_weights: True
 retrain_from_pl: False
 
 train:
-  total_iters: 20000
-  warm_up_iters: 4000
+  total_iters: 5
+  warm_up_iters: 2
   lr: 0.001
   policy_lr: 0.01
   backbone_lr: 0.001
