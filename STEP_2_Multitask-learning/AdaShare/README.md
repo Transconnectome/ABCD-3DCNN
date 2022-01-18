@@ -62,9 +62,9 @@ For example, `python re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --exp
 # Test/Inference
 After Retraining Phase, execute `test.py` for get the quantitative results on the test set. 
 ```
-python test.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_name <name of experiments>
+python test.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id> --cat_target <categorical target variable> --num_target <numerical target variable>
 ```
-For example, `python test.py --config yamls/adashare/ABCD.yml --gpus 0 --exp_ids 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
+For example, `python test.py --config yamls/adashare/ABCD.yml --gpus 0 --exp_ids 0 --cat_target sex race.ethnicity --num_target age BMI`.
 
 
 
