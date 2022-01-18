@@ -23,23 +23,27 @@ Welcome to cite our work if you find it is helpful to your research.
 }
 ```
 
-
+# Dataset 
+Please split train/val/test image dataset for running this code. 
+This model adopt curriculum learning framework.  
+Thus, the overall workflow is also splitted as  "Policy Learning Phase", "Retraing Phase", and "Test Phase".  
+Thus, for valid data loading process, please split the dataset.
 
 # Training
 ## Policy Learning Phase
 Please execute `train.py` for policy learning, using the command 
 ```
-python3 train.py --config <yaml_file_name> --gpus <gpu ids> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_name <name of experiments>
+python3 train.py --config <yaml_file_name> --gpus <gpu ids> --cat_target <categorical target variable> --num_target <numerical target variable> 
 ```
-For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
+For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI`.
 
-If you want to do experiments with only categorical target variables or numerical target variables: `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity --exp_name test`  
-or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name test`. 
+If you want to do experiments with only categorical target variables or numerical target variables: `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
+or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI`. 
   
-If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_name test`  
-or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name test`.  
+If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex `  
+or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age `.  
   
-If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI `.
   
   
 ## Retrain Phase
@@ -49,9 +53,17 @@ python re-train.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random 
 ```
 where we use different `--exp_ids` to specify different random seeds and generate different architectures. The best performance of all 8 runs is reported in the paper.
 
-For example, `python re-train.py --config yamls/adashare/nyu_v2_2task.yml --gpus 0 --exp_ids 0`. 
+For example, `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
 
-**Note:** use `domainnet` branch for experiments on DomainNet, i.e. `python re-train_domainnet.py --config <yaml_file_name> --gpus <gpu ids>`
+If you want to do experiments with only categorical target variables or numerical target variables: `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
+or  `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_ids 0 1 2 3`. 
+  
+If you want to do single task learning, just type one variable :  `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_ids 0 1 2 3`  
+or ` python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_ids 0 1 2 3`.  
+  
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
+
+
 
 
 # Test/Inference
@@ -59,33 +71,17 @@ After Retraining Phase, execute `test.py` for get the quantitative results on th
 ```
 python test.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id>
 ```
-For example, `python test.py --config yamls/adashare/nyu_v2_2task.yml --gpus 0 --exp_ids 0`.
 
-We provide our trained checkpoints as follows:
-1. Please download  [our model in NYU v2 2-Task Learning](https://drive.google.com/file/d/1f49uFxHg9W5A3-s96f--QxQKrG1MABBw/view?usp=sharing)
-2. Please donwload [our model in CityScapes 2-Task Learning](https://drive.google.com/file/d/1x0g8aOQ-esFXIGhoIKeegcl14zf45Ew_/view?usp=sharing)
-3. Please download  [our model in NYU v2 3-Task Learning](https://drive.google.com/file/d/1ERfBiDf36rv0wJkb4BlE8w13IDuamcQ-/view?usp=sharing)
+For example, `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
 
-To use these provided checkpoints, please download them to `../experiments/checkpoints/` and uncompress there. Use the following command to test
-```
-python test.py --config yamls/adashare/nyu_v2_2task_test.yml --gpus 0 --exp_ids 0
-python test.py --config yamls/adashare/cityscapes_2task_test.yml --gpus 0 --exp_ids 0
-python test.py --config yamls/adashare/nyu_v2_3task_test.yml --gpus 0 --exp_ids 0
-```
+If you want to do experiments with only categorical target variables or numerical target variables: `python3 test.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
+or  `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_ids 0 1 2 3`. 
+  
+If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_ids 0 1 2 3`  
+or ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_ids 0 1 2 3`.  
+  
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
 
-## Test with our pre-trained checkpoints
-We also provide some sample images to easily test our model for nyu v2 3 tasks.
-
-Please download  [our model in NYU v2 3-Task Learning](https://drive.google.com/file/d/1ERfBiDf36rv0wJkb4BlE8w13IDuamcQ-/view?usp=sharing)
-
-Execute `test_sample.py` to test on sample images in `./nyu_v2_samples`, using the command 
-```
-python test_sample.py --config  yamls/adashare/nyu_v2_3task_test.yml --gpus 0
-```
-It will print the average quantitative results of sample images.
-
-## Note
-If any link is invalid or any question, please email sunxm@bu.edu
 
 
 
