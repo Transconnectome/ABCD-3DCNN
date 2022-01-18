@@ -37,25 +37,26 @@ Please execute `train.py` for policy learning, using the command
 ```
 python3 train.py --config <yaml_file_name> --gpus <gpu ids> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_name <name of experiments>
 ```
-For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
+For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI`.
 
 If you want to do experiments with only categorical target variables or numerical target variables: `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity --exp_name test`  
-or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name test`. 
+or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI`. 
   
-If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_name test`  
-or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name test`.  
+If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex`  
+or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age`.  
   
-If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`.
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI`.
   
   
 ## Retrain Phase
 After Policy Learning Phase, we sample 8 different architectures and execute `re-train.py` for retraining.
 ```
-python re-train.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_name <name of experiments>
+python re-train.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_ids
 ```
 where we use different `--exp_ids` to specify different random seeds and generate different architectures. The best performance of all 8 runs is reported in the paper.
 
-For example, `python re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --exp_ids 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name test`. 
+For example, `python re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --exp_ids 0 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0`. 
+
 
 
 # Test/Inference
