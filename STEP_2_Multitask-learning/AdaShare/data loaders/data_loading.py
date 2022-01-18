@@ -9,17 +9,18 @@ from monai.apps import CrossValidation
 ## ========= divide into train, val, test ========= ##
 # defining train,val, test set splitting function
 def partitioning_loading(imageFiles_labels,opt):
+    """This function used only for warming up phase"""
     random.shuffle(imageFiles_labels)
 
     images = []
     labels = []
-    targets = opt['task']['targets']
+    tasks = opt['task']['targets']
 
     for imageFile_label in imageFiles_labels:
         image = imageFile_label['subjectkey']
         label = {}
 
-        for label_name in targets[:len(targets)]:
+        for label_name in tasks[:len(tasks)]:
             label[label_name]=imageFile_label[label_name]
 
         images.append(image)
@@ -36,7 +37,6 @@ def partitioning_loading(imageFiles_labels,opt):
     # training data are split into training_warmup and training_learning
     num_warmup = int(num_total*opt['data_split']['warmup_size'])
     num_train1 = int((num_total - num_warmup)/2)
-    num_train2 = num_total - num_warmup - num_train1
 
     # image and label information of train
     images_warmup = images[:num_warmup]
@@ -44,7 +44,7 @@ def partitioning_loading(imageFiles_labels,opt):
     images_train1 = images[num_warmup:num_warmup + num_train1]
     labels_train1 = labels[num_warmup:num_warmup + num_train1]
     images_train2 = images[num_warmup + num_train1:]
-    labels_train2 = images[num_warmup + num_train1:]
+    labels_train2 = labels[num_warmup + num_train1:]
 
     train_warmup_set = ImageDataset(image_files=images_warmup,labels=labels_warmup,transform=transform)
     train_set1 = ImageDataset(image_files=images_train1,labels=labels_train1,transform=transform)
@@ -63,13 +63,13 @@ def loading(imageFiles_labels,opt):
 
     images = []
     labels = []
-    targets = opt['task']['targets']
+    tasks = opt['task']['targets']
 
     for imageFile_label in imageFiles_labels:
         image = imageFile_label['subjectkey']
         label = {}
 
-        for label_name in targets[:len(targets)]:
+        for label_name in tasks[:len(tasks)]:
             label[label_name]=imageFile_label[label_name]
 
         images.append(image)
