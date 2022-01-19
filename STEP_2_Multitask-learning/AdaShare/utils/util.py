@@ -287,3 +287,14 @@ def save_exp_results(results_final, policy_distribution, opt, mode=None):
 
     with open(file_name, 'w') as f:
         json.dump(opt, f)
+
+
+def ImageList_loading(file_name):
+    image_files = []
+    with open(file_name, 'r') as f:
+        while True:
+            subject = f.readline()
+            if not subject: break
+            image_files.append(str(subject.strip('\n')))
+    
+    return image_files
