@@ -17,7 +17,7 @@ from dataloaders.data_loading import *
 from envs.blockdrop_env import BlockDropEnv
 
 import torch
-from utils.util import makedir, print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results
+from utils.util import makedir, print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results, ImageList_loading
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
@@ -102,18 +102,17 @@ def train():
     
     # load the dataloader
     print_separator('DATA PREPROCSESSING AND CREATE DATALOADER')
+    os.chdir(opt['dataload']['img_dataroot']) # important line
     
     ## ========= get image, subject ID and target variables ========= ##
     if opt['dataload']['dataset'] == 'ABCD':
-        os.chdir(opt['dataload']['img_dataroot_train'])
-        image_files_train = glob.glob('*.npy')
+        image_files_train = ImageList_loading(os.path.join(opt['dataload']['img_dataroot'],'image_train_SubjectList.txt'))
         image_files_train = sorted(image_files_train)
-        image_files_train = image_files_train[:30]
+        #image_files_train = image_files_train[:30]
 
-        os.chdir(opt['dataload']['img_dataroot_val'])
-        image_files_val = glob.glob('*.npy')
+        image_files_val = ImageList_loading(os.path.join(opt['dataload']['img_dataroot'],'image_val_SubjectList.txt'))
         image_files_val = sorted(image_files_val)
-        image_files_val = image_files_val[:30]
+        #image_files_val = image_files_val[:30]
         
 
     if not opt['task']['cat_target'] and opt['task']['num_target']:

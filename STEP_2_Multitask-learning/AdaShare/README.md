@@ -28,6 +28,13 @@ Welcome to cite our work if you find it is helpful to your research.
 This model adopt **curriculum learning framework**.  
 Thus, the overall workflow is also splitted as  **"Policy Learning Phase"**, **"Retraing Phase"**, and **"Test Phase"**.  
 Thus, for valid data loading process, please split the dataset.
+Please execute 'data_split.py' before starting experiments. 
+This command will make text file containing file names of images in the directory of 'img_dataroot'
+
+```
+python3 data_split.py --config <yaml_file_name> --test_size <ratio of test sample size to total sample size> --val_size <ratio of validation sample size to total sample size>
+``` 
+For, example, `python3 ~/3DCNN/AdaShare/data_split.py --config ~/3DCNN/AdaShare/yamls/adashare/ABCD.yml --test_size 0.1 --val_size 0.1`
 
 # Training
 ## Policy Learning Phase

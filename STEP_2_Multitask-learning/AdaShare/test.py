@@ -12,7 +12,7 @@ from dataloaders.data_loading import *
 
 from envs.blockdrop_env import BlockDropEnv
 import torch
-from utils.util import print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results
+from utils.util import print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results, ImageList_loading
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
@@ -59,11 +59,11 @@ def test():
     # ********************************************************************
     # load the dataloader
     print_separator('DATA PREPROCSESSING AND CREATE DATALOADER')
+    os.chdir(opt['dataload']['img_dataroot']) # important line
     
     ## ========= get image, subject ID and target variables ========= ##
     if opt['dataload']['dataset'] == 'ABCD':
-        os.chdir(opt['dataload']['img_dataroot_test'])
-        image_files_test = glob.glob('*.npy')
+        image_files_test = ImageList_loading(os.path.join(opt['dataload']['img_dataroot'],'image_test_SubjectList.txt'))
         image_files_test = sorted(image_files_test)
         #image_files_test = image_files_test[:30]
 
