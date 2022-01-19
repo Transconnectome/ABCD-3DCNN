@@ -1,6 +1,7 @@
 import os
 import argparse
 import yaml
+import json
 import random
 
 import torch
@@ -154,34 +155,59 @@ def parse_config():
     return opt, gpu_ids
 
 
-def summarizing_results(results, opt, test = False):
+def summarizing_results(opt ,results_iter, results_final, test = False):
     # summarizing 
     if test:
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
-                results[cat_target]['test']['loss'] = np.mean(results[cat_target]['test']['loss'])
-                results[cat_target]['test']['ACC or MSE'] = np.mean(results[cat_target]['test']['ACC or MSE']) 
+                test_loss = np.mean(results_iter[cat_target]['test']['loss'])
+                test_acc = np.mean(results_iter[cat_target]['test']['ACC or MSE'])
+                results_iter[cat_target]['test']['loss'] = test_loss
+                results_iter[cat_target]['test']['ACC or MSE'] = test_acc
+                results_final[cat_target]['test']['loss'].append(test_loss)
+                results_final[cat_target]['test']['MSE or ACC'].append(test_acc) 
 
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
-                results[num_target]['test']['loss'] = np.mean(results[num_target]['test']['loss'])
-                results[num_target]['test']['ACC or MSE'] = np.mean(results[num_target]['test']['ACC or MSE'])
+                test_loss = np.mean(results_iter[num_target]['test']['loss'])
+                test_acc = np.mean(results_iter[num_target]['test']['ACC or MSE'])
+                results_iter[num_target]['test']['loss'] = test_loss
+                results_iter[num_target]['test']['ACC or MSE'] = test_acc
+                results_final[cat_target]['test']['loss'].append(test_loss)
+                results_final[cat_target]['test']['MSE or ACC'].append(test_acc) 
+
     else:
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
-                results[cat_target]['train']['loss'] = np.mean(results[cat_target]['train']['loss'])
-                results[cat_target]['train']['ACC or MSE'] = np.mean(results[cat_target]['train']['ACC or MSE']) 
-                results[cat_target]['val']['loss'] = np.mean(results[cat_target]['val']['loss'])           
-                results[cat_target]['val']['ACC or MSE'] = np.mean(results[cat_target]['val']['ACC or MSE'])
+                train_loss = np.mean(results_iter[cat_target]['train']['loss'])
+                train_acc = np.mean(results_iter[cat_target]['train']['ACC or MSE']) 
+                val_loss = np.mean(results_iter[cat_target]['val']['loss'])     
+                val_acc = np.mean(results_iter[cat_target]['val']['ACC or MSE'])
+                results_iter[cat_target]['train']['loss'] = train_loss
+                results_iter[cat_target]['train']['ACC or MSE'] = train_acc
+                results_iter[cat_target]['val']['loss'] =  val_loss
+                results_iter[cat_target]['val']['ACC or MSE'] = val_acc 
+                results_final[cat_target]['train']['loss'].append(train_loss)
+                results_final[cat_target]['train']['ACC or MSE'].append(train_acc) 
+                results_final[cat_target]['val']['loss'].append(val_loss)
+                results_final[cat_target]['val']['ACC or MSE'].append(val_acc)
             
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
-                results[num_target]['train']['loss'] = np.mean(results[num_target]['train']['loss'])
-                results[num_target]['train']['ACC or MSE'] = np.mean(results[num_target]['train']['ACC or MSE'])
-                results[num_target]['val']['loss'] = np.mean(results[num_target]['val']['loss'])
-                results[num_target]['val']['ACC or MSE'] =  np.mean(results[num_target]['val']['ACC or MSE'])
+                train_loss = np.mean(results_iter[num_target]['train']['loss'])
+                train_acc = np.mean(results_iter[num_target]['train']['ACC or MSE']) 
+                val_loss = np.mean(results_iter[num_target]['val']['loss'])     
+                val_acc = np.mean(results_iter[num_target]['val']['ACC or MSE'])
+                results_iter[num_target]['train']['loss'] = train_loss
+                results_iter[num_target]['train']['ACC or MSE'] = train_acc
+                results_iter[num_target]['val']['loss'] =  val_loss
+                results_iter[num_target]['val']['ACC or MSE'] = val_acc 
+                results_final[num_target]['train']['loss'].append(train_loss)
+                results_final[num_target]['train']['ACC or MSE'].append(train_acc) 
+                results_final[num_target]['val']['loss'].append(val_loss)
+                results_final[num_target]['val']['ACC or MSE'].append(val_acc)
 
-    return results
+    return results_iter, results_final
 
 
 def CLIreporter(results, opt, test= False):
@@ -203,8 +229,8 @@ def CLIreporter(results, opt, test= False):
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
                 var_column.append(num_target)
-                loss_value = '{:2.2f}'.format(results[cat_target]['test']['loss'])
-                acc_value = '{:2.2f}'.format(results[cat_target]['test']['ACC or MSE'])                
+                loss_value = '{:2.2f}'.format(results[num_target]['test']['loss'])
+                acc_value = '{:2.2f}'.format(results[num_target]['test']['ACC or MSE'])                
                 visual_report['Loss'].append(loss_value)
                 visual_report['MSE or ACC'].append(acc_value)
 
@@ -231,3 +257,33 @@ def CLIreporter(results, opt, test= False):
                 visual_report['MSE or ACC (train/val)'].append(acc_value)
 
     print(pd.DataFrame(visual_report, index=var_column))
+
+
+def making_results_template(opt):
+    results_final = {}
+    if opt['task']['cat_target']:
+        for cat_target in opt['task']['cat_target']:
+            results_final[cat_target] = {'train':{'loss':[], 'ACC or MSE':[]}, 'val':{'loss':[], 'ACC or MSE':[]}}
+    if opt['task']['num_target']:
+        for num_target in opt['task']['num_target']:
+            results_final[num_target] = {'train':{'loss':[], 'ACC or MSE':[]}, 'val':{'loss':[], 'ACC or MSE':[]}}
+    
+    return results_final
+
+
+def save_exp_results(results_final, policy_distribution, opt, mode=None):
+    # summarizing policy distribution
+    policy = {}
+    for t_id, task in enumerate(opt['task']['targets']):
+        policy_task = np.concatenate(policy_distribution, axis=-1)[:,t_id]
+        policy['policy_%s' % task] = policy_task.tolist()
+        
+    print(policy)
+    exp_name = opt['exp_name']
+    file_name = '{}_results_{}.json'.format(exp_name, mode)
+    file_name = os.path.join(opt['paths']['result_dir'], exp_name, file_name)
+    opt.update(results_final)
+    opt.update(policy)
+
+    with open(file_name, 'w') as f:
+        json.dump(opt, f)
