@@ -13,9 +13,7 @@ paths:
 
 dataload:
   dataset: ABCD
-  img_dataroot_train: /home/ubuntu/HEEHWAN/preprocessed_masked/
-  img_dataroot_val: /home/ubuntu/HEEHWAN/preprocessed_masked/
-  img_dataroot_test: /home/ubuntu/HEEHWAN/preprocessed_masked/ 
+  img_dataroot: /home/ubuntu/HEEHWAN/preprocessed_masked/
   label_dataroot: /home/ubuntu/HEEHWAN/ABCD_phenotype_total.csv
 
 task:
