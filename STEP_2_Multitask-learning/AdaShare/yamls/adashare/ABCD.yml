@@ -44,8 +44,8 @@ diff_sparsity_weights: True
 retrain_from_pl: False
 
 train:
-  total_iters: 5
-  warm_up_iters: 2
+  total_iters: 150
+  warm_up_iters: 50
   lr: 0.001
   policy_lr: 0.01
   backbone_lr: 0.001
