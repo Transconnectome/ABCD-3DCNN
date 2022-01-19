@@ -17,7 +17,7 @@ from dataloaders.data_loading import *
 from envs.blockdrop_env import BlockDropEnv
 
 import torch
-from utils.util import makedir, print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results
+from utils.util import makedir, print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
@@ -108,12 +108,12 @@ def train():
         os.chdir(opt['dataload']['img_dataroot_train'])
         image_files_train = glob.glob('*.npy')
         image_files_train = sorted(image_files_train)
-        #image_files_train = image_files_train[:30]
+        image_files_train = image_files_train[:30]
 
         os.chdir(opt['dataload']['img_dataroot_val'])
         image_files_val = glob.glob('*.npy')
         image_files_val = sorted(image_files_val)
-        #image_files_val = image_files_val[:30]
+        image_files_val = image_files_val[:30]
         
 
     if not opt['task']['cat_target'] and opt['task']['num_target']:
@@ -191,6 +191,10 @@ def train():
     if torch.cuda.is_available():
         environ.cuda(gpu_ids)
 
+    # creating final results template 
+    results_final = making_results_template(opt)
+
+
     # ********************************************************************
     # ***************************  Training  *****************************
     # ********************************************************************
@@ -208,8 +212,6 @@ def train():
         for num_target in opt['task']['num_target']:
             best_value[num_target] = 100000.0       # best_value[num_target] is compared to the validation MSE Loss. This value should be set according to its cases
 
-    #best_value, best_iter = 0, 0
-    #best_metrics = None
 
     p_epoch = 0
     flag_warmup = True
@@ -243,7 +245,7 @@ def train():
                 results_iter, time= train_and_eval_iter(environ=environ, trainloader=warminguploader, valloader=valloader,current_iter=current_iter, results_iter=results_iter, optimizing_opt=optimizing_opt, opt=opt)
 
                 # summarizing and report results per epoch
-                results_iter = summarizing_results(results_iter, opt) 
+                results_iter, results_final = summarizing_results(opt, results_iter, results_final) 
                 CLIreporter(results_iter, opt)
                 print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
@@ -282,7 +284,7 @@ def train():
                     results_iter, time = train_and_eval_iter(environ=environ, trainloader=trainloader1, valloader=valloader, current_iter=current_iter, results_iter=results_iter, optimizing_opt=optimizing_opt, opt=opt)
                     
                     # summarizing and report results per epoch 
-                    results_iter = summarizing_results(results_iter, opt)
+                    results_iter, results_final = summarizing_results(opt, results_iter, results_final)
                     CLIreporter(results_iter, opt)
                     print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
@@ -296,13 +298,10 @@ def train():
                     if opt['task']['cat_target']:
                         for cat_target in opt['task']['cat_target']:
                             if results_iter[cat_target]['val']['ACC or MSE'] >= best_value[cat_target]:
-                                print(results_iter[cat_target]['val']['ACC or MSE'])
                                 best_checkpoints_vote += 1
                                 best_value[cat_target] = results_iter[cat_target]['val']['ACC or MSE']
                     if opt['task']['num_target']:
                         for num_target in opt['task']['num_target']:
-                            if results_iter[num_target]['val']['ACC or MSE'] <= best_value[num_target]:
-                                print(results_iter[num_target]['val']['ACC or MSE'])
                                 best_checkpoints_vote += 1      
                                 best_value[num_target] = results_iter[num_target]['val']['ACC or MSE']
                     
@@ -310,7 +309,7 @@ def train():
                     if best_checkpoints_vote == len(opt['task']['targets']):
                         best_iter = current_iter
                         environ.save('best', current_iter)
-                        print("Best iteration from now on is %d" % best_iter)
+                        print("Best iteration until now is %d" % best_iter)
 
 
                     print("## ====================== CHANGING THE LEARNING STATUR FROM **update_weigth** to **update_alpha** ====================== ##"  )
@@ -341,7 +340,7 @@ def train():
                     p_epoch += 1
 
                     # summarizing and report results per epoch 
-                    results_iter = summarizing_results(results_iter, opt)
+                    results_iter, results_final = summarizing_results(opt, results_iter, results_final)
                     CLIreporter(results_iter, opt)
                     print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
@@ -355,6 +354,9 @@ def train():
                 else:
                     raise ValueError('flag %s is not recognized' % flag)
             progress_bar.update(1)
+
+    # saving results as json file
+    save_exp_results(results_final, dists, opt, mode='train')
 
 if __name__ == "__main__":
     train()

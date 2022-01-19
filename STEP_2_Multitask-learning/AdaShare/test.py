@@ -12,7 +12,7 @@ from dataloaders.data_loading import *
 
 from envs.blockdrop_env import BlockDropEnv
 import torch
-from utils.util import print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results
+from utils.util import print_separator, read_yaml, create_path, print_yaml, fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
@@ -130,6 +130,10 @@ def test():
     if torch.cuda.is_available():
         environ.cuda(gpu_ids)
 
+    # creating final results template 
+    results_final = making_results_template(opt)
+
+
     # ********************************************************************
     # ***************************  Test  *********************************
     # ********************************************************************
@@ -144,13 +148,15 @@ def test():
     
     # Test/ Inference 
     results_iter = eval_iter_fix_policy(environ, testloader, results_iter=results_iter, opt=opt)
-    results_iter = summarizing_results(results_iter, opt, test=True)
+    results_iter, results_final = summarizing_results(opt, results_iter, results_final, test=True)
     CLIreporter(results_iter, opt, test=True)
+
 
     # *********************************************************************
     # ************************  Saving Results  ***************************
     # *********************************************************************
-
+    # saving results as json file
+    save_exp_results(results_final, policys, opt, mode='test')
 
 
 if __name__ == "__main__":

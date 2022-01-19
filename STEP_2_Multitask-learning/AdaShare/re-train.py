@@ -13,7 +13,7 @@ from dataloaders.data_loading import *
 
 from envs.blockdrop_env import BlockDropEnv
 import torch
-from utils.util import print_separator, read_yaml, create_path, print_yaml,  fix_random_seed, CLIreporter, summarizing_results
+from utils.util import print_separator, read_yaml, create_path, print_yaml,  fix_random_seed, CLIreporter, summarizing_results, making_results_template, save_exp_results
 from copy import deepcopy
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
@@ -173,6 +173,9 @@ def _train(exp_id, opt, gpu_ids):
     if torch.cuda.is_available():
         environ.cuda(gpu_ids)
 
+    # creating final results template 
+    results_final = making_results_template(opt)
+
     # ********************************************************************
     # ***************************  Training  *****************************
     # ********************************************************************
@@ -210,7 +213,7 @@ def _train(exp_id, opt, gpu_ids):
             
             # Training 
             results_iter, time= train_and_eval_iter_fix_policy(environ=environ, trainloader=trainloader, valloader=valloader, current_iter=current_iter, results_iter=results_iter, opt=opt)
-            results_iter = summarizing_results(results_iter, opt)
+            results_iter, results_final = summarizing_results(opt, results_iter, results_final)
             CLIreporter(results_iter, opt)
                         
 
@@ -241,6 +244,10 @@ def _train(exp_id, opt, gpu_ids):
             # summarizing and report results per epoch 
             print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
             progress_bar.update(1)
+    
+    # saving results as json file
+    save_exp_results(results_final, policys, opt, mode='re-train')
+
 
 
 
