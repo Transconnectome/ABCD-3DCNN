@@ -16,10 +16,12 @@ def preprocessing_cat(subject_data, opt):
 
 ## numeric
 def preprocessing_num(subject_data, opt):
-    for num in opt['task']['num_target']:
-        mean = np.mean(subject_data[num],axis=0)
-        std = np.std(subject_data[num],axis=0)
-        subject_data[num] = (subject_data[num]-mean)/std
+    #for num in opt['task']['num_target']:
+    #    mean = np.mean(subject_data[num],axis=0)
+    #    std = np.std(subject_data[num],axis=0)
+    #    subject_data[num] = (subject_data[num]-mean)/std
+    pass
+
 
 ## combine categorical + numeric
 def combining_image_target(image_files, subject_data, opt):
