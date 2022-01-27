@@ -40,35 +40,37 @@ For, example, `python3 ~/3DCNN/AdaShare/data_split.py --config ~/3DCNN/AdaShare/
 ## Policy Learning Phase
 Please execute `train.py` for policy learning, using the command 
 ```
-python3 train.py --config <yaml_file_name> --gpus <gpu ids> --cat_target <categorical target variable> --num_target <numerical target variable> 
+python3 train.py --config <yaml_file_name> --gpus <gpu ids> --cat_target <categorical target variable> --num_target <numerical target variable> --exp_name <experiment name>
 ```
-For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI`.
+For example, `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
 
-If you want to do experiments with only categorical target variables or numerical target variables: `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
-or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI`. 
+If you want to do experiments with only categorical target variables or numerical target variables: `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity --exp_name ABCD_multitask`  
+or  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name ABCD_multitask`. 
   
-If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex `  
-or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age `.  
+If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_name ABCD_multitask`  
+or ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name ABCD_multitask`.  
   
-If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI `.
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
   
   
 ## Retrain Phase
 After Policy Learning Phase, we sample 8 different architectures and execute `re-train.py` for retraining.
 ```
-python re-train.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id>
+python re-train.py --config <yaml_file_name> --gpus <gpu ids> --exp_name <experiment name>
 ```
-where we use different `--exp_ids` to specify different random seeds and generate different architectures. The best performance of all 8 runs is reported in the paper.
+**`--exp_name <experiment name>` should be same as in Policy learning phase**.  
 
-For example, `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
+**(optional)** where we use different `--exp_ids` to specify different random seeds and generate different architectures. The best performance of all 8 runs is reported in the paper.
+
+For example, `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
 
 If you want to do experiments with only categorical target variables or numerical target variables: `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
-or  `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_ids 0 1 2 3`. 
+or  `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name ABCD_multitask`. 
   
-If you want to do single task learning, just type one variable :  `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_ids 0 1 2 3`  
-or ` python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_ids 0 1 2 3`.  
+If you want to do single task learning, just type one variable :  `python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_name ABCD_multitask`  
+or ` python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name ABCD_multitask`.  
   
-If you want to do Data Parallelism, type ID number of cuda device: ` python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 re-train.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
 
 
 
@@ -76,18 +78,19 @@ If you want to do Data Parallelism, type ID number of cuda device: ` python3 re-
 # Test/Inference
 After Retraining Phase, execute `test.py` for get the quantitative results on the test set. 
 ```
-python test.py --config <yaml_file_name> --gpus <gpu ids> --exp_ids <random seed id>
+python test.py --config <yaml_file_name> --gpus <gpu ids> --exp_name <experiment name>
 ```
+**`--exp_name <experiment name>` should be same as in Policy learning phase and Retrain phase**.  
 
 For example, `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
 
 If you want to do experiments with only categorical target variables or numerical target variables: `python3 test.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
-or  `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_ids 0 1 2 3`. 
+or  `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name ABCD_multitask`. 
   
-If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_ids 0 1 2 3`  
-or ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_ids 0 1 2 3`.  
+If you want to do single task learning, just type one variable :  `python3 train.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex --exp_name ABCD_multitask`  
+or ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name ABCD_multitask`.  
   
-If you want to do Data Parallelism, type ID number of cuda device: ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
+If you want to do Data Parallelism, type ID number of cuda device: ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
 
 
 
