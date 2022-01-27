@@ -1,4 +1,3 @@
-
 import nibabel as nib
 
 def plot(input) :
@@ -61,6 +60,8 @@ parser.add_argument('--debug',  default=False, action='store_true')
 parser.add_argument('-e', '--epoch', type=int, required=False, default=100, help='total # of epoch')
 parser.add_argument('-p', '--path', type=str, required=False, default='./docker/share/B_DenseNet/images', help='relative path to preprocessed dataset')
 parser.add_argument('-i', '--id', type=int, required=False, default=0, help='id')
+parser.add_argument('--lr', '-lr', type=float, default=1e-5, required = False, help = 'learning rate')
+parser.add_argument('--l2', '-l2', type=float, default=0.00001, required = False, help = 'weight decay')
 
 
 args = parser.parse_args()
@@ -249,14 +250,14 @@ loss_function = torch.nn.CrossEntropyLoss(weight=torch.FloatTensor(weight).cuda(
 
 if args.optim == 0:
     # Optimizer 1: Simple Adam
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), args.lr=1e-5, args.l2=1e-5)
 elif args.optim == 1:
     # Optimizer 2: SGD with three step learning rate
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), args.lr=0.001, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
 else:
     # Optimizer 3: SGD with scheduler
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=1e-4, momentum=0.9, nesterov=True)
+    optimizer = torch.optim.SGD(model.parameters(), args.lr=0.001, args.l2=1e-4, momentum=0.9, nesterov=True)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=4)
 
 def get_lr(optimizer):
