@@ -82,7 +82,7 @@ python test.py --config <yaml_file_name> --gpus <gpu ids> --exp_name <experiment
 ```
 **`--exp_name <experiment name>` should be same as in Policy learning phase and Retrain phase**.  
 
-For example, `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_ids 0 1 2 3`.
+For example, `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
 
 If you want to do experiments with only categorical target variables or numerical target variables: `python3 test.py --config yamls/adashare/ABCD.yml --gpus 2 --cat_target sex race.ethnicity`  
 or  `python3 test.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age BMI --exp_name ABCD_multitask`. 
@@ -91,7 +91,6 @@ If you want to do single task learning, just type one variable :  `python3 train
 or ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 --num_target age --exp_name ABCD_multitask`.  
   
 If you want to do Data Parallelism, type ID number of cuda device: ` python3 est.py --config yamls/adashare/ABCD.yml --gpus 0 1 2 --cat_target sex race.ethnicity --num_target age BMI --exp_name ABCD_multitask`.
-
 
 
 

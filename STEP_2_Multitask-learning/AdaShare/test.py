@@ -27,11 +27,11 @@ def eval_iter_fix_policy(environ, testloader, results_iter, opt):
             results = getattr(environ, 'results')
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
-                    results_iter[cat_target]['test']['loss'].append(results[cat_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                    results_iter[cat_target]['test']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                     results_iter[cat_target]['test']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    results_iter[num_target]['test']['loss'].append(results[num_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                    results_iter[num_target]['test']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                     results_iter[num_target]['test']['ACC or MSE'].append(results[num_target]['ACC or MSE'])          
 
     
@@ -67,8 +67,6 @@ def test():
         image_files_test = sorted(image_files_test)
         #image_files_test = image_files_test[:30]
 
-    if not opt['task']['cat_target'] and opt['task']['num_target']:
-        raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
     tasks = opt['task']['targets']
     col_list = tasks + ['subjectkey']
@@ -95,10 +93,12 @@ def test():
 
     # count the class of labels (= output dimension of neural networks) 
     opt['task']['tasks_num_class'] = []
-    for cat_label in opt['task']['cat_target']:
-        opt['task']['tasks_num_class'].append(len(subject_data[cat_label].value_counts()))
-    for num_label in opt['task']['cat_target']:
-        opt['task']['tasks_num_class'].append(int(1))    
+    if opt['task']['cat_target']:
+        for cat_label in opt['task']['cat_target']:
+            opt['task']['tasks_num_class'].append(len(subject_data[cat_label].value_counts()))
+    if opt['task']['num_target']:
+        for num_label in opt['task']['num_target']:
+            opt['task']['tasks_num_class'].append(int(1))    
 
     print("Loading image file names as list is completed")
     print('size of test set: ', len(partition['test']))
@@ -131,7 +131,7 @@ def test():
         environ.cuda(gpu_ids)
 
     # creating final results template 
-    results_final = making_results_template(opt)
+    results_final = making_results_template(opt, mode='test')
 
 
     # ********************************************************************
@@ -156,7 +156,7 @@ def test():
     # ************************  Saving Results  ***************************
     # *********************************************************************
     # saving results as json file
-    save_exp_results(results_final, policys, opt, mode='test')
+    save_exp_results(results_final, opt, mode='test')
 
 
 if __name__ == "__main__":

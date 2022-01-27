@@ -32,11 +32,11 @@ def train_and_eval_iter_fix_policy(environ, trainloader, valloader, current_iter
         results = getattr(environ,'results')
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
-                results_iter[cat_target]['train']['loss'].append(results[cat_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                results_iter[cat_target]['train']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                 results_iter[cat_target]['train']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
-                results_iter[num_target]['train']['loss'].append(results[num_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                results_iter[num_target]['train']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                 results_iter[num_target]['train']['ACC or MSE'].append(results[num_target]['ACC or MSE'])
                         
 
@@ -51,11 +51,11 @@ def train_and_eval_iter_fix_policy(environ, trainloader, valloader, current_iter
             results = getattr(environ, 'results')
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
-                    results_iter[cat_target]['val']['loss'].append(results[cat_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                    results_iter[cat_target]['val']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                     results_iter[cat_target]['val']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    results_iter[num_target]['val']['loss'].append(results[num_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                    results_iter[num_target]['val']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                     results_iter[num_target]['val']['ACC or MSE'].append(results[num_target]['ACC or MSE'])          
     end_time = time.time()
 
@@ -84,8 +84,6 @@ def _train(exp_id, opt, gpu_ids):
         image_files_val = sorted(image_files_val)
         #image_files_val = image_files_val[:30]
 
-    if not opt['task']['cat_target'] and opt['task']['num_target']:
-        raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
     tasks = opt['task']['targets']
     col_list = tasks + ['subjectkey']
@@ -114,10 +112,12 @@ def _train(exp_id, opt, gpu_ids):
 
     # count the class of labels (= output dimension of neural networks) 
     opt['task']['tasks_num_class'] = []
-    for cat_label in opt['task']['cat_target']:
-        opt['task']['tasks_num_class'].append(len(subject_data[cat_label].value_counts()))
-    for num_label in opt['task']['cat_target']:
-        opt['task']['tasks_num_class'].append(int(1))    
+    if  opt['task']['cat_target']:
+        for cat_label in opt['task']['cat_target']:
+            opt['task']['tasks_num_class'].append(len(subject_data[cat_label].value_counts()))
+    if opt['task']['num_target']:
+        for num_label in opt['task']['num_target']:
+            opt['task']['tasks_num_class'].append(int(1))    
 
     print("Loading image file names as list is completed")
     print('size of training set: ', len(partition['train']))
@@ -145,27 +145,26 @@ def _train(exp_id, opt, gpu_ids):
         if opt['policy_model'] == 'task-specific':
             environ.load_policy(policy_label)
     else:
-        if opt['policy_model'] == 'task-specific':
-            init_state = deepcopy(environ.get_current_state(0))      # getting the number of the last iterations from "train.py"
-            if environ.check_exist_policy(policy_label):
-                environ.load_policy(policy_label)
-            else:
-                environ.load(opt['train']['policy_iter'])
-                dists = environ.get_policy_prob()
-                overall_dist = np.concatenate(dists, axis=-1)
-                print(overall_dist)
-                environ.sample_policy(opt['train']['hard_sampling'])
-                environ.save_policy(policy_label)
 
-            if opt['retrain_from_pl']:
-                environ.load(opt['train']['policy_iter'])
-            else:
-                environ.load_snapshot(init_state)
+        init_state = deepcopy(environ.get_current_state(0))      # getting the number of the last iterations from "train.py"
+        if environ.check_exist_policy(policy_label):
+            environ.load_policy(policy_label)
+        else:
+            environ.load(opt['train']['policy_iter'])
+            dists = environ.get_policy_prob()
+            overall_dist = np.concatenate(dists, axis=-1)
+            #print(overall_dist)
+            environ.sample_policy(opt['train']['hard_sampling'])
+            environ.save_policy(policy_label)
 
-    if opt['policy_model'] == 'task-specific':
-        policys = environ.get_current_policy()
-        overall_policy = np.concatenate(policys, axis=-1)
-        print(overall_policy)
+        if opt['retrain_from_pl']:
+            environ.load(opt['train']['policy_iter'])
+        else:
+            environ.load_snapshot(init_state)
+
+    policys = environ.get_current_policy()
+    overall_policy = np.concatenate(policys, axis=-1)
+    print(overall_policy)
 
     environ.define_optimizer(False)
     environ.define_scheduler(False)
@@ -173,7 +172,7 @@ def _train(exp_id, opt, gpu_ids):
         environ.cuda(gpu_ids)
 
     # creating final results template 
-    results_final = making_results_template(opt)
+    results_final = making_results_template(opt, mode='re-train')
 
     # ********************************************************************
     # ***************************  Training  *****************************
@@ -220,15 +219,11 @@ def _train(exp_id, opt, gpu_ids):
             best_checkpoints_vote = 0
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
-                    pass
-                #    print(results_iter[cat_target]['val']['ACC or MSE'])
                     if results_iter[cat_target]['val']['ACC or MSE'] >= best_value[cat_target]:
                         best_checkpoints_vote += 1
                         best_value[cat_target] = results_iter[cat_target]['val']['ACC or MSE']
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    pass
-                #    print(results_iter[num_target]['val']['ACC or MSE'])
                     if results_iter[num_target]['val']['ACC or MSE'] <= best_value[num_target]:
                         best_checkpoints_vote += 1      
                         best_value[num_target] = results_iter[num_target]['val']['ACC or MSE']
@@ -245,7 +240,7 @@ def _train(exp_id, opt, gpu_ids):
             progress_bar.update(1)
     
     # saving results as json file
-    save_exp_results(results_final, policys, opt, mode='re-train')
+    save_exp_results(results_final, opt, mode='re-train')
 
 
 

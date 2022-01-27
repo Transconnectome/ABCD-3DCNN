@@ -36,11 +36,11 @@ def train_and_eval_iter(environ, trainloader, valloader, current_iter, results_i
         results = getattr(environ,'results')
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
-                results_iter[cat_target]['train']['loss'].append(results[cat_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                results_iter[cat_target]['train']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                 results_iter[cat_target]['train']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
-                results_iter[num_target]['train']['loss'].append(results[num_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                results_iter[num_target]['train']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                 results_iter[num_target]['train']['ACC or MSE'].append(results[num_target]['ACC or MSE'])
                         
 
@@ -48,6 +48,7 @@ def train_and_eval_iter(environ, trainloader, valloader, current_iter, results_i
     environ.eval()
     with torch.no_grad():
         for batch_idx, batch in enumerate(valloader):
+            
             environ.set_inputs(batch)
             environ.val(policy=False, num_train_layers=None, hard_sampling=False)
 
@@ -55,14 +56,13 @@ def train_and_eval_iter(environ, trainloader, valloader, current_iter, results_i
             results = getattr(environ, 'results')
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
-                    results_iter[cat_target]['val']['loss'].append(results[cat_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                    results_iter[cat_target]['val']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                     results_iter[cat_target]['val']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    results_iter[num_target]['val']['loss'].append(results[num_target]['loss'].item())       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
+                    results_iter[num_target]['val']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
                     results_iter[num_target]['val']['ACC or MSE'].append(results[num_target]['ACC or MSE'])          
     end_time = time.time()
-
                 
     # save the model
     environ.save('latest', current_iter)
@@ -115,7 +115,7 @@ def train():
         #image_files_val = image_files_val[:30]
         
 
-    if not opt['task']['cat_target'] and opt['task']['num_target']:
+    if not opt['task']['targets']:
         raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
     tasks = opt['task']['targets']
@@ -127,6 +127,7 @@ def train():
     subject_data = subject_data.sort_values(by='subjectkey')
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values
+
   
 
     ## ========= Data Loading ========= ##
@@ -135,7 +136,7 @@ def train():
 
     if opt['task']['num_target']:
         preprocessing_num(subject_data, opt)
-
+    
     imageFiles_labels_train = combining_image_target(image_files_train, subject_data, opt)
     imageFiles_labels_val = combining_image_target(image_files_val, subject_data, opt)
 
@@ -144,10 +145,12 @@ def train():
 
     # count the class of labels (= output dimension of neural networks) 
     opt['task']['tasks_num_class'] = []
-    for cat_label in opt['task']['cat_target']:
-        opt['task']['tasks_num_class'].append(len(subject_data[cat_label].value_counts()))
-    for num_label in opt['task']['cat_target']:
-        opt['task']['tasks_num_class'].append(int(1))    
+    if  opt['task']['cat_target']:
+        for cat_label in opt['task']['cat_target']:
+            opt['task']['tasks_num_class'].append(len(subject_data[cat_label].value_counts()))
+    if opt['task']['num_target']:
+        for num_label in opt['task']['num_target']:
+            opt['task']['tasks_num_class'].append(int(1))    
 
     print("Loading image file names as list is completed")
     
@@ -191,7 +194,7 @@ def train():
         environ.cuda(gpu_ids)
 
     # creating final results template 
-    results_final = making_results_template(opt)
+    results_final = making_results_template(opt, mode='train')
 
 
     # ********************************************************************
@@ -284,6 +287,7 @@ def train():
                     
                     # summarizing and report results per epoch 
                     results_iter, results_final = summarizing_results(opt, results_iter, results_final)
+                    
                     CLIreporter(results_iter, opt)
                     print('Epoch {}. Took {:2.2f} sec'.format(current_iter, time))
 
@@ -301,6 +305,7 @@ def train():
                                 best_value[cat_target] = results_iter[cat_target]['val']['ACC or MSE']
                     if opt['task']['num_target']:
                         for num_target in opt['task']['num_target']:
+                            if results_iter[num_target]['val']['ACC or MSE'] <= best_value[num_target]:
                                 best_checkpoints_vote += 1      
                                 best_value[num_target] = results_iter[num_target]['val']['ACC or MSE']
                     
@@ -311,7 +316,7 @@ def train():
                         print("Best iteration until now is %d" % best_iter)
 
 
-                    print("## ====================== CHANGING THE LEARNING STATUR FROM **update_weigth** to **update_alpha** ====================== ##"  )
+                    print("## ====================== CHANGING THE LEARNING STATUS FROM **update_weigth** to **update_alpha** ====================== ##"  )
 
                 # update the policy network
                 elif flag == 'update_alpha':
@@ -355,7 +360,7 @@ def train():
             progress_bar.update(1)
 
     # saving results as json file
-    save_exp_results(results_final, dists, opt, mode='train')
+    save_exp_results(results_final, opt, mode='train')
 
 if __name__ == "__main__":
     train()
