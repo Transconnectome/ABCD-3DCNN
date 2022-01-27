@@ -112,6 +112,7 @@ class Deeplab_ResNet_Backbone(nn.Module):
         
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+
         
         return x
 
@@ -229,7 +230,7 @@ class MTL(nn.Module):
                 task_logits = 0.5 * torch.ones(num_layers-self.skip_layer, 2)
             else:
                 raise NotImplementedError('Init Method %s is not implemented' % self.init_method)
-
+            
             self._arch_parameters = []
             self.register_parameter('task%d_logits' % (t_id + 1), nn.Parameter(task_logits, requires_grad=True))
             self._arch_parameters.append(getattr(self, 'task%d_logits' % (t_id + 1)))
@@ -263,11 +264,6 @@ class MTL(nn.Module):
             else:
                 raise NotImplementedError('mode %s is not implemented' % mode)
             
-            for t_id in range(self.num_tasks):
-                if cuda_device != -1:     
-                    self.policys[t_id] = self.policys[t_id].to(cuda_device)
-                else:
-                    self.policys[t_id] = self.policys[t_id].cpu()
 
             skip_layer = sum(self.layers) - num_train_layers
             if cuda_device != -1:
@@ -278,13 +274,20 @@ class MTL(nn.Module):
 
             padding_policys = []
             feats = []
-                                   
-            for t_id in range(self.num_tasks): # the order of tasks is cat_target~num_target
-                padding_policy = torch.cat((padding.float(),self.policys[t_id][-num_train_layers:].float()),dim=0) 
-                padding_policys.append(padding_policy)
 
-                feats.append(self.backbone(img,padding_policy).to(cuda_device)) # forwarding images until reaching the right before classifier.
-        
+
+            for t_id in range(self.num_tasks):
+                if cuda_device != -1:     
+                    self.policys[t_id] = self.policys[t_id].to(cuda_device)
+                    padding_policy = torch.cat((padding.float(),self.policys[t_id][-num_train_layers:].float()),dim=0) 
+                    padding_policys.append(padding_policy)
+                    feats.append(self.backbone(img,padding_policy))
+                else:
+                    self.policys[t_id] = self.policys[t_id].cpu()            
+                    padding_policy = torch.cat((padding.float(),self.policys[t_id][-num_train_layers:].float()),dim=0) 
+                    padding_policys.append(padding_policy)
+                    feats.append(self.backbone(img,padding_policy))
+
         else:
             feats = [self.backbone(img)] * self.num_tasks
 
