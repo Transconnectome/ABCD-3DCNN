@@ -112,7 +112,7 @@ class BlockDropEnv(BaseEnv):
         if self.opt['train']['init_method'] == 'all_chosen':
             self.optimizers['alphas'] = optim.Adam(arch_parameters, lr=self.opt['train']['policy_lr'], weight_decay=5*self.opt['train']['weight_decay'])
         else:
-            self.optimizers['alphas'] = optim.Adam(arch_parameters, lr=0.01, weight_decay=5*self.opt['train']['weight_decay'])
+            self.optimizers['alphas'] = optim.Adam(arch_parameters, lr=self.opt['train']['policy_lr'], weight_decay=5*self.opt['train']['weight_decay'])
 
 
     def define_scheduler(self, policy_learning=False):
@@ -314,8 +314,7 @@ class BlockDropEnv(BaseEnv):
                     logits = getattr(self.networks['mtl-net'].module, 'task%d_logits' % (t_id + 1)).detach().cpu().numpy()
                 else:
                     logits = getattr(self.networks['mtl-net'], 'task%d_logits' % (t_id + 1)).detach().cpu().numpy()
-            distributions.append(softmax(logits, axis=-1))
-
+                distributions.append(softmax(logits, axis=-1))
         else:
             raise ValueError('policy mode = %s is not supported' % self.opt['policy_model']  )
         return distributions
@@ -354,7 +353,6 @@ class BlockDropEnv(BaseEnv):
             policy = pickle.load(handle)
         for t_id in range(self.num_tasks):
             setattr(self, 'policy%d' % (t_id + 1), policy['task%d_policy' % (t_id+1)])
-            print(getattr(self, 'policy%d' % (t_id + 1)))
 
 
     def check_exist_policy(self, label):
