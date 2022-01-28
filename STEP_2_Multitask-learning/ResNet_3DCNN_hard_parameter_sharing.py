@@ -435,7 +435,7 @@ def validate(net,partition,scheduler,args):
 
 
     # learning rate scheduler
-    scheduler.step(sum(val_loss.values()))
+    scheduler.step(sum(val_acc.values()))
 
 
     return val_loss, val_acc
