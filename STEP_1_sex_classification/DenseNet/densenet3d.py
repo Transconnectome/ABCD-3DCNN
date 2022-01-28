@@ -223,19 +223,17 @@ def generate_model(model_depth, **kwargs):
 
 def densenet121():
     model = generate_model(121)
-    print(model)
     return model
 
-"""
-def densenet121(pretrained: bool = False, progress: bool = True, **kwargs):
-    return DenseNet("densenet121", 32, (6, 12, 24, 16), 64, pretrained, progress, **kwargs)
+def densenet161():
+    model = generate_model(121)
+    return model
 
-def densenet161(pretrained: bool = False, progress: bool = True, **kwargs):
-    return DenseNet("densenet169", 32, (6, 12, 32, 32), 64, pretrained, progress, **kwargs)
+def densenet169():
+    model = generate_model(121)
+    return model
 
-def densenet169(pretrained: bool = False, progress: bool = True, **kwargs):
-    return DenseNet("densenet169", 32, (6, 12, 32, 32), 64, pretrained, progress, **kwargs)
+def densenet201():
+    model = generate_model(121)
+    return model
 
-def densenet201(pretrained: bool = False, progress: bool = True, **kwargs):
-    return DenseNet("densenet201", 32, (6, 12, 48, 32), 64, pretrained, progress, **kwargs)
-"""
