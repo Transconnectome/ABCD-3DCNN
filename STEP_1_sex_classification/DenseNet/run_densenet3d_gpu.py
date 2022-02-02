@@ -383,7 +383,7 @@ def save_exp_result(setting, result, cmt):
     del setting['test_batch_size']
 
     hash_key = hashlib.sha1(str(setting).encode()).hexdigest()[:6]
-    filename = '/scratch/3DCNN/ResNet_results/{}-{}.json'.format(exp_name, hash_key)
+    filename = '/home/connectome/bettybetty3k/0.myResearch/3DCNN/results_densenet/{}-{}.json'.format(exp_name, hash_key)
     result.update(setting)
     result.update(cmt)
     
