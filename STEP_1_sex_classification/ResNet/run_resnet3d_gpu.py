@@ -323,7 +323,7 @@ def test(net,partition,args):
         # subj_predicted
         subj_predicted['label'].append(label.cpu().tolist()[0])
         subj_predicted['pred'].append(output.data.cpu().tolist()[0])
-        print(subj_predicted)
+        #print(subj_predicted)
            
     test_acc = 100 * correct / total
     
