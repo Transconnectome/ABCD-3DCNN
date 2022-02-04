@@ -284,6 +284,10 @@ def test(net,partition,args):
     false_positive = 0
     false_negative = 0
     
+    subj_predicted = {}
+    subj_predicted['label'] = []
+    subj_predicted['pred'] = []
+    
     for i, data in enumerate(testloader,0):
         image, label = data
         image = image.to(f'cuda:{net.device_ids[0]}')
@@ -316,9 +320,14 @@ def test(net,partition,args):
         cmt['false_positive'] = false_positive
         cmt['false_negative'] = false_negative
 
+        # subj_predicted
+        subj_predicted['label'].append(label.cpu().tolist()[0])
+        subj_predicted['pred'].append(output.data.cpu().tolist()[0])
+        print(subj_predicted)
+           
     test_acc = 100 * correct / total
     
-    return test_acc, cmt
+    return test_acc, cmt, subj_predicted
 ## ============================================ ##
 
 ## ========= Experiment =============== ##
@@ -364,7 +373,7 @@ def experiment(partition, args): #in_channels,out_dim
         print('Epoch {}, ACC(train/val): {:2.2f}/{:2.2f}, Loss(train/val): {:2.2f}/{:2.2f}. Current learning rate {}.Took {:2.2f} sec'.format(epoch,train_acc,val_acc,train_loss,val_loss,optimizer.param_groups[0]['lr'],te-ts))
 
 
-    test_acc, cmt = test(net,partition,args)
+    test_acc, cmt, subj_predicted = test(net,partition,args)
 
     result = {}
     result['train_losses'] = train_losses
@@ -375,12 +384,12 @@ def experiment(partition, args): #in_channels,out_dim
     result['val_acc'] = val_acc
     result['test_acc'] = test_acc
 
-    return vars(args), result, cmt
+    return vars(args), result, cmt, subj_predicted
 ## ==================================== ##
 
 ## ========= Run Experiment and saving result ========= ##
 # define result-saving function
-def save_exp_result(setting, result, cmt):
+def save_exp_result(setting, result, cmt, subj_predicted):
     exp_name = setting['exp_name']
     
     del setting['epoch']
@@ -390,6 +399,7 @@ def save_exp_result(setting, result, cmt):
     filename = '/scratch/3DCNN/ResNet_results/{}-{}.json'.format(exp_name, hash_key)
     result.update(setting)
     result.update(cmt)
+    result.update(subj_predicted)
     
     with open(filename, 'w') as f:
         json.dump(result, f)
@@ -400,6 +410,6 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 
 # Run Experiment and save result
-setting, result, cmt = experiment(partition, deepcopy(args))
-save_exp_result(setting,result, cmt)
+setting, result, cmt, subj_predicted = experiment(partition, deepcopy(args))
+save_exp_result(setting,result, cmt, subj_predicted)
 ## ==================================================== ##
