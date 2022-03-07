@@ -77,7 +77,7 @@ data_dir = '/home/connectome/dhkdgmlghks/3DCNN_test/preprocessed_masked'
 os.chdir(data_dir)
 image_files = glob.glob('*.npy')
 image_files = sorted(image_files)
-image_files = image_files[:100]
+#image_files = image_files[:100]
 print("Loading image file names as list is completed")
 ## ====================================== ##
 
