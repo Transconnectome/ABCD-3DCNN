@@ -52,7 +52,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model",required=True,type=str,choices=['densenet121', 'densenet161', 'densenet169', 'densenet201'],help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-parser.add_argument("--resize",default=(96,96,96),required=False,help='')
+parser.add_argument("--resize",default=[96,96,96],type=int,nargs="*",required=False,help='')
 parser.add_argument("--train_batch_size",default=32,type=int,required=False,help='')
 parser.add_argument("--val_batch_size",default=8,type=int,required=False,help='')
 parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
@@ -120,7 +120,7 @@ for subjectID in tqdm(image_files):
 
 ## ========= Split train, val, test========= ##
 # defining train,val, test set splitting function
-def partition(imageFiles_labels):
+def partition(imageFiles_labels, args):
     random.shuffle(imageFiles_labels)
 
     images = []
@@ -130,9 +130,9 @@ def partition(imageFiles_labels):
         images.append(image)
         labels.append(label)
 
-    resize = (96,96,96)
-    val_size = 0.1
-    test_size = 0.1
+    resize = tuple(args.resize)
+    val_size = args.val_size
+    test_size = args.test_size
     train_transform = Compose([ScaleIntensity(),
                                AddChannel(),
                                Resize(resize),
@@ -177,7 +177,7 @@ def partition(imageFiles_labels):
     return partition
 
 # split dataset
-partition = partition(imageFiles_labels)
+partition = partition(imageFiles_labels, args)
 print("Splitting data to train, val, test is completed")
 ## ====================================== ##
 
