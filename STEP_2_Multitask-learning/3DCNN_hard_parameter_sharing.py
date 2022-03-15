@@ -56,10 +56,10 @@ parser = argparse.ArgumentParser()
 
 
 #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
-parser.add_argument("--model",required=True,type=str,help='',choices=['resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D161','densenet169','densenet201'])
+parser.add_argument("--model",required=True,type=str,help='',choices=['resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-parser.add_argument("--resize",default=[96, 96, 96],nargs="*",required=False,help='')
+parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
 parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
 parser.add_argument("--val_batch_size",default=16,type=int,required=False,help='')
 parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
@@ -104,7 +104,7 @@ data_dir = '/master_ssd/3DCNN/data/1.sMRI_fmriprep/preprocessed_masked'
 os.chdir(data_dir)
 image_files = glob.glob('*.npy')
 image_files = sorted(image_files)
-#image_files = image_files[:30]
+#image_files = image_files[:100]
 print("Loading image file names as list is completed")
 ## ====================================== ##
 
@@ -122,7 +122,7 @@ targets = args.cat_target + args.num_target
 col_list = targets + ['subjectkey']
 
 ##
-
+print(args.resize)
 ### get subject ID and target variables
 subject_data = pd.read_csv('/home/connectome/dhkdgmlghks/3DCNN_test/ABCD_phenotype_total.csv')
 subject_data = subject_data.loc[:,col_list]
@@ -201,7 +201,7 @@ def partition(imageFiles_labels,args):
         labels.append(label)
 
 
-    resize = args.resize
+    resize = tuple(args.resize)
     train_transform = Compose([ScaleIntensity(),
                                AddChannel(),
                                Resize(resize),
@@ -574,11 +574,6 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
         net, train_loss, train_acc = train(net,partition,optimizer,args)
         val_loss, val_acc = validate(net,partition,scheduler,args)
         te = time.time()
-
-        if val_acc > max(val_accs):
-            model_path = "/home/connectome/dhkdgmlghks/3DCNN_test/%s_%s.pth" % (args.model, args.exp_name)
-            torch.save(net, model_path)
-        print('Epoch {}. Current LR {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
          # sorting the results
         for target_name in targets:
