@@ -224,15 +224,15 @@ def densenet121():
     model = generate_model(121)
     return model
 
-def densenet161():
-    model = generate_model(121)
-    return model
-
 def densenet169():
-    model = generate_model(121)
+    model = generate_model(169)
     return model
 
 def densenet201():
-    model = generate_model(121)
+    model = generate_model(201)
+    return model
+
+def densenet264():
+    model = generate_model(264)
     return model
 
