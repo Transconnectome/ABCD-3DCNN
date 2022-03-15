@@ -1,8 +1,8 @@
 The list of models are as follows 
-- simple 3DCNN
-- VGGNet (11 layers, 13 layers, 16 layers, 19 layers)
-- ResNet (50 layers, 101 layers, 152 layers)
-- DenseNet (121 layers, 169 layers, 201 layers, 264 layers)
+- **simple 3DCNN**
+- **VGGNet** (11 layers, 13 layers, 16 layers, 19 layers)
+- **ResNet** (50 layers, 101 layers, 152 layers)
+- **DenseNet** (121 layers, 169 layers, 201 layers, 264 layers)
 
   
 This python script could be used in both **single task learning** and **multi task learning**  
