@@ -576,7 +576,7 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
         te = time.time()
 
         if val_acc > max(val_accs):
-            model_path = "/home/connectome/dhkdgmlghks/3DCNN_test/resenet_%s.pth" % args.cat_target[0]
+            model_path = "/home/connectome/dhkdgmlghks/3DCNN_test/%s_%s.pth" % (args.model, args.exp_name)
             torch.save(net, model_path)
         print('Epoch {}. Current LR {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
