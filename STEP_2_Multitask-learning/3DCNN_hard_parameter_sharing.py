@@ -3,8 +3,8 @@
 ## =================================== ##
 
 ## ======= load module ======= ##
-import resnet3d #model script
-import densenet3d #model script
+import resnet3d_hardparameter_sharing as resnet3d #model script
+import densenet3d_hardparameter_sharing as densenet3d #model script
 import glob
 import os
 from os import listdir
