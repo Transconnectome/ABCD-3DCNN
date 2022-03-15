@@ -1,0 +1,9 @@
+The list of models are as follows 
+- simple 3DCNN
+- VGGNet (11 layers, 13 layers, 16 layers, 19 layers)
+- ResNet (50 layers, 101 layers, 152 layers)
+- DenseNet (121 layers, 169 layers, 201 layers, 264 layers)
+
+```
+python3 run_3DCNN_hard_parameter_sharing.py --cat_target sex  --optim SGD --lr 1e-3 --gpus 4 5 --exp_name sex_test --model {model_name} --epoch 300 --train_batch_size 32 --val_batch_size 32 
+```
