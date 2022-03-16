@@ -118,7 +118,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
         # visualize the result
         CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
-        print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
+        print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
 
         # saving the checkpoint
         checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
