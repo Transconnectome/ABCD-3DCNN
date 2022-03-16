@@ -138,10 +138,13 @@ def preprocessing_cat():
 
 ## numeric
 def preprocessing_num():
+    """
     for num in args.num_target:
         mean = np.mean(subject_data[num],axis=0)
         std = np.std(subject_data[num],axis=0)
         subject_data[num] = (subject_data[num]-mean)/std
+    """
+    pass
 
 ## combine categorical + numeric
 def combining_image_target():
@@ -599,6 +602,7 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
 
         # visualize the result
         CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
+        print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch,optimizer.param_groups[0]['lr'],te-ts))
 
         # test
     test_acc = test(net, partition, args)
