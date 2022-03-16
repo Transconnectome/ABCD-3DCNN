@@ -530,7 +530,7 @@ def experiment(partition, subject_data, args): #in_channels,out_dim
     # Simple CNN
     if args.model == 'simple3D':
         assert args.resize == [96, 96, 96]
-        net = simple3d.simple3d(subject_data, args)
+        net = simple3d.simple3D(subject_data, args)
     # VGGNet
     elif args.model == 'vgg3D11':
         assert args.resize == [96, 96, 96]
