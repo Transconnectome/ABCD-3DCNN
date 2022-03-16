@@ -103,7 +103,7 @@ class SIMPLE_CNN3D(nn.Module):
 
         return  results 
 
-def simple3d(subject_data, args):
+def simple3D(subject_data, args):
     model = SIMPLE_CNN3D(subject_data, args)
     return model
 
