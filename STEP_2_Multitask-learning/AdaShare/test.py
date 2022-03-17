@@ -28,11 +28,11 @@ def eval_iter_fix_policy(environ, testloader, results_iter, opt):
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
                     results_iter[cat_target]['test']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
-                    results_iter[cat_target]['test']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
+                    results_iter[cat_target]['test']['ACC or R2'].append(results[cat_target]['ACC or R2'])
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
                     results_iter[num_target]['test']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
-                    results_iter[num_target]['test']['ACC or MSE'].append(results[num_target]['ACC or MSE'])          
+                    results_iter[num_target]['test']['ACC or R2'].append(results[num_target]['ACC or R2'])          
 
     
     return results_iter
@@ -141,10 +141,10 @@ def test():
     results_iter = {}
     if opt['task']['cat_target']:
         for cat_target in opt['task']['cat_target']:
-            results_iter[cat_target] = {'test':{'loss':[], 'ACC or MSE':[]}}
+            results_iter[cat_target] = {'test':{'loss':[], 'ACC or R2':[]}}
     if opt['task']['num_target']:
         for num_target in opt['task']['num_target']:
-            results_iter[num_target] = {'test':{'loss':[], 'ACC or MSE':[]}}
+            results_iter[num_target] = {'test':{'loss':[], 'ACC or R2':[]}}
     
     # Test/ Inference 
     results_iter = eval_iter_fix_policy(environ, testloader, results_iter=results_iter, opt=opt)

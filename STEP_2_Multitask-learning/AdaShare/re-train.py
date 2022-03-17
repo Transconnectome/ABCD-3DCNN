@@ -33,11 +33,11 @@ def train_and_eval_iter_fix_policy(environ, trainloader, valloader, current_iter
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
                 results_iter[cat_target]['train']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
-                results_iter[cat_target]['train']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
+                results_iter[cat_target]['train']['ACC or R2'].append(results[cat_target]['ACC or R2'])
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
                 results_iter[num_target]['train']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
-                results_iter[num_target]['train']['ACC or MSE'].append(results[num_target]['ACC or MSE'])
+                results_iter[num_target]['train']['ACC or R2'].append(results[num_target]['ACC or R2'])
                         
 
     # validation
@@ -52,11 +52,11 @@ def train_and_eval_iter_fix_policy(environ, trainloader, valloader, current_iter
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
                     results_iter[cat_target]['val']['loss'].append(results[cat_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
-                    results_iter[cat_target]['val']['ACC or MSE'].append(results[cat_target]['ACC or MSE'])
+                    results_iter[cat_target]['val']['ACC or R2'].append(results[cat_target]['ACC or R2'])
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
                     results_iter[num_target]['val']['loss'].append(results[num_target]['loss'])       # if item is extracted by item() in the class of environ, loss could be not backpropagated. Thus it is extracted by item() in here.  
-                    results_iter[num_target]['val']['ACC or MSE'].append(results[num_target]['ACC or MSE'])          
+                    results_iter[num_target]['val']['ACC or R2'].append(results[num_target]['ACC or R2'])          
     end_time = time.time()
 
                 
@@ -204,10 +204,10 @@ def _train(exp_id, opt, gpu_ids):
             results_iter = {}
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
-                    results_iter[cat_target] = {'train':{'loss':[], 'ACC or MSE':[]}, 'val':{'loss':[], 'ACC or MSE':[]}}
+                    results_iter[cat_target] = {'train':{'loss':[], 'ACC or R2':[]}, 'val':{'loss':[], 'ACC or R2':[]}}
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    results_iter[num_target] = {'train':{'loss':[], 'ACC or MSE':[]}, 'val':{'loss':[], 'ACC or MSE':[]}}
+                    results_iter[num_target] = {'train':{'loss':[], 'ACC or R2':[]}, 'val':{'loss':[], 'ACC or R2':[]}}
             
             # Training 
             results_iter, time= train_and_eval_iter_fix_policy(environ=environ, trainloader=trainloader, valloader=valloader, current_iter=current_iter, results_iter=results_iter, opt=opt)
@@ -219,14 +219,14 @@ def _train(exp_id, opt, gpu_ids):
             best_checkpoints_vote = 0
             if opt['task']['cat_target']:
                 for cat_target in opt['task']['cat_target']:
-                    if results_iter[cat_target]['val']['ACC or MSE'] >= best_value[cat_target]:
+                    if results_iter[cat_target]['val']['ACC or R2'] >= best_value[cat_target]:
                         best_checkpoints_vote += 1
-                        best_value[cat_target] = results_iter[cat_target]['val']['ACC or MSE']
+                        best_value[cat_target] = results_iter[cat_target]['val']['ACC or R2']
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    if results_iter[num_target]['val']['ACC or MSE'] <= best_value[num_target]:
+                    if results_iter[num_target]['val']['ACC or R2'] <= best_value[num_target]:
                         best_checkpoints_vote += 1      
-                        best_value[num_target] = results_iter[num_target]['val']['ACC or MSE']
+                        best_value[num_target] = results_iter[num_target]['val']['ACC or R2']
                     
 
             if best_checkpoints_vote == len(opt['task']['targets']):
