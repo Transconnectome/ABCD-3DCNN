@@ -8,19 +8,18 @@ from tqdm.auto import tqdm ##progress
 ## ========= define functinos for data preprocesing categorical variable and numerical variables ========= ##
 ## categorical
 def preprocessing_cat(subject_data, opt):
-    for cat in opt['task']['cat_target']:
-        if not 0 in list(subject_data.loc[:,cat]):
-            subject_data[cat] = subject_data[cat] - 1
+    for cat_target in opt['task']['cat_target']:
+        if not 0 in list(subject_data.loc[:,cat_target]):
+            subject_data[cat_target] = subject_data[cat_target] - 1
         else:
             continue
 
 ## numeric
 def preprocessing_num(subject_data, opt):
-    pass
-    #for num in opt['task']['num_target']:
-    #    mean = np.mean(subject_data[num],axis=0)
-    #    std = np.std(subject_data[num],axis=0)
-    #    subject_data[num] = (subject_data[num]-mean)/std
+    for num_target in opt['task']['num_target']:
+        mean = np.mean(subject_data[num_target],axis=0)
+        std = np.std(subject_data[num_target],axis=0)
+        subject_data[num_target] = (subject_data[num_target]-mean)/std
 
 
 ## combine categorical + numeric
