@@ -42,10 +42,10 @@ class BaseEnv():
         self.results = {}   
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
-                self.results[cat_target] = {'loss':[], 'ACC or MSE':[]}
+                self.results[cat_target] = {'loss':[], 'ACC or R2':[]}
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
-                self.results[num_target] = {'loss':[], 'ACC or MSE':[]}
+                self.results[num_target] = {'loss':[], 'ACC or R2':[]}
         
         self.optimizers = {}
         self.schedulers = {}
@@ -121,7 +121,7 @@ class BaseEnv():
                 correct = (pred_class == ground_truth).sum().item()
                 total = ground_truth.size(0)
 
-                self.results[cat_target]['ACC or MSE'] = 100 * correct / total
+                self.results[cat_target]['ACC or R2'] = 100 * correct / total
                 self.results[cat_target]['loss'] = loss.item()
                 self.losses[cat_target]['total'] = loss
                 
@@ -133,8 +133,9 @@ class BaseEnv():
                 groud_truth = getattr(self,'ground_truth_%s' % num_target)
                 loss = self.mse(predicted.float(), groud_truth.float().unsqueeze(1))
                 
-                 
-                self.results[num_target]['ACC or MSE'] = loss.item()
+                y_var = torch.var(ground_truth)
+                r_square = 1 - (loss / y_var) 
+                self.results[num_target]['ACC or R2'] = r_square.item()
                 self.results[num_target]['loss'] = loss.item()
                 self.losses[num_target]['total'] = loss
         
