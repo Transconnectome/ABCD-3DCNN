@@ -1,7 +1,9 @@
+import numpy as np
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from envs.loss_functions import calculating_loss_acc, calculating_acc
+from envs.loss_functions import calculating_loss, calculating_acc
 
 ### ========= Train,Validate, and Test ========= ###
 '''The process of calcuating loss and accuracy metrics is as follows.
@@ -34,15 +36,16 @@ def train(net,partition,optimizer,args):
     
 
     if args.cat_target:
-        for cat_label in args.cat_target:
-            correct[cat_label] = 0
-            total[cat_label] = 0
-            train_loss[cat_label] = 0.0
+        for cat_target in args.cat_target:
+            correct[cat_target] = 0
+            total[cat_target] = 0
+            train_acc[cat_target] = []
+            train_loss[cat_target] = []
 
     if args.num_target:
-        for num_label in args.num_target:
-            train_acc[num_label] = 0.0
-            train_loss[num_label] = 0.0
+        for num_target in args.num_target:
+            train_acc[num_target] = []
+            train_loss[num_target] = []
 
 
     for i, data in enumerate(trainloader,0):
@@ -51,7 +54,9 @@ def train(net,partition,optimizer,args):
         image, targets = data
         image = image.to(f'cuda:{net.device_ids[0]}')
         output = net(image)
-        loss, correct, total, train_loss,train_acc = calculating_loss_acc(targets,output, args.cat_target, args.num_target, correct, total, train_loss, train_acc,net)
+
+        loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
+        train_acc = calculating_acc(targets, output, correct, total, train_acc, net, args)
 
         scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
         scaler.step(optimizer)
@@ -59,14 +64,14 @@ def train(net,partition,optimizer,args):
 
     # calculating total loss and acc of separate mini-batch
     if args.cat_target:
-        for cat_label in args.cat_target:
-            train_acc[cat_label] = 100 * correct[cat_label] / total[cat_label]
-            train_loss[cat_label] = train_loss[cat_label] / len(trainloader)
+        for cat_target in args.cat_target:
+            train_acc[cat_target] = np.mean(train_acc[cat_target])
+            train_loss[cat_target] = np.mean(train_loss[cat_target])
 
     if args.num_target:
-        for num_label in args.num_target:
-            train_acc[num_label] = train_acc[num_label] / len(trainloader)
-            train_loss[num_label] = train_loss[num_label] / len(trainloader)
+        for num_target in args.num_target:
+            train_acc[num_target] = np.mean(train_acc[num_target])
+            train_loss[num_target] = np.mean(train_loss[num_target])
 
 
     return net, train_loss, train_acc
@@ -76,7 +81,7 @@ def train(net,partition,optimizer,args):
 def validate(net,partition,scheduler,args):
     valloader = torch.utils.data.DataLoader(partition['val'],
                                            batch_size=args.val_batch_size,
-                                           shuffle=False,
+                                           shuffle=True,
                                            num_workers=24)
 
     net.eval()
@@ -90,15 +95,16 @@ def validate(net,partition,scheduler,args):
 
 
     if args.cat_target:
-        for cat_label in args.cat_target:
-            correct[cat_label] = 0
-            total[cat_label] = 0
-            val_loss[cat_label] = 0.0
+        for cat_target in args.cat_target:
+            correct[cat_target] = 0
+            total[cat_target] = 0
+            val_acc[cat_target] = []
+            val_loss[cat_target] = []
 
     if args.num_target:
-        for num_label in args.num_target:
-            val_acc[num_label] = 0.0
-            val_loss[num_label] = 0.0
+        for num_target in args.num_target:
+            val_acc[num_target] = []
+            val_loss[num_target] = []
 
 
     with torch.no_grad():
@@ -107,18 +113,18 @@ def validate(net,partition,scheduler,args):
             image = image.to(f'cuda:{net.device_ids[0]}')
             output = net(image)
 
-            loss, correct, total, val_loss,val_acc = calculating_loss_acc(targets,output, args.cat_target, args.num_target, correct, total, val_loss, val_acc,net)
-
+            loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
+            val_acc = calculating_acc(targets, output, correct, total, val_acc, net, args)
 
     if args.cat_target:
-        for cat_label in args.cat_target:
-            val_acc[cat_label] = 100 * correct[cat_label] / total[cat_label]
-            val_loss[cat_label] = val_loss[cat_label] / len(valloader)
+        for cat_target in args.cat_target:
+            val_acc[cat_target] = np.mean(val_acc[cat_target])
+            val_loss[cat_target] = np.mean(val_loss[cat_target])
 
     if args.num_target:
-        for num_label in args.num_target:
-            val_acc[num_label] = val_acc[num_label] / len(valloader)
-            val_loss[num_label] = val_loss[num_label] / len(valloader)
+        for num_target in args.num_target:
+            val_acc[num_target] = np.mean(val_acc[num_target])
+            val_loss[num_target] = np.mean(val_loss[num_target])
 
 
     # learning rate scheduler
@@ -145,13 +151,14 @@ def test(net,partition,args):
 
 
     if args.cat_target:
-        for cat_label in args.cat_target:
-            correct[cat_label] = 0
-            total[cat_label] = 0
+        for cat_target in args.cat_target:
+            correct[cat_target] = 0
+            total[cat_target] = 0
+            test_acc[cat_target] = []
 
     if args.num_target:
-        for num_label in args.num_target:
-            test_acc[num_label] = 0.0
+        for num_target in args.num_target:
+            test_acc[num_target] = []
 
 
     for i, data in enumerate(testloader,0):
@@ -159,16 +166,15 @@ def test(net,partition,args):
             image = image.to(f'cuda:{net.device_ids[0]}')
             output = net(image)
 
-            correct, total, test_acc = calculating_acc(targets,output, args.cat_target, args.num_target, correct, total, test_acc,net)
-
+            test_acc = calculating_acc(targets, output, correct, total, test_acc, net, args)
 
     if args.cat_target:
-        for cat_label in args.cat_target:
-            test_acc[cat_label] = 100 * correct[cat_label] / total[cat_label]
+        for cat_target in args.cat_target:
+            test_acc[cat_target] = np.mean(test_acc[cat_target])
 
     if args.num_target:
-        for num_label in args.num_target:
-            test_acc[num_label] = test_acc[num_label] / len(testloader)
+        for num_target in args.num_target:
+            test_acc[num_target] = np.mean(test_acc[num_target])
 
 
     return test_acc
