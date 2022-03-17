@@ -13,8 +13,8 @@ paths:
 
 dataload:
   dataset: ABCD
-  img_dataroot: /home/connectome/dhkdgmlghks/3DCNN_test/preprocessed_masked/
-  label_dataroot: /home/connectome/dhkdgmlghks/3DCNN_test/ABCD_phenotype_total.csv
+  img_dataroot: /master_ssd/3DCNN/data/1.sMRI_fmriprep/preprocessed_masked
+  label_dataroot: /master_ssd/3DCNN/data/3.demo_qc/ABCD_phenotype_total.csv
 
 task:
   cat_target:
