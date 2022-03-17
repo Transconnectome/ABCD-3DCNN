@@ -87,21 +87,22 @@ def read_yaml():
     # read in yaml
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, type=str, help="Path for the config file")
-    parser.add_argument("--exp_ids", type=int, nargs='+', default=[0], help="Path for the config file")
-    parser.add_argument("--gpus", type=int, nargs='+', default=[0], help="Path for the config file")
+    parser.add_argument("--exp_ids", type=int, nargs='+', default=[0])
+    parser.add_argument("--gpus", type=int, nargs='+', default=[0])
+    parser.add_argument("--exp_name", required=True, type=str, default='ABCD_multitask')
 
-    parser.add_argument("--cat_target", type=str, nargs='*', required=True, help='')
-    parser.add_argument("--num_target", type=str,nargs='*', required=True, help='')
+    parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
+    parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
     
     parser.add_argument("--model",required=False,type=str,help='',choices=['ResNet3D50','ResNet3D101','ResNet3D152'])
     parser.add_argument("--warmup_size",default=0.3,type=float,required=False,help='')
-    parser.add_argument("--train_batch_size",default=1,type=int,required=False,help='')
-    parser.add_argument("--val_batch_size",default=1,type=int,required=False,help='')
-    parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
+    parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
+    parser.add_argument("--val_batch_size",default=16,type=int,required=False,help='')
+    parser.add_argument("--test_batch_size",default=16,type=int,required=False,help='')
 
     parser.add_argument("--resize",default=(96,96,96),required=False,help='')
     
-    parser.add_argument("--lr", default=1e-6,type=float,required=False,help='')
+    parser.add_argument("--lr", default=1e-3,type=float,required=False,help='')
     parser.add_argument("--backbone_lr", default=1e-6,type=float,required=False,help='')
     parser.add_argument("--policy_lr", default=1e-4,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
@@ -113,9 +114,16 @@ def read_yaml():
     with open(args.config) as f:
         opt = yaml.load(f, Loader=yaml.FullLoader)
 
+    opt['exp_name'] = args.exp_name
+    
     opt['task']['cat_target'] = args.cat_target
     opt['task']['num_target'] = args.num_target
-    opt['task']['targets'] = args.cat_target + args.num_target
+    if not opt['task']['cat_target']:
+        opt['task']['cat_target'] = []
+    if not opt['task']['num_target'] :
+        opt['task']['num_target'] = []
+    opt['task']['targets'] = opt['task']['cat_target'] + opt['task']['num_target']
+
 
     opt['data_split']['warmup_size'] = args.warmup_size
     opt['data_split']['train_batch_size'] = args.train_batch_size
@@ -127,6 +135,9 @@ def read_yaml():
     opt['train']['weight_decay'] = args.weight_decay
 
     opt['data_augmentation']['resize'] = args.resize
+
+    opt['lambdas'] = [1] * len(opt['task']['targets']) # This lambda value is the weight of loss of tasks. Now set as 1, so all loss of tasks are treated samely
+
 
     return opt, args.gpus, args.exp_ids
 
@@ -161,51 +172,51 @@ def summarizing_results(opt ,results_iter, results_final, test = False):
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
                 test_loss = np.mean(results_iter[cat_target]['test']['loss'])
-                test_acc = np.mean(results_iter[cat_target]['test']['ACC or MSE'])
+                test_acc = np.mean(results_iter[cat_target]['test']['ACC or R2'])
                 results_iter[cat_target]['test']['loss'] = test_loss
-                results_iter[cat_target]['test']['ACC or MSE'] = test_acc
+                results_iter[cat_target]['test']['ACC or R2'] = test_acc
                 results_final[cat_target]['test']['loss'].append(test_loss)
-                results_final[cat_target]['test']['MSE or ACC'].append(test_acc) 
+                results_final[cat_target]['test']['ACC or R2'].append(test_acc) 
 
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
                 test_loss = np.mean(results_iter[num_target]['test']['loss'])
-                test_acc = np.mean(results_iter[num_target]['test']['ACC or MSE'])
+                test_acc = np.mean(results_iter[num_target]['test']['ACC or R2'])
                 results_iter[num_target]['test']['loss'] = test_loss
-                results_iter[num_target]['test']['ACC or MSE'] = test_acc
-                results_final[cat_target]['test']['loss'].append(test_loss)
-                results_final[cat_target]['test']['MSE or ACC'].append(test_acc) 
+                results_iter[num_target]['test']['ACC or R2'] = test_acc
+                results_final[num_target]['test']['loss'].append(test_loss)
+                results_final[num_target]['test']['ACC or R2'].append(test_acc) 
 
     else:
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
                 train_loss = np.mean(results_iter[cat_target]['train']['loss'])
-                train_acc = np.mean(results_iter[cat_target]['train']['ACC or MSE']) 
+                train_acc = np.mean(results_iter[cat_target]['train']['ACC or R2']) 
                 val_loss = np.mean(results_iter[cat_target]['val']['loss'])     
-                val_acc = np.mean(results_iter[cat_target]['val']['ACC or MSE'])
+                val_acc = np.mean(results_iter[cat_target]['val']['ACC or R2'])
                 results_iter[cat_target]['train']['loss'] = train_loss
-                results_iter[cat_target]['train']['ACC or MSE'] = train_acc
+                results_iter[cat_target]['train']['ACC or R2'] = train_acc
                 results_iter[cat_target]['val']['loss'] =  val_loss
-                results_iter[cat_target]['val']['ACC or MSE'] = val_acc 
+                results_iter[cat_target]['val']['ACC or R2'] = val_acc 
                 results_final[cat_target]['train']['loss'].append(train_loss)
-                results_final[cat_target]['train']['ACC or MSE'].append(train_acc) 
+                results_final[cat_target]['train']['ACC or R2'].append(train_acc) 
                 results_final[cat_target]['val']['loss'].append(val_loss)
-                results_final[cat_target]['val']['ACC or MSE'].append(val_acc)
+                results_final[cat_target]['val']['ACC or R2'].append(val_acc)
             
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
                 train_loss = np.mean(results_iter[num_target]['train']['loss'])
-                train_acc = np.mean(results_iter[num_target]['train']['ACC or MSE']) 
+                train_acc = np.mean(results_iter[num_target]['train']['ACC or R2']) 
                 val_loss = np.mean(results_iter[num_target]['val']['loss'])     
-                val_acc = np.mean(results_iter[num_target]['val']['ACC or MSE'])
+                val_acc = np.mean(results_iter[num_target]['val']['ACC or R2'])
                 results_iter[num_target]['train']['loss'] = train_loss
-                results_iter[num_target]['train']['ACC or MSE'] = train_acc
+                results_iter[num_target]['train']['ACC or R2'] = train_acc
                 results_iter[num_target]['val']['loss'] =  val_loss
-                results_iter[num_target]['val']['ACC or MSE'] = val_acc 
+                results_iter[num_target]['val']['ACC or R2'] = val_acc 
                 results_final[num_target]['train']['loss'].append(train_loss)
-                results_final[num_target]['train']['ACC or MSE'].append(train_acc) 
+                results_final[num_target]['train']['ACC or R2'].append(train_acc) 
                 results_final[num_target]['val']['loss'].append(val_loss)
-                results_final[num_target]['val']['ACC or MSE'].append(val_acc)
+                results_final[num_target]['val']['ACC or R2'].append(val_acc)
 
     return results_iter, results_final
 
@@ -216,74 +227,74 @@ def CLIreporter(results, opt, test= False):
         var_column = []
         visual_report = {}
         visual_report['Loss'] = []
-        visual_report['MSE or ACC'] = []
+        visual_report['R2 or ACC'] = []
 
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
                 var_column.append(cat_target)
                 loss_value = '{:2.2f}'.format(results[cat_target]['test']['loss'])
-                acc_value = '{:2.2f}'.format(results[cat_target]['test']['ACC or MSE'])
+                acc_value = '{:2.2f}'.format(results[cat_target]['test']['ACC or R2'])
                 visual_report['Loss'].append(loss_value)
-                visual_report['MSE or ACC'].append(acc_value)
+                visual_report['R2 or ACC'].append(acc_value)
         
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
                 var_column.append(num_target)
                 loss_value = '{:2.2f}'.format(results[num_target]['test']['loss'])
-                acc_value = '{:2.2f}'.format(results[num_target]['test']['ACC or MSE'])                
+                acc_value = '{:2.2f}'.format(results[num_target]['test']['ACC or R2'])                
                 visual_report['Loss'].append(loss_value)
-                visual_report['MSE or ACC'].append(acc_value)
+                visual_report['R2 or ACC'].append(acc_value)
 
     else:
         var_column = []
         visual_report = {}
         visual_report['Loss (train/val)'] = []
-        visual_report['MSE or ACC (train/val)'] = []
+        visual_report['R2 or ACC (train/val)'] = []
 
         if opt['task']['cat_target']:
             for cat_target in opt['task']['cat_target']:
                 var_column.append(cat_target)
                 loss_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['loss'],results[cat_target]['val']['loss'])
-                acc_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['ACC or MSE'],results[cat_target]['val']['ACC or MSE'])
+                acc_value = '{:2.2f} / {:2.2f}'.format(results[cat_target]['train']['ACC or R2'],results[cat_target]['val']['ACC or R2'])
                 visual_report['Loss (train/val)'].append(loss_value)
-                visual_report['MSE or ACC (train/val)'].append(acc_value)
+                visual_report['R2 or ACC (train/val)'].append(acc_value)
         
         if opt['task']['num_target']:
             for num_target in opt['task']['num_target']:
                 var_column.append(num_target)
                 loss_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['loss'],results[num_target]['val']['loss'])           
-                acc_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['ACC or MSE'],results[num_target]['val']['ACC or MSE'])
+                acc_value = '{:2.2f} / {:2.2f}'.format(results[num_target]['train']['ACC or R2'],results[num_target]['val']['ACC or R2'])
                 visual_report['Loss (train/val)'].append(loss_value)
-                visual_report['MSE or ACC (train/val)'].append(acc_value)
+                visual_report['R2 or ACC (train/val)'].append(acc_value)
 
     print(pd.DataFrame(visual_report, index=var_column))
 
 
-def making_results_template(opt):
+def making_results_template(opt, mode=None):
     results_final = {}
-    if opt['task']['cat_target']:
-        for cat_target in opt['task']['cat_target']:
-            results_final[cat_target] = {'train':{'loss':[], 'ACC or MSE':[]}, 'val':{'loss':[], 'ACC or MSE':[]}}
-    if opt['task']['num_target']:
-        for num_target in opt['task']['num_target']:
-            results_final[num_target] = {'train':{'loss':[], 'ACC or MSE':[]}, 'val':{'loss':[], 'ACC or MSE':[]}}
+    if mode == 'test':
+        if opt['task']['cat_target']:
+            for cat_target in opt['task']['cat_target']:
+                results_final[cat_target] = {'test':{'loss':[], 'ACC or R2':[]}}
+        if opt['task']['num_target']:
+            for num_target in opt['task']['num_target']:
+                results_final[num_target] = {'test':{'loss':[], 'ACC or R2':[]}}      
+    else:
+        if opt['task']['cat_target']:
+            for cat_target in opt['task']['cat_target']:
+                results_final[cat_target] = {'train':{'loss':[], 'ACC or R2':[]}, 'val':{'loss':[], 'ACC or R2':[]}}
+        if opt['task']['num_target']:
+            for num_target in opt['task']['num_target']:
+                results_final[num_target] = {'train':{'loss':[], 'ACC or R2':[]}, 'val':{'loss':[], 'ACC or R2':[]}}
     
     return results_final
 
 
-def save_exp_results(results_final, policy_distribution, opt, mode=None):
-    # summarizing policy distribution
-    policy = {}
-    for t_id, task in enumerate(opt['task']['targets']):
-        policy_task = np.concatenate(policy_distribution, axis=-1)[:,t_id]
-        policy['policy_%s' % task] = policy_task.tolist()
-        
-    print(policy)
+def save_exp_results(results_final, opt, mode=None):
     exp_name = opt['exp_name']
     file_name = '{}_results_{}.json'.format(exp_name, mode)
     file_name = os.path.join(opt['paths']['result_dir'], exp_name, file_name)
     opt.update(results_final)
-    opt.update(policy)
 
     with open(file_name, 'w') as f:
         json.dump(opt, f)
