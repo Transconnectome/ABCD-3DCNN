@@ -108,11 +108,11 @@ def train():
     if opt['dataload']['dataset'] == 'ABCD':
         image_files_train = ImageList_loading(os.path.join(opt['dataload']['img_dataroot'],'image_train_SubjectList.txt'))
         image_files_train = sorted(image_files_train)
-        image_files_train = image_files_train[:30]
+        #image_files_train = image_files_train[:30]
 
         image_files_val = ImageList_loading(os.path.join(opt['dataload']['img_dataroot'],'image_val_SubjectList.txt'))
         image_files_val = sorted(image_files_val)
-        image_files_val = image_files_val[:30]
+        #image_files_val = image_files_val[:30]
         
 
     if not opt['task']['targets']:
@@ -212,7 +212,7 @@ def train():
             best_value[cat_target] = 0.0       # best_value[cat_target] is compared to the validation Accuracy  
     if opt['task']['num_target']:
         for num_target in opt['task']['num_target']:
-            best_value[num_target] = 100000.0       # best_value[num_target] is compared to the validation MSE Loss. This value should be set according to its cases
+            best_value[num_target] = 0.0       # best_value[num_target] is compared to the validation MSE Loss. This value should be set according to its cases
 
 
     p_epoch = 0
@@ -305,7 +305,7 @@ def train():
                                 best_value[cat_target] = results_iter[cat_target]['val']['ACC or R2']
                     if opt['task']['num_target']:
                         for num_target in opt['task']['num_target']:
-                            if results_iter[num_target]['val']['ACC or R2'] <= best_value[num_target]:
+                            if results_iter[num_target]['val']['ACC or R2'] >= best_value[num_target]:
                                 best_checkpoints_vote += 1      
                                 best_value[num_target] = results_iter[num_target]['val']['ACC or R2']
                     
