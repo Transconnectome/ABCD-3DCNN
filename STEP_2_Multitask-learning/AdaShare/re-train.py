@@ -189,7 +189,7 @@ def _train(exp_id, opt, gpu_ids):
             best_value[cat_target] = 0.0       # best_value[cat_target] is compared to the validation Accuracy  
     if opt['task']['num_target']:
         for num_target in opt['task']['num_target']:
-            best_value[num_target] = 100000.0       # best_value[num_target] is compared to the validation MSE Loss. This value should be set according to its cases
+            best_value[num_target] = 0.0       # best_value[num_target] is compared to the validation MSE Loss. This value should be set according to its cases
 
 
     opt['train']['retrain_total_iters'] = opt['train'].get('retrain_total_iters', opt['train']['total_iters'])
@@ -224,7 +224,7 @@ def _train(exp_id, opt, gpu_ids):
                         best_value[cat_target] = results_iter[cat_target]['val']['ACC or R2']
             if opt['task']['num_target']:
                 for num_target in opt['task']['num_target']:
-                    if results_iter[num_target]['val']['ACC or R2'] <= best_value[num_target]:
+                    if results_iter[num_target]['val']['ACC or R2'] >= best_value[num_target]:
                         best_checkpoints_vote += 1      
                         best_value[num_target] = results_iter[num_target]['val']['ACC or R2']
                     
