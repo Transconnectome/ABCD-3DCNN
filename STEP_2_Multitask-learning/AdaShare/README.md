@@ -10,6 +10,11 @@ through a task-specific policy that selectively chooses which layers to execute 
 the multi-task network. In other words, we aim to obtain a single network for multi-task learning
 that supports separate execution paths for different tasks.
 
+**AdaShare could theroetically only be implemented to ResNet. DenseNet transit information of all previous layers and add it to later layers.  
+However, AdaShare should have task-specific layers and shared layers.  
+Thus, if AdaShare is implemented to DenseNet, information of task A specific layers could intervene task B specific layers.** 
+
+
 Here is [the link](https://arxiv.org/pdf/1911.12423.pdf) for our arxiv version. 
 
 Welcome to cite our work if you find it is helpful to your research.
