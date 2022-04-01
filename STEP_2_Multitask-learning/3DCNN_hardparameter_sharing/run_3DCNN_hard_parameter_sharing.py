@@ -65,7 +65,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = resnet3d.resnet3D50(subject_data, args)
     elif args.model == 'resnet3D101':
         net = resnet3d.resnet3D101(subject_data, args)
-    elif args.model == 'restnet3D152':
+    elif args.model == 'resnet3D152':
         net = resnet3d.resnet3D152(subject_data, args)
     # DenseNet
     elif args.model == 'densenet3D121':
