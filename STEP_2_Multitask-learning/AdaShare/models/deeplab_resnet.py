@@ -278,8 +278,8 @@ class MTL(nn.Module):
 
             for t_id in range(self.num_tasks):
                 if cuda_device != -1:     
-                    self.policys[t_id] = self.policys[t_id].to(cuda_device)
-                    padding_policy = torch.cat((padding.float(),self.policys[t_id][-num_train_layers:].float()),dim=0) 
+                    #self.policys[t_id] = self.policys[t_id].to(cuda_device)
+                    padding_policy = torch.cat((padding.float().to(cuda_device),self.policys[t_id][-num_train_layers:].float().to(cuda_device)),dim=0) 
                     padding_policys.append(padding_policy)
                     feats.append(self.backbone(img,padding_policy))
                 else:
