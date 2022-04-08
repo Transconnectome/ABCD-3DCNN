@@ -75,8 +75,8 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
 def checkpoint_save(net, save_dir, epoch, current_result, previous_result, args):
-    makedir(save_dir + '/model')
-    checkpoint_dir = save_dir + '/{}_{}.pth'.format(args.exp_name, args.model)
+    makedir(os.path.join(save_dir,'model'))
+    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}.pth'.format(args.exp_name, args.model))
     best_checkpoint_votes = 0
 
     if args.cat_target:
