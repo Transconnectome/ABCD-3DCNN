@@ -11,6 +11,7 @@ import random
 from tqdm.auto import tqdm
 
 import pandas as pd
+import numpy as np
 
 import monai
 from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor
@@ -39,26 +40,32 @@ def loading_phenotype(phenotype_dir, args):
     subject_data = preprocessing_cat(subject_data, args)
     subject_data = preprocessing_num(subject_data, args)
     
-    return subject_data, col_list
+    return subject_data, targets
 
 ## combine categorical + numeric
 def combining_image_target(subject_data, image_files, target_list):
     imageFiles_labels = []
+    
+    
+    subj= []
+    if type(subject_data['subjectkey'][0]) == np.str_ or type(subject_data['subjectkey'][0]) == str:
+        for i in range(len(image_files)):
+            subj.append(str(image_files[i][:-4]))
+    elif type(subject_data['subjectkey'][0]) == np.int_ or type(subject_data['subjectkey'][0]) == int:
+        for i in range(len(image_files)):
+            subj.append(int(image_files[i][:-4]))
+    print(subj)
+    image_list = pd.DataFrame({'subjectkey':subj, 'image_files': image_files})
+    subject_data = pd.merge(subject_data, image_list, how='inner', on='subjectkey')
 
-    for subjectID in tqdm(image_files):
-        subjectID = subjectID[:-4] #removing '.npy' for comparing
-        #print(subjectID)
-        for i in range(len(subject_data)):
-            if subjectID == subject_data['subjectkey'][i]:
-                imageFile_label = {}
-                imageFile_label['subjectkey'] = subjectID+'.npy'
-
-                # combine all target variables in dictionary type.
-                for j in range(len(target_list)-1):
-                    imageFile_label[subject_data.columns[j]] = subject_data[subject_data.columns[j]][i]
-
-
-                imageFiles_labels.append(imageFile_label)
+    col_list = target_list + ['image_files']
+    
+    for i in tqdm(range(len(subject_data))):
+        imageFile_label = {}
+        for j, col in enumerate(col_list):
+            imageFile_label[col] = subject_data[col][i]
+        imageFiles_labels.append(imageFile_label)
+        
 
     return imageFiles_labels
 
@@ -72,7 +79,7 @@ def partition_dataset(imageFiles_labels,args):
     targets = args.cat_target + args.num_target
 
     for imageFile_label in imageFiles_labels:
-        image = imageFile_label['subjectkey']
+        image = imageFile_label['image_files']
         label = {}
 
         for label_name in targets[:len(targets)]:
@@ -115,7 +122,6 @@ def partition_dataset(imageFiles_labels,args):
     # image and label information of test
     images_test = images[num_total-num_test:]
     labels_test = labels[num_total-num_test:]
-
 
     train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
     val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
