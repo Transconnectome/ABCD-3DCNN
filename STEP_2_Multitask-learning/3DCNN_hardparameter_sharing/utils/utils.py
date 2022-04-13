@@ -89,7 +89,7 @@ def checkpoint_save(net, save_dir, epoch, current_result, previous_result, args)
                 best_checkpoint_votes += 1
     
     if best_checkpoint_votes == len(args.cat_target + args.num_target):
-        torch.save(net.state_dict(), checkpoint_dir)
+        torch.save(net, checkpoint_dir)
         print("Best iteration until now is %d" % (epoch + 1))
             
 
