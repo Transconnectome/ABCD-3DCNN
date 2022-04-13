@@ -27,7 +27,7 @@ def argument_setting():
     parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
     parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
-    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
+    parser.add_argument("--sbatch", type=str, default='False',required=False, choices=['True', 'False'])
 
     args = parser.parse_args()
     print("Categorical target labels are {} and Numerical target labels are {}".format(args.cat_target, args.num_target))
