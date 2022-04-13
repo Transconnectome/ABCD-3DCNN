@@ -29,5 +29,5 @@ python3 run_3DCNN_hard_parameter_sharing.py --cat_target sex --num_target age --
 ``` 
 
 ### The example of using slurm 
-If you want to using slurm SBATCH, add options ```--sbatch True```  
-In this case, you don't need to assign gpu device ids by using gpu option ```--gpu {device_id}```
+If you want to using slurm SBATCH, add options ```--sbatch True```.  
+In this case, you don't need to assign gpu device ids by using gpu option ```--gpu {device_id}```.
