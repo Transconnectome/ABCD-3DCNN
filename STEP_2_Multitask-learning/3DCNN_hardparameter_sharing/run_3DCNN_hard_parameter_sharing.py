@@ -77,7 +77,16 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     elif args.model == 'densenet3D201':
         net = densenet3d.densenet3D201(subject_data, args)     
 
-    net = nn.DataParallel(net, device_ids=args.gpus)
+    # Data parallel
+    if args.sbatch == "True":
+        net = nn.DataParallel(net)
+    else:
+        if not args.gpus:
+            raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
+        else:
+            net = nn.DataParallel(net, device_ids=args.gpus)
+    
+    # transmit network to gpus         
     net.to(f'cuda:{net.device_ids[0]}')
 
     if args.optim == 'SGD':
