@@ -27,3 +27,7 @@ or
 ```
 python3 run_3DCNN_hard_parameter_sharing.py --cat_target sex --num_target age --optim SGD --lr 1e-3 --gpus 4 5 --exp_name sex_test --model {model_name} --epoch 300 --train_batch_size 32 --val_batch_size 32 
 ``` 
+
+### The example of using slurm 
+If you want to using slurm SBATCH, add options ```--sbatch True```  
+In this case, you don't need to assign gpu device ids by using gpu option ```--gpu {device_id}```
