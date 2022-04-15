@@ -19,7 +19,7 @@ from monai.data import ImageDataset
 
 def loading_images(image_dir, args):
     os.chdir(image_dir)
-    image_files = glob.glob('*.npy')
+    image_files = glob.glob('*.nii.gz')
     image_files = sorted(image_files)
     #image_files = image_files[:100]
     print("Loading image file names as list is completed")
@@ -27,12 +27,12 @@ def loading_images(image_dir, args):
 
 def loading_phenotype(phenotype_dir, args):
     targets = args.cat_target + args.num_target
-    col_list = targets + ['subjectkey']
+    col_list = targets + ['eid']
 
     ### get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
     subject_data = subject_data.loc[:,col_list]
-    subject_data = subject_data.sort_values(by='subjectkey')
+    subject_data = subject_data.sort_values(by='eid')
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values in sex
 
@@ -48,15 +48,15 @@ def combining_image_target(subject_data, image_files, target_list):
     
     
     subj= []
-    if type(subject_data['subjectkey'][0]) == np.str_ or type(subject_data['subjectkey'][0]) == str:
+    if type(subject_data['eid'][0]) == np.str_ or type(subject_data['eid'][0]) == str:
         for i in range(len(image_files)):
-            subj.append(str(image_files[i][:-4]))
-    elif type(subject_data['subjectkey'][0]) == np.int_ or type(subject_data['subjectkey'][0]) == int:
+            subj.append(str(image_files[i][:-7]))
+    elif type(subject_data['eid'][0]) == np.int_ or type(subject_data['eid'][0]) == int:
         for i in range(len(image_files)):
-            subj.append(int(image_files[i][:-4]))
-    
-    image_list = pd.DataFrame({'subjectkey':subj, 'image_files': image_files})
-    subject_data = pd.merge(subject_data, image_list, how='inner', on='subjectkey')
+            subj.append(int(image_files[i][:-7]))
+
+    image_list = pd.DataFrame({'eid':subj, 'image_files': image_files})
+    subject_data = pd.merge(subject_data, image_list, how='inner', on='eid')
 
     col_list = target_list + ['image_files']
     
