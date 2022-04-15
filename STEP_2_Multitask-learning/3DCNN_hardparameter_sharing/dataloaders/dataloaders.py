@@ -54,7 +54,7 @@ def combining_image_target(subject_data, image_files, target_list):
     elif type(subject_data['subjectkey'][0]) == np.int_ or type(subject_data['subjectkey'][0]) == int:
         for i in range(len(image_files)):
             subj.append(int(image_files[i][:-4]))
-    print(subj)
+    
     image_list = pd.DataFrame({'subjectkey':subj, 'image_files': image_files})
     subject_data = pd.merge(subject_data, image_list, how='inner', on='subjectkey')
 
