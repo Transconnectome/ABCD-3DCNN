@@ -85,6 +85,8 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
+    
+    net.to(f'cuda:{net.device_ids[0]}')
 
 
     if args.optim == 'SGD':
