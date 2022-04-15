@@ -6,6 +6,7 @@ import hashlib
 import json
 import argparse 
 import torch
+from copy import deepcopy
 
 def argument_setting():
     parser = argparse.ArgumentParser()
@@ -26,8 +27,9 @@ def argument_setting():
     parser.add_argument("--exp_name",type=str,required=True,help='')
     parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
     parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
+    parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
-    parser.add_argument("--sbatch", type=str, default='False',required=False, choices=['True', 'False'])
+    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
 
     args = parser.parse_args()
     print("Categorical target labels are {} and Numerical target labels are {}".format(args.cat_target, args.num_target))
@@ -76,22 +78,24 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
 def checkpoint_save(net, save_dir, epoch, current_result, previous_result, args):
-    makedir(os.path.join(save_dir,'model'))
-    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}.pth'.format(args.exp_name, args.model))
-    best_checkpoint_votes = 0
+    if os.path.isdir(os.path.join(save_dir,'model')) == False:
+        makedir(os.path.join(save_dir,'model'))
+    else:
+        checkpoint_dir = os.path.join(save_dir, 'model/{}_{}.pth'.format(args.exp_name, args.model))
+        best_checkpoint_votes = 0
 
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            if current_result[cat_target] >= max(previous_result[cat_target]):
-                best_checkpoint_votes += 1
-    if args.num_target:
-        for num_target in args.num_target:
-            if current_result[num_target] >= max(previous_result[num_target]):
-                best_checkpoint_votes += 1
-    
-    if best_checkpoint_votes == len(args.cat_target + args.num_target):
-        torch.save(net, checkpoint_dir)
-        print("Best iteration until now is %d" % (epoch + 1))
+        if args.cat_target:
+            for cat_target in args.cat_target:
+                if current_result[cat_target] >= max(previous_result[cat_target]):
+                    best_checkpoint_votes += 1
+        if args.num_target:
+            for num_target in args.num_target:
+                if current_result[num_target] >= max(previous_result[num_target]):
+                    best_checkpoint_votes += 1
+        
+        if best_checkpoint_votes == len(args.cat_target + args.num_target):
+            torch.save(net.module.state_dict(), checkpoint_dir)
+            print("Best iteration until now is %d" % (epoch + 1))
             
 
 # define result-saving function
