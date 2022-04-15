@@ -78,8 +78,14 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = densenet3d.densenet3D201(subject_data, args)
              
 
-    net = nn.DataParallel(net, device_ids=args.gpus)
-    net.to(f'cuda:{net.device_ids[0]}')
+    if args.sbatch == "True":
+        net = nn.DataParallel(net)
+    else:
+        if not args.gpus:
+            raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
+        else:
+            net = nn.DataParallel(net, device_ids=args.gpus)
+
 
     if args.optim == 'SGD':
         optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
@@ -150,10 +156,10 @@ if __name__ == "__main__":
     ## ========= Setting ========= ##
     args = argument_setting()
     current_dir = os.getcwd()
-    #image_dir = '/master_ssd/3DCNN/data/2.UKB/1.sMRI'
-    #phenotype_dir = '/master_ssd/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
-    image_dir = '/master_ssd/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
-    phenotype_dir = '/master_ssd/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'    
+    image_dir = '/master_ssd/3DCNN/data/2.UKB/1.sMRI'
+    phenotype_dir = '/master_ssd/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
+    #image_dir = '/master_ssd/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+    #phenotype_dir = '/master_ssd/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'    
     image_files = loading_images(image_dir, args)
     subject_data, target_list = loading_phenotype(phenotype_dir, args)
     os.chdir(image_dir)
