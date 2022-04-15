@@ -75,18 +75,10 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     elif args.model == 'densenet3D169':
         net = densenet3d.densenet3D169(subject_data, args) 
     elif args.model == 'densenet3D201':
-        net = densenet3d.densenet3D201(subject_data, args)     
+        net = densenet3d.densenet3D201(subject_data, args)
+             
 
-    # Data parallel
-    if args.sbatch == "True":
-        net = nn.DataParallel(net)
-    else:
-        if not args.gpus:
-            raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
-        else:
-            net = nn.DataParallel(net, device_ids=args.gpus)
-    
-    # transmit network to gpus         
+    net = nn.DataParallel(net, device_ids=args.gpus)
     net.to(f'cuda:{net.device_ids[0]}')
 
     if args.optim == 'SGD':
@@ -133,7 +125,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
 
     # test
-    test_acc = test(net, partition, args)
+    test_acc, confusion_matrices = test(net, partition, args)
 
     # summarize results
     result = {}
@@ -146,6 +138,8 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     result['val_acc'] = val_acc
     result['test_acc'] = test_acc
 
+    result['confusion_matrices'] = confusion_matrices
+
     return vars(args), result
 ## ==================================== ##
 
@@ -156,8 +150,10 @@ if __name__ == "__main__":
     ## ========= Setting ========= ##
     args = argument_setting()
     current_dir = os.getcwd()
-    image_dir = '/master_ssd/3DCNN/data/1.sMRI_fmriprep/preprocessed_masked'
-    phenotype_dir = '/master_ssd/3DCNN/data/3.demo_qc/ABCD_phenotype_total.csv'
+    #image_dir = '/master_ssd/3DCNN/data/2.UKB/1.sMRI'
+    #phenotype_dir = '/master_ssd/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
+    image_dir = '/master_ssd/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+    phenotype_dir = '/master_ssd/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'    
     image_files = loading_images(image_dir, args)
     subject_data, target_list = loading_phenotype(phenotype_dir, args)
     os.chdir(image_dir)
@@ -184,5 +180,5 @@ if __name__ == "__main__":
     setting, result = experiment(partition, subject_data, save_dir, deepcopy(args))
 
     # Save result
-    save_exp_result(save_dir, setting,result)
+    save_exp_result(save_dir, setting, result)
     ## ====================================== ##
