@@ -165,7 +165,7 @@ def test(net,partition,args):
         for num_target in args.num_target:
             outputs[num_target] = torch.tensor([])
             y_true[num_target] = torch.tensor([])
-            test_acc[cat_target] = []
+            test_acc[num_target] = []
             
 
     for i, data in enumerate(testloader,0):
