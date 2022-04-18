@@ -174,22 +174,21 @@ def test(net,partition,args):
             test_acc[cat_target] = []
     
             
-    with torch.no_grad():
-       for i, data in enumerate(testloader,0):
-           image, targets = data
-           image = image.to(device)
-           output = net(image)
+    for i, data in enumerate(testloader,0):
+        image, targets = data
+        image = image.to(device)
+        output = net(image)
 
-           if args.cat_target:
-               for cat_target in args.cat_target:
-                   outputs[cat_target] = torch.cat((outputs[cat_target], output[cat_target].cpu()))
-                   y_true[cat_target] = torch.cat((y_true[cat_target], targets[cat_target].cpu()))
-           if args.num_target:
-               for num_target in args.num_target:
-                   outputs[num_target] = torch.cat((outputs[num_target], output[num_target].cpu()))
-                   y_true[num_target] = torch.cat((y_true[num_target], targets[num_target].cpu()))
+        if args.cat_target:
+            for cat_target in args.cat_target:
+                outputs[cat_target] = torch.cat((outputs[cat_target], output[cat_target].cpu()))
+                y_true[cat_target] = torch.cat((y_true[cat_target], targets[cat_target].cpu()))
+        if args.num_target:
+            for num_target in args.num_target:
+                outputs[num_target] = torch.cat((outputs[num_target], output[num_target].cpu()))
+                y_true[num_target] = torch.cat((y_true[num_target], targets[num_target].cpu()))
 
-           #test_acc, correct, total = calculating_acc(targets, output, correct, y_true, test_acc, net, args, test_mode=True)
+        #test_acc, correct, total = calculating_acc(targets, output, correct, y_true, test_acc, net, args, test_mode=True)
 
     
     # caculating ACC and R2 at once  
