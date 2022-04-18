@@ -145,7 +145,13 @@ def test(net,partition,args):
                                             num_workers=24)
 
     net.eval()
-
+    if hasattr(net, 'module'):
+        device = net.device_ids[0]
+    else: 
+        if args.sbatch =='True':
+            device = 'cuda:0'
+        else:
+            device = f'cuda:{args.gpus[0]}'
     #correct = {}
     #y_true = {}
     
@@ -165,12 +171,12 @@ def test(net,partition,args):
         for num_target in args.num_target:
             outputs[num_target] = torch.tensor([])
             y_true[num_target] = torch.tensor([])
-            test_acc[num_target] = []
+            test_acc[cat_target] = []
             
 
     for i, data in enumerate(testloader,0):
         image, targets = data
-        image = image.to(f'cuda:{net.device_ids[0]}')
+        image = image.to(device)
         output = net(image)
         
         if args.cat_target:
@@ -206,7 +212,7 @@ def test(net,partition,args):
                             confusion_matrices[label_cm]['True Positive'] = int(tp)
                             confusion_matrices[label_cm]['True Negative'] = int(tn)
                             confusion_matrices[label_cm]['False Positive'] = int(fp)
-                            confusion_matrices[label_cm]['False Negative'] = int(fn)                        
+                            confusion_matrices[label_cm]['False Negative'] = int(fn)                       
 
 
     if args.num_target:
