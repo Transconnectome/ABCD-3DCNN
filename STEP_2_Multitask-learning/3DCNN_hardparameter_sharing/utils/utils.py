@@ -77,35 +77,47 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, save_dir, epoch, current_result, previous_result, args):
+def checkpoint_save(net, save_dir, epoch, current_result, previous_result, hash_key, args):
     if os.path.isdir(os.path.join(save_dir,'model')) == False:
         makedir(os.path.join(save_dir,'model'))
-    else:
-        checkpoint_dir = os.path.join(save_dir, 'model/{}_{}.pth'.format(args.exp_name, args.model))
-        best_checkpoint_votes = 0
+    
+    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}_{}.pth'.format(args.exp_name, args.model, hash_key))
+    best_checkpoint_votes = 0
 
-        if args.cat_target:
-            for cat_target in args.cat_target:
-                if current_result[cat_target] >= max(previous_result[cat_target]):
-                    best_checkpoint_votes += 1
-        if args.num_target:
-            for num_target in args.num_target:
-                if current_result[num_target] >= max(previous_result[num_target]):
-                    best_checkpoint_votes += 1
+    if args.cat_target:
+        for cat_target in args.cat_target:
+            if current_result[cat_target] >= max(previous_result[cat_target]):
+                best_checkpoint_votes += 1
+    if args.num_target:
+        for num_target in args.num_target:
+            if current_result[num_target] >= max(previous_result[num_target]):
+                best_checkpoint_votes += 1
         
-        if best_checkpoint_votes == len(args.cat_target + args.num_target):
-            torch.save(net.module.state_dict(), checkpoint_dir)
-            print("Best iteration until now is %d" % (epoch + 1))
+    if best_checkpoint_votes == len(args.cat_target + args.num_target):
+        torch.save(net.module.state_dict(), checkpoint_dir)
+        print("Best iteration until now is %d" % (epoch + 1))
+
+    return checkpoint_dir
+
+
+def checkpoint_load(net, checkpoint_dir):
+    if hasattr(net, 'module'):
+        net = net.module
+
+    model_state = torch.load(checkpoint_dir)
+    net.load_state_dict(model_state)
+    print('The best checkpoint is loaded')
+
+    return net
             
 
 # define result-saving function
-def save_exp_result(save_dir, setting, result):
+def save_exp_result(save_dir, setting, result, hash_key):
     makedir(save_dir)
     exp_name = setting['exp_name']
     del setting['epoch']
     del setting['test_batch_size']
 
-    hash_key = hashlib.sha1(str(setting).encode()).hexdigest()[:6]
     filename = save_dir + '/{}-{}.json'.format(exp_name, hash_key)
     result.update(setting)
 
