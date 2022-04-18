@@ -3,10 +3,13 @@ import models.simple3d as simple3d #model script
 import models.vgg3d as vgg3d #model script
 import models.resnet3d as resnet3d #model script
 import models.densenet3d as densenet3d #model script
-from utils.utils import argument_setting, CLIreporter, save_exp_result, checkpoint_save
+from utils.utils import argument_setting, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load
 from dataloaders.dataloaders import loading_images, loading_phenotype, combining_image_target, partition_dataset
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.experiments import train, validate, test 
+import hashlib
+import datetime
+
 
 
 
@@ -40,7 +43,7 @@ warnings.filterwarnings("ignore")
 
 
 ## ========= Experiment =============== ##
-def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
+def experiment(partition, subject_data, save_dir, hash_key, args): #in_channels,out_dim
     targets = args.cat_target + args.num_target
 
     # Simple CNN
@@ -130,9 +133,17 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
 
         # saving the checkpoint
-        checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
+        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, hash_key, args)
 
     # test
+    net.to('cpu')
+    torch.cuda.empty_cache()
+
+    net = checkpoint_load(net, checkpoint_dir)
+    if args.sbatch == 'True':
+        net.cuda()
+    else:
+        net.to(f'cuda:{args.gpus[0]}')
     test_acc, confusion_matrices = test(net, partition, args)
 
     # summarize results
@@ -182,11 +193,13 @@ if __name__ == "__main__":
     torch.manual_seed(seed)
     save_dir = current_dir + '/result'
     
+    time_hash = datetime.datetime.now().time()
+    hash_key = hashlib.sha1(str(time_hash).encode()).hexdigest()[:6]
 
 
     # Run Experiment
-    setting, result = experiment(partition, subject_data, save_dir, deepcopy(args))
+    setting, result = experiment(partition, subject_data, save_dir, hash_key, deepcopy(args))
 
     # Save result
-    save_exp_result(save_dir, setting, result)
+    save_exp_result(save_dir, setting, result, hash_key)
     ## ====================================== ##
