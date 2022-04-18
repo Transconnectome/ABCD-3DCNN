@@ -120,8 +120,8 @@ def partition_dataset(imageFiles_labels,args):
     labels_val = labels[num_train:num_train+num_val]
 
     # image and label information of test
-    images_test = images[num_total-num_test:]
-    labels_test = labels[num_total-num_test:]
+    images_test = images[num_train+num_val:]
+    labels_test = labels[num_train+num_val:]
 
     train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
     val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
