@@ -11,3 +11,8 @@ Befor you run the code, directory should the same as follw.
     |-- female_lower_0.75
 
 ```
+
+## Explanation for UKB_sex_GradCAM.ipynb
+This code making mean heatmap according to category. (i.e., male_upper_0.75, female_upper_0.75...)
+Visualize mid-sagittal, mid-coronal, mid-horizontal slice of mean heatmap. 
+To, easy understanding, open an individual T1 image and overlay it over heatmap
