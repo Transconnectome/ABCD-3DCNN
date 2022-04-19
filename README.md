@@ -68,3 +68,14 @@ In summary, this study shows CNN can predict sex from T1w images. The results no
 
 
 ### STEP 4. Transfer Learning
+
+## Analysis Pipeline
+### STEP 1. Prediction Task 
+With code (folder name **"3DCNN_hardparameter_sharing"**) performing prediction task. (e.g., age, sex...) 
+
+### STEP 2. XAI 
+ * 1. Getting individual heatmap 
+With XAI codes (i.e.,Grad CAM ++, Integrated Grad CAM, and Occlusion Sensitivity), 
+
+ * 2. Getting mean heatmap 
+With ipython notebook (i.e., jupyter notebook), making mean heatmap and visualize it. 
