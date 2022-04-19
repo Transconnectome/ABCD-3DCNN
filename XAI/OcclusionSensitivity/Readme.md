@@ -14,7 +14,7 @@ Befor you run the code, directory should the same as follw.
   
 example command line
 ```
-python3 UKB_sex_OcclusionSensitivity.py --target sex --save_dir /scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/OcclusionSensitivity --mask_size 7 --stride 5
+python3 UKB_sex_OcclusionSensitivity.py --target sex --save_dir /scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/OcclusionSensitivity --mask_size 7 --stride 5 --gpu 0
 ```
 
 ## Explanation for UKB_sex_OcclusionSensitivity.ipynb
