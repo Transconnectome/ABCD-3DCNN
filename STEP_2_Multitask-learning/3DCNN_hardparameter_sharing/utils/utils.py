@@ -77,11 +77,11 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, save_dir, epoch, current_result, previous_result, hash_key, args):
+def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args):
     if os.path.isdir(os.path.join(save_dir,'model')) == False:
         makedir(os.path.join(save_dir,'model'))
     
-    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}_{}.pth'.format(args.exp_name, args.model, hash_key))
+    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}_{}.pth'.format(args.model, args.exp_name))
     best_checkpoint_votes = 0
 
     if args.cat_target:
@@ -112,13 +112,13 @@ def checkpoint_load(net, checkpoint_dir):
             
 
 # define result-saving function
-def save_exp_result(save_dir, setting, result, hash_key):
+def save_exp_result(save_dir, setting, result):
     makedir(save_dir)
     exp_name = setting['exp_name']
     del setting['epoch']
     del setting['test_batch_size']
 
-    filename = save_dir + '/{}-{}.json'.format(exp_name, hash_key)
+    filename = save_dir + '/{}.json'.format(exp_name)
     result.update(setting)
 
     with open(filename, 'w') as f:
