@@ -7,7 +7,7 @@
   * [참고자료](#참고자료)
   * [test_model](#test_model)
   * [결과](#결과)
-  * [Analysis Pipeline](#Analysis Pipeline)
+  * [Analysis_Pipeline](#Analysis_Pipeline)
   
   
 ## objective  
@@ -70,7 +70,7 @@ In summary, this study shows CNN can predict sex from T1w images. The results no
 
 ### STEP 4. Transfer Learning
 
-## Analysis Pipeline
+## Analysis_Pipeline
 ### STEP 1. Prediction Task 
 With code (folder name **"3DCNN_hardparameter_sharing"**) performing prediction task. (e.g., age, sex...) 
 
