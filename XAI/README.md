@@ -21,3 +21,4 @@ In other words, Occlusion Sensitivity is like "sliding NxN size window through i
  * [참고 링크](https://www.kaggle.com/code/blargl/simple-occlusion-and-saliency-maps/notebook)
  * [원문 링크](https://arxiv.org/pdf/1311.2901.pdf)
  * [코드 관련](https://docs.monai.io/en/stable/_modules/monai/visualize/occlusion_sensitivity.html)
+ * [more details](https://stackoverflow.com/questions/59411239/how-does-the-occlusion-sensitivity-and-predicted-class-map-works-in-the-given-li)
