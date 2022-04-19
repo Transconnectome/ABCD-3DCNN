@@ -42,7 +42,10 @@ parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--resize",default=[80, 80, 80],type=int,nargs="*",required=False,help='')
 parser.add_argument("--target", type=str, default='sex', required=True, help='')
+parser.add_argument("--gpus", type=int, default=[7],nargs='*', required=False, help='')
+parser.add_argument("--batch_size", type=int, default=256, required=False, help='')
 parser.add_argument("--save_dir", default='/scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/OcclusionSensitivity',type=str, required=True)
+parser.add_argument("--sbatch", type=str, default='False', required=False, help='')
 args = parser.parse_args()
 
 
@@ -158,17 +161,21 @@ partition, subject_list = partition_dataset(imageFiles_labels,args)
 '''네트워크를 선언한다.
    이미 저장되어 있는 학습된 parameter를 앞서 선언한 네트워크에 얹어준다.'''
 net = densenet3d.densenet121()
-net.cuda()
 
-model_state = torch.load("/scratch/connectome/dhkdgmlghks/UKB_sex_densenet3D121_6cbde7.pth", map_location='cuda:0')
+
+model_state = torch.load("/scratch/connectome/dhkdgmlghks/UKB_sex_densenet3D121_6cbde7.pth", map_location='cpu')
 model_state['classifier.weight'] = model_state.pop('classifiers.0.0.weight')
 model_state['classifier.bias'] = model_state.pop('classifiers.0.0.bias')
 net.load_state_dict(model_state)
-net.cuda()
+if args.sbatch == 'True':
+    net = nn.DataParallel(net)
+else:
+    net = nn.DataParallel(net, device_ids = args.gpus)
 
+net.to(f'cuda:{net.device_ids[0]}')
 
 ### 5) CAM class setting 
-occ_sens = monai.visualize.OcclusionSensitivity(nn_module=net, mask_size = args.mask_size, n_batch=1, stride=args.stride)
+occ_sens = monai.visualize.OcclusionSensitivity(nn_module=net, mask_size = args.mask_size, n_batch=args.batch_size, stride=args.stride)
 
 
 ### 6) GradCAM calculation and saving results as numpy file 
@@ -185,8 +192,8 @@ net.eval()
 
 for idx, data in tqdm(enumerate(testloader,0)):
     image, label = data 
-    image = image.cuda()
-    label = label.cuda()
+    image = image.to(f'cuda:{net.device_ids[0]}')
+    label = label.to(f'cuda:{net.device_ids[0]}')
 
     criterion = nn.Softmax(dim=1)
     pred_prob = net(image)
@@ -196,6 +203,7 @@ for idx, data in tqdm(enumerate(testloader,0)):
     occ_map, _ = occ_sens(image)
     occ_map = occ_map[..., predicted.item()]  # predicted label에 대한 occlusion map을 얻는 과정
     occ_map = occ_map.cpu().numpy()
+    occ_map = occ_map.reshape(tuple(args.resize))
 
     # only case when predictino is right
     if predicted == label:
