@@ -43,7 +43,7 @@ warnings.filterwarnings("ignore")
 
 
 ## ========= Experiment =============== ##
-def experiment(partition, subject_data, save_dir, hash_key, args): #in_channels,out_dim
+def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     targets = args.cat_target + args.num_target
 
     # Simple CNN
@@ -100,7 +100,7 @@ def experiment(partition, subject_data, save_dir, hash_key, args): #in_channels,
         raise ValueError('In-valid optimizer choice')
 
     # learning rate schedluer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=15)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
 
     # setting for results' data frame
     train_losses = {}
@@ -133,7 +133,7 @@ def experiment(partition, subject_data, save_dir, hash_key, args): #in_channels,
         print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
 
         # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, hash_key, args)
+        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
 
     # test
     net.to('cpu')
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     ## ========= Setting ========= ##
     args = argument_setting()
     current_dir = os.getcwd()
-    image_dir = '/master_ssd/3DCNN/data/2.UKB/1.sMRI'
+    image_dir = '/master_ssd/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
     phenotype_dir = '/master_ssd/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
     #image_dir = '/master_ssd/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
     #phenotype_dir = '/master_ssd/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'    
@@ -195,11 +195,12 @@ if __name__ == "__main__":
     
     time_hash = datetime.datetime.now().time()
     hash_key = hashlib.sha1(str(time_hash).encode()).hexdigest()[:6]
+    args.exp_name = args.exp_name + f'_{hash_key}'
 
 
     # Run Experiment
-    setting, result = experiment(partition, subject_data, save_dir, hash_key, deepcopy(args))
+    setting, result = experiment(partition, subject_data, save_dir, deepcopy(args))
 
     # Save result
-    save_exp_result(save_dir, setting, result, hash_key)
+    save_exp_result(save_dir, setting, result)
     ## ====================================== ##
