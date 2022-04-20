@@ -221,7 +221,7 @@ def test(net,partition,args):
             predicted =  outputs[num_target].float()
             criterion = nn.MSELoss()
             loss = criterion(predicted, y_true[num_target].float().unsqueeze(1))
-            y_var = torch.var(y_true)
+            y_var = torch.var(y_true[num_target])
             r_square = 1 - (loss / y_var)
             test_acc.append(r_square.item())
 
