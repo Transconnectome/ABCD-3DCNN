@@ -104,7 +104,7 @@ def checkpoint_load(net, checkpoint_dir):
     if hasattr(net, 'module'):
         net = net.module
 
-    model_state = torch.load(checkpoint_dir)
+    model_state = torch.load(checkpoint_dir, map_location = 'cpu')
     net.load_state_dict(model_state)
     print('The best checkpoint is loaded')
 
