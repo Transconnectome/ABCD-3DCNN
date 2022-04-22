@@ -81,7 +81,7 @@ def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args
     if os.path.isdir(os.path.join(save_dir,'model')) == False:
         makedir(os.path.join(save_dir,'model'))
     
-    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}_{}.pth'.format(args.model, args.exp_name))
+    checkpoint_dir = os.path.join(save_dir, 'model/{}_{}.pth'.format(args.model, args.exp_name))
     best_checkpoint_votes = 0
 
     if args.cat_target:
