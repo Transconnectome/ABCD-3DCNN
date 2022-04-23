@@ -50,10 +50,10 @@ def combining_image_target(subject_data, image_files, target_list):
     subj= []
     if type(subject_data['eid'][0]) == np.str_ or type(subject_data['eid'][0]) == str:
         for i in range(len(image_files)):
-            subj.append(str(image_files[i][:-7]))
+            subj.append(str(image_files[i][:-12]))
     elif type(subject_data['eid'][0]) == np.int_ or type(subject_data['eid'][0]) == int:
         for i in range(len(image_files)):
-            subj.append(int(image_files[i][:-7]))
+            subj.append(int(image_files[i][:-12]))
 
     image_list = pd.DataFrame({'eid':subj, 'image_files': image_files})
     subject_data = pd.merge(subject_data, image_list, how='inner', on='eid')
