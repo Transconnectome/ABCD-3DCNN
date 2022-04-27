@@ -1,3 +1,7 @@
+# flow of pipeline 
+At first, run **UKB_sex_GradCAM.py** file to obtain individual heatmap. 
+Second, mean template of every individual heatmap **UKB_sex_GradCAM.ipynb** and visualize it. 
+
 ## Explanation for UKB_sex_GradCAM.py
 This code making individual GradCAM heatmap. 
 The results from **the last convolution layer of densenet** are visualized. 
