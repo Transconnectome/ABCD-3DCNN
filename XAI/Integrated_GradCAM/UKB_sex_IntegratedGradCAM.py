@@ -167,8 +167,8 @@ net.load_state_dict(model_state)
 
 
 ### 5) Integrated grad CAM with noise tunneling setting 
-integrated_gradients = IntegratedGradients(net)
-interpreter = NoiseTunnel(integrated_gradients)
+interpreter = IntegratedGradients(net)
+interpreter = NoiseTunnel(interpreter) # if you don't want to use noise tunneling, plz deactivate this line
 
 kwargs = {
     "nt_samples": 10,
