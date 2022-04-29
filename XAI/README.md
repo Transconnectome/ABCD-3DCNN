@@ -19,13 +19,13 @@ Building on the same measures, furthermore, Integrated Grad CAM integrates **Smo
   DNN uses piece-wise linear functions, so gradients of intermediate layers are not continuous but discontinuous.  
   SmoothGrad is a solution to overcome this problem by smoothing the gradient.   
   SmoothGrad add noise to pixel values of original input images, and get means of several results from saliency map measured with noise-added images.
-  In equation, **SmoothGrad := 1/n(integral(∂f(x*)/∂x*)), x* = x + N(0,sigma^2)**  
+  In equation, **SmoothGrad := 1/n(integral(∂f(x_hat)/∂x_hat)), x_hat = x + N(0,sigma^2)**  
   
   * **What is Interior Gradient?**  
   A feature may have a strong effect globally, but with small derivative locally.  
   In other words, gradient could be saturate, so that saliency map become noisy. (not detect object well)
   Interior Gradient adjust (reduce) pixel values of original input images, and get saliency map measured with adjusted images.  
-  In equation, **Interior Gradient := ∂f(x*)/∂x*, x* = ax, 0 < a =< 1**  
+  In equation, **Interior Gradient := ∂f(x_hat)/∂x_hat, x_hat = ax, 0 < a =< 1**  
 
 **Be aware whether you want use noise tunneling or not. 
 If you don't want to use noise tunneling, just deactivate the line assigning class "custom_noise_tunnel"**
