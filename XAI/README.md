@@ -3,7 +3,7 @@
  * **Grad CAM** and **Occlusion Sensitivity** directory contains python script and ipython notebook for analysis pipeline 
 
 ## What is Grad CAM?
-Grad CAM measures gradient between output of neural networks and pixels of input image. (saliency := ∂f(x)/∂x) 
+Grad CAM measures gradient between output of neural networks and pixels of input image. **(saliency := ∂f(x)/∂x)** 
 When you think of the process of back propagation, gradient can be said as "Total amount of effect of input K on output class C". 
 If some pixels have high gradient according to output class, it could be said that these pixels have great impact on model's prediciton.
 Grad CAM++ is a variation of Grad CAM 
@@ -12,17 +12,20 @@ Grad CAM++ is a variation of Grad CAM
 
 ## What is Integrated Grad CAM?
 Integrated Grad CAM is an extension of Grad CAM.  
-As same as Grad CAM, integrated Grad CAM measures ∂f(x)/∂x.  
+As same as Grad CAM, integrated Grad CAM measures **∂f(x)/∂x**.  
 Building on the same measures, furthermore, Integrated Grad CAM integrates **SmoothGrad and Interior Gradient**
 
-  * **What is SmoothGrad?**
+  * **What is SmoothGrad?**  
   DNN uses piece-wise linear functions, so gradients of intermediate layers are not continuous but discontinuous.  
   SmoothGrad is a solution to overcome this problem by smoothing the gradient.   
-  SmoothGrad add noise to original input images, and get means of several results from saliency map measured with noise-added images.
+  SmoothGrad add noise to pixel values of original input images, and get means of several results from saliency map measured with noise-added images.
   In equation, **SmoothGrad := 1/n(integral(∂f(x*)/∂x*)), x* = x + N(0,sigma^2)**  
   
-  * **What is Integrated Gradient?**
-  
+  * **What is Interior Gradient?**  
+  A feature may have a strong effect globally, but with small derivative locally.  
+  In other words, gradient could be saturate, so that saliency map become noisy. (not detect object well)
+  Interior Gradient adjust (reduce) pixel values of original input images, and get saliency map measured with adjusted images.  
+  In equation, **Interior Gradient := ∂f(x*)/∂x*, x* = ax, 0 < a =< 1**  
 **Be aware whether you want use noise tunneling or not. 
 If you don't want to use noise tunneling, just deactivate the line assigning class "custom_noise_tunnel"**
 
