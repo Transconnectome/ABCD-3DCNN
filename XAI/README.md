@@ -26,10 +26,11 @@ Building on the same measures, furthermore, Integrated Grad CAM integrates **Smo
   In other words, gradient could be saturate, so that saliency map become noisy. (not detect object well)
   Interior Gradient adjust (reduce) pixel values of original input images, and get saliency map measured with adjusted images.  
   In equation, **Interior Gradient := ∂f(x*)/∂x*, x* = ax, 0 < a =< 1**  
+
 **Be aware whether you want use noise tunneling or not. 
 If you don't want to use noise tunneling, just deactivate the line assigning class "custom_noise_tunnel"**
 
-* [참고 링크]()
+* [참고 링크](https://www.youtube.com/watch?v=5fIy19GXAxI&list=PLypiXJdtIca5sxV7aE3-PS9fYX3vUdIOX&index=8)
 * [원문 링크](https://arxiv.org/abs/1703.01365)
 
 ## What is Occlusion Sensitivity?
