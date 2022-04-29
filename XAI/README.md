@@ -10,6 +10,14 @@ Grad CAM++ is a variation of Grad CAM
  * [참고 링크](https://tyami.github.io/deep%20learning/CNN-visualization-Grad-CAM/)
  * [원문 링크](https://arxiv.org/abs/1610.02391)
 
+## What is Integrated Grad CAM?
+
+**Be aware whether you want use noise tunneling or not. 
+If you don't want to use noise tunneling, just deactivate the line assigning class "custom_noise_tunnel"**
+
+* [참고 링크]()
+* [원문 링크](https://arxiv.org/abs/1703.01365)
+
 ## What is Occlusion Sensitivity?
 Occlusion Sensitivity follows this flow. 
  * 1. masking a patch for original images 
