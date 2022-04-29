@@ -19,7 +19,7 @@ Building on the same measures, furthermore, Integrated Grad CAM integrates **Smo
   DNN uses piece-wise linear functions, so gradients of intermediate layers are not continuous but discontinuous.  
   SmoothGrad is a solution to overcome this problem by smoothing the gradient.   
   SmoothGrad add noise to original input images, and get means of several results from saliency map measured with noise-added images.
-  In equation, SmoothGrad := 1/n(integral(∂f(x*)/∂x*)), x* = x + N(0,sigma^2)  
+  In equation, **SmoothGrad := 1/n(integral(∂f(x*)/∂x*)), x* = x + N(0,sigma^2)**  
   
   * **What is Integrated Gradient?**
   
