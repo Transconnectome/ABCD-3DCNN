@@ -1,5 +1,5 @@
 # flow of pipeline 
-At first, run **UKB_sex_OcclusionSensitivity.pyy** file to obtain individual heatmap. 
+At first, run **UKB_sex_OcclusionSensitivity.py** file to obtain individual heatmap. 
 Second, mean template of every individual heatmap **UKB_sex_OcclusionSensitivity.ipynb** and visualize it. 
 
 ## Explanation for Occlusion Sensitivity
