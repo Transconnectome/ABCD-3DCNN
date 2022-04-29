@@ -3,7 +3,7 @@
  * **Grad CAM** and **Occlusion Sensitivity** directory contains python script and ipython notebook for analysis pipeline 
 
 ## What is Grad CAM?
-Grad CAM measures gradient between label (class of image) and pixels of input image. 
+Grad CAM measures gradient between output of neural networks and pixels of input image. (saliency := ∂f(x)/∂x) 
 When you think of the process of back propagation, gradient can be said as "Total amount of effect of input K on output class C". 
 If some pixels have high gradient according to output class, it could be said that these pixels have great impact on model's prediciton.
 Grad CAM++ is a variation of Grad CAM 
@@ -11,7 +11,18 @@ Grad CAM++ is a variation of Grad CAM
  * [원문 링크](https://arxiv.org/abs/1610.02391)
 
 ## What is Integrated Grad CAM?
+Integrated Grad CAM is an extension of Grad CAM.  
+As same as Grad CAM, integrated Grad CAM measures ∂f(x)/∂x.  
+Building on the same measures, furthermore, Integrated Grad CAM integrates **SmoothGrad and Interior Gradient**
 
+  * **What is SmoothGrad?**
+  DNN uses piece-wise linear functions, so gradients of intermediate layers are not continuous but discontinuous.  
+  SmoothGrad is a solution to overcome this problem by smoothing the gradient.   
+  SmoothGrad add noise to original input images, and get means of several results from saliency map measured with noise-added images.
+  In equation, SmoothGrad := 1/n(integral(∂f(x*)/∂x*)), x* = x + N(0,sigma^2)  
+  
+  * **What is Integrated Gradient?**
+  
 **Be aware whether you want use noise tunneling or not. 
 If you don't want to use noise tunneling, just deactivate the line assigning class "custom_noise_tunnel"**
 
