@@ -10,10 +10,10 @@ Grad CAM++ is a variation of Grad CAM
  * [참고 링크](https://tyami.github.io/deep%20learning/CNN-visualization-Grad-CAM/)
  * [원문 링크](https://arxiv.org/abs/1610.02391)
 
-## What is Integrated Grad CAM?
-Integrated Grad CAM is an extension of Grad CAM.  
-As same as Grad CAM, integrated Grad CAM measures **∂f(x)/∂x**.  
-Building on the same measures, furthermore, Integrated Grad CAM integrates **SmoothGrad and Interior Gradient**
+## What is Integrated Grad?
+Integrated Grad CAM is an extension of Gradient based method.  
+As same as Grad CAM , integrated Grad measures **∂f(x)/∂x**.  
+Building on the same measures, furthermore, Integrated Grad integrates **SmoothGrad and Interior Gradient**
 
   * **What is SmoothGrad?**  
   DNN uses piece-wise linear functions, so gradients of intermediate layers are not continuous but discontinuous.  
