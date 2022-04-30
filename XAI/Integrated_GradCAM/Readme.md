@@ -17,7 +17,7 @@ Befor you run the code, directory should the same as follw.
   
 example command line
 ```
-python3 UKB_sex_GradCAM.py --target sex --save_dir /scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/GradCAM
+python3 UKB_sex_GradCAM.py --target sex --save_dir /scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/GradCAM --model_dir {model_name.pth}
 ```
 
 ## Explanation for UKB_sex_IntegratedGradCAM.ipynb
