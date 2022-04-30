@@ -43,7 +43,7 @@ parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--resize",default=[80, 80, 80],type=int,nargs="*",required=False,help='')
 parser.add_argument("--target", type=str, default='sex', required=True, help='')
 parser.add_argument("--model_dir", default='',type=str, required=True)
-parser.add_argument("--save_dir", default='/scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/GradCAM',type=str, required=True)
+parser.add_argument("--save_dir", default='/scratch/connectome/dhkdgmlghks/UKB_interpretation/sex/IntegratedGradCAM',type=str, required=True)
 args = parser.parse_args()
 
 
