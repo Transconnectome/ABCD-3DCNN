@@ -149,7 +149,7 @@ class DenseNet(nn.Module):
         self.features.add_module('norm5', nn.BatchNorm3d(self.num_features))
 
         # Linear layer
-        self.classifiers = self._make_fclayers()
+        self.FClayers = self._make_fclayers()
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -162,16 +162,16 @@ class DenseNet(nn.Module):
     
 
     def _make_fclayers(self):
-        self.FClayer = []
+        FClayer = []
         
         for cat_label in self.cat_target:
             self.out_dim = len(self.subject_data[cat_label].value_counts())                        
-            self.FClayer.append(nn.Sequential(nn.Linear(self.num_features, self.out_dim)))
+            FClayer.append(nn.Sequential(nn.Linear(self.num_features, self.out_dim)))
 
         for num_label in self.num_target:
-            self.FClayer.append(nn.Sequential(nn.Linear(self.num_features, 1)))
+            FClayer.append(nn.Sequential(nn.Linear(self.num_features, 1)))
 
-        return nn.ModuleList(self.FClayer)
+        return nn.ModuleList(FClayer)
 
 
     def forward(self, x):
@@ -182,8 +182,8 @@ class DenseNet(nn.Module):
         out = F.adaptive_avg_pool3d(out, output_size=(1, 1, 1))
         out = torch.flatten(out, 1)
 
-        for i in range(len(self.FClayer)):
-            results[self.target[i]] = self.classifiers[i](out)
+        for i in range(len(self.FClayers)):
+            results[self.target[i]] = self.FClayers[i](out)
         return results
 
 def generate_model(model_depth, subject_data, args, **kwargs):
