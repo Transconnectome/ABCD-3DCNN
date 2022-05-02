@@ -123,6 +123,8 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         ts = time.time()
         net, loss = simCLR_train(net, partition, optimizer, args)
         train_losses.append(loss)
+        #scheduler.step(loss)
+        scheduler.step()
         te = time.time()
 
         # visualize the result
