@@ -1,10 +1,10 @@
 ## Before you run these code  
 
-In this codes, pretraining simCLR and finetuning it for prediction task is a single PIPLINE applied to a single dataset.  
+**In this codes, pretraining simCLR and finetuning it for prediction task is a single PIPLINE applied to a single dataset.  
 Thus, a single dataset is partitioned into 4 parts: pretraining, finetuning, validation, test.  
 If you want to pretrain simCLR with one dataset and fintune it to another independent dataset, only finetuning dataset should be partitioned into 3 parts.  
 Pretraining dataset does not need to be partitioned.  
-Revising this code according to your experiment setup.
+Revising this code according to your experiment setup.**
 
 
 ## About these code
