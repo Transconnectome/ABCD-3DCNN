@@ -81,7 +81,12 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
     else:
         raise ValueError('In-valid optimizer choice')
 
+        
+    # setting learning rate scheduler 
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
+    scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
 
+    
     # loading last checkpoint if resume training
     if args.resume == 'True':
         if args.checkpoint_dir != None:
@@ -90,7 +95,7 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
     else:
         last_epoch = 0 
-
+        
 
     # setting DataParallel
     if args.sbatch == "True":
@@ -104,12 +109,15 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
 
+            
     # attach network to cuda device
     net.to(f'cuda:{net.device_ids[0]}')
 
+    
     # setting for results' data frame
     train_losses = []
 
+    
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
@@ -123,6 +131,7 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         # saving the checkpoint
         checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, args, mode='simCLR')
 
+        
     # summarize results
     result = {}
     result['train_losses'] = train_losses
