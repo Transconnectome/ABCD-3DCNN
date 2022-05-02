@@ -117,7 +117,7 @@ class ResNet3d(nn.Module):
 
         self.blocks = nn.ModuleList(self.blocks)
         self.ds = nn.ModuleList(self.ds)
-        self.classifiers = self._make_fclayers()        
+        self.FClayers = self._make_fclayers()        
         
 
         for m in self.modules():
@@ -161,16 +161,16 @@ class ResNet3d(nn.Module):
 
 
     def _make_fclayers(self):
-        self.FClayer = []
+        FClayer = []
         
         for cat_label in self.cat_target:
             self.out_dim = len(self.subject_data[cat_label].value_counts())                        
-            self.FClayer.append(nn.Sequential(nn.Linear(512 * self.block_config.expansion, self.out_dim)))
+            FClayer.append(nn.Sequential(nn.Linear(512 * self.block_config.expansion, self.out_dim)))
 
         for num_label in self.num_target:
-            self.FClayer.append(nn.Sequential(nn.Linear(512 * self.block_config.expansion, 1)))
+            FClayer.append(nn.Sequential(nn.Linear(512 * self.block_config.expansion, 1)))
 
-        return nn.ModuleList(self.FClayer)
+        return nn.ModuleList(FClayer)
 
 
     def forward(self, x):
@@ -192,8 +192,8 @@ class ResNet3d(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        for i in range(len(self.FClayer)):
-            results[self.target[i]] = self.classifiers[i](x)
+        for i in range(len(self.FClayers)):
+            results[self.target[i]] = self.FClayers[i](x)
 
         return results
                   
