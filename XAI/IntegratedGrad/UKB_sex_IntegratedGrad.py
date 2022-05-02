@@ -162,8 +162,8 @@ net = densenet3d.densenet121()
 net.cuda()
 
 model_state = torch.load(args.model_dir, map_location='cuda:0')
-model_state['classifier.weight'] = model_state.pop('classifiers.0.0.weight')
-model_state['classifier.bias'] = model_state.pop('classifiers.0.0.bias')
+model_state['FClayers.weight'] = model_state.pop('FClayers.0.0.weight')
+model_state['FClayers.bias'] = model_state.pop('FClayers.0.0.bias')
 net.load_state_dict(model_state)
 
 
