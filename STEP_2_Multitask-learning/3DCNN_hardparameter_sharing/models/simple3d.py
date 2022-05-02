@@ -52,27 +52,27 @@ class SIMPLE_CNN3D(nn.Module):
         
            
     def _make_fclayers(self):
-        self.FClayer = []
+        FClayer = []
 
         for cat_label in self.cat_target:
             self.out_dim = len(self.subject_data[cat_label].value_counts()) 
-            self.fc = nn.Sequential(nn.Linear(6**3*256,25),
+            fc = nn.Sequential(nn.Linear(6**3*256,25),
                                     nn.Sigmoid(),
                                     nn.Dropout(),
                                     nn.Linear(25,self.out_dim),
                                     nn.Softmax(dim=1))
             
-            self.FClayer.append(self.fc)
+            FClayer.append(fc)
         
         for num_label in self.num_target:
             self.out_dim = 1
-            self.fc = nn.Sequential(nn.Linear(6**3*256,25),
+            fc = nn.Sequential(nn.Linear(6**3*256,25),
                                     nn.Sigmoid(),
                                     nn.Dropout(),
                                     nn.Linear(25,self.out_dim))
-            self.FClayer.append(self.fc)
+            FClayer.append(fc)
         
-        return nn.ModuleList(self.FClayer) # must store list of multihead fc layer as nn.ModuleList to attach FC layer to cuda
+        return nn.ModuleList(FClayer) # must store list of multihead fc layer as nn.ModuleList to attach FC layer to cuda
 
         
     def forward(self,x):
@@ -98,8 +98,8 @@ class SIMPLE_CNN3D(nn.Module):
         x = x.view(x.size(0),-1)
         
         # passing through several fc layers with for loop
-        for i in range(len(self.FClayer)):
-            results[self.target[i]] = self.classifiers[i](x)
+        for i in range(len(self.FClayers)):
+            results[self.target[i]] = self.FClayers[i](x)
 
         return  results 
 
