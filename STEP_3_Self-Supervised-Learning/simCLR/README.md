@@ -51,6 +51,6 @@ python3 run_3DCNN_hardparameter_sharing.py --model resnet3D50 --resize 80 80 80 
 
 ### The example of using slurm 
 If you want to using slurm SBATCH, add options ```--sbatch True```.  
-In this case, you don't need to assign gpu device ids by using gpu option ```--gpu {device_id}```.
+In this case, you don't need to assign gpu device ids by using gpu option ```--gpus {device_id}```.
 
 
