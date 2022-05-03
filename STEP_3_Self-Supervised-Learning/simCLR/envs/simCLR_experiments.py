@@ -70,6 +70,10 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
     net = simCLR(args)
     checkpoint_dir = args.checkpoint_dir
 
+    
+    # change model class to jit torchscript. torch.jit.script is for Just-In-Time compile
+    net = torch.jit.script(net) 
+    
 
     # setting optimizer 
     if args.optim == 'SGD':
