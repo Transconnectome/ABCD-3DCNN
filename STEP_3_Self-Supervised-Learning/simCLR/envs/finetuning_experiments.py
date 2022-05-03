@@ -251,6 +251,9 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
     net = prediction_model(subject_data, args)
     checkpoint_dir = args.checkpoint_dir
     pretrained_model_dir = args.pretrained_model_dir
+   
+    # change model class to jit torchscript. torch.jit.script is for Just-In-Time compile
+    net = torch.jit.script(net) 
 
     # setting optimizer 
     if args.optim == 'SGD':
