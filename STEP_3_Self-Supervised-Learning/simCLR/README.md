@@ -17,7 +17,8 @@ This python script could be used in both **pretraining self-supervised model** a
 
 ### The example of pretraining self-supervised model
 To enable to train models with large batch size and overcome the OUT OF MEMORY issues, **gradient accumulation** is implemented.  
-Thus, **the number of mini-batches used to step optimizer is {*train_batch_size * accumulation_steps*}**
+Thus, **the number of mini-batches used to step optimizer is {*train_batch_size * accumulation_steps*}**. 
+Another important this is ```--train_batch_size```. If you set ```--train_batch_size N```, the number of mini-batches fed into networks is ***2N***  
 
 When you train models first time, you should set ```--resume False```.  
 If you resume training models, you should set ```--resume True``` and ```--checkpoint_dir {checkpoint_file}```.
