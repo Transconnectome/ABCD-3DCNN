@@ -17,7 +17,7 @@ This python script could be used in both **pretraining self-supervised model** a
 
 ### The example of pretraining self-supervised model
 To enable to train models with large batch size and overcome the OUT OF MEMORY issues, **gradient accumulation** is implemented.  
-Thus, **the number of mini-batches used to step optimizer is {*train_batch_size * accumulation_steps*}**.  
+Thus, **the number of mini-batches used to step optimizer is {*2 * train_batch_size * accumulation_steps*}**.  
 
 Another important this is ```--train_batch_size```. If you set ```--train_batch_size N```, the number of mini-batches fed into networks is ***2N***  
 
