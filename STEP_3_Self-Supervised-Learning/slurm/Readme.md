@@ -4,4 +4,7 @@ To run this code you need **initial script** and **retrain script**.
 **Initial script** set ```--resume False``` and **retrain script** set ```--resume True``` option of simCLR python script.  
 
 For example, run Job Chain script as follow.
-```bash JobChain.sh 4 #the number of running retrain script```
+```
+#the number indicates the number of running retrain script
+bash JobChain.sh 4 
+```
