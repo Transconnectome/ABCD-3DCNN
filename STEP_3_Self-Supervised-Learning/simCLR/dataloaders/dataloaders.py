@@ -90,9 +90,11 @@ def partition_dataset_simCLR(imageFiles,args):
     By applying scale intensity, crop, and resize, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
     That's because we can apply augmentation technique to all of samples in mini-batches simulateously by tensor operation at GPU.
     However, GPUs have limitations in their RAM memory. Thus, too large matrix couldn't be attached. 
-    So, in this code, crop and resizing operatiins are done at CPU, afterward other augmentations are applied at GPU.
+    So, in this code, crop and resizing operations are done at CPU, afterward other augmentations are applied at GPU.
     
     This strategy dramatically reduce training time by resolving the CPU ->GPU bottleneck problem
+
+    Of note, crop and resizing operations are done before data loader iterator stack mini-batches because each image size could be different.
     """
     
     train_transform = Compose([ScaleIntensity(),
