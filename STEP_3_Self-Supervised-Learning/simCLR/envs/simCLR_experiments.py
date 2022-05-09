@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 import torch
 import torch.nn as nn
@@ -16,7 +17,9 @@ from models.simCLR import simCLR #model script
 
 from envs.loss_functions import calculating_loss, calculating_acc, ContrastiveLoss
 from utils.utils import argument_setting_simCLR, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load
-from utils.LARS_optimizer import LARS 
+from utils.optimizers import LAMB, LARS 
+
+from dataloaders.data_augmentation import intensity_crop_resize, applying_augmentation, add_channel, remove_channel
 
 
 import time
@@ -24,6 +27,17 @@ from tqdm import tqdm
 import copy
 
 def simCLR_train(net, partition, optimizer, args):
+    """
+    Flow of data augmentation is as follows. 
+    intensity_crop_resize (together image set1 and image set2) at CPU -> cuda -> transform (sepreately applied to image set1 and image set2) at GPU. 
+    By applying scale intensity, crop, and resize, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
+    That's because we can apply augmentation technique to all of samples in mini-batches simulateously by tensor operation at GPU.
+    However, GPUs have limitations in their RAM memory. Thus, too large matrix couldn't be attached. 
+    So, in this code, crop and resizing operatiins are done at CPU, afterward other augmentations are applied at GPU.
+    
+    This strategy dramatically reduce training time by resolving the CPU ->GPU bottleneck problem
+    """
+
     scaler = torch.cuda.amp.GradScaler()
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
@@ -31,7 +45,7 @@ def simCLR_train(net, partition, optimizer, args):
                                              shuffle=True,
                                              drop_last = True,
                                              pin_memory=True,
-                                             num_workers=24)
+                                             num_workers=len(net.device_ids)*4)
 
     net.train()
 
@@ -43,8 +57,13 @@ def simCLR_train(net, partition, optimizer, args):
         image1 = images[0]
         image2 = images[1]
 
+        
         image1 = image1.to(f'cuda:{net.device_ids[0]}')
         image2 = image2.to(f'cuda:{net.device_ids[0]}')
+
+        image1 = applying_augmentation(image1, args)
+        image2 = applying_augmentation(image2, args)
+
 
         z1 = net(image1)
         z2 = net(image2)
@@ -54,12 +73,12 @@ def simCLR_train(net, partition, optimizer, args):
 
         loss = loss / args.accumulation_steps
         scaler.scale(loss).backward()
-        
+
         if (i+1) % args.accumulation_steps == 0: # gradient accumulation
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
-            
+
     return net, np.mean(losses) 
         
 
@@ -70,7 +89,6 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
     net = simCLR(args)
     checkpoint_dir = args.checkpoint_dir
 
-    
 
     # setting optimizer 
     if args.optim == 'SGD':
@@ -79,24 +97,25 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
     elif args.optim == 'LARS':
         optimizer = LARS(net.parameters(), lr=args.lr, momentum=0.9)
+    elif args.optim == 'LAMB':
+        optimizer = LAMB(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)        
     else:
         raise ValueError('In-valid optimizer choice')
 
-        
     # setting learning rate scheduler 
-    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
-    scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
+    #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
 
-    
     # loading last checkpoint if resume training
     if args.resume == 'True':
         if args.checkpoint_dir != None:
-            net, optimizer, last_epoch = checkpoint_load(net, checkpoint_dir, optimizer, mode='simCLR')
+            net, optimizer, last_epoch, args.lr = checkpoint_load(net, checkpoint_dir, optimizer, args, mode='simCLR')
+            print('Training start from epoch {} and learning rate {}.'.format(last_epoch, args.lr))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
     else:
         last_epoch = 0 
-        
+
 
     # setting DataParallel
     if args.sbatch == "True":
@@ -110,22 +129,19 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
 
-            
     # attach network to cuda device
     net.to(f'cuda:{net.device_ids[0]}')
 
-    
     # setting for results' data frame
     train_losses = []
 
-    
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
         net, loss = simCLR_train(net, partition, optimizer, args)
         train_losses.append(loss)
-        #scheduler.step(loss)
-        scheduler.step()
+        scheduler.step(loss)
+        #scheduler.step()
         te = time.time()
 
         # visualize the result
@@ -134,7 +150,6 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         # saving the checkpoint
         checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, args, mode='simCLR')
 
-        
     # summarize results
     result = {}
     result['train_losses'] = train_losses

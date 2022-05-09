@@ -24,14 +24,14 @@ def argument_setting_simCLR():
     parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
     parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
-    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD', 'LARS'])
+    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD', 'LARS', 'LAMB'])
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
     parser.add_argument("--epoch",type=int,required=True,help='')
     parser.add_argument("--exp_name",type=str,required=True,help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
     parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
-    parser.add_argument("--augmentation", type=str, nargs='*', required=True, choices=['RandRotate','RandRotate90','RandCrop','RandFlip','RandAdjustContrast','RandGaussianSmooth', 'RandGibbsNoise','RandCoarseDropout'])
+    parser.add_argument("--augmentation", type=str, nargs='*', required=True, choices=['RandRotate','RandRotate90','RandFlip','RandAdjustContrast','RandGaussianSmooth', 'RandGibbsNoise','RandCoarseDropout'])
     parser.add_argument("--accumulation_steps", type=int, required=True)
     parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
     parser.add_argument("--resume", type=str, default='True', required=True)
@@ -159,6 +159,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, args, current_result=None, 
         torch.save({'backbone':net.module.backbone.state_dict(), 
                     'projection_head': net.module.projection_head.state_dict(),
                     'optimizer': optimizer.state_dict(),
+                    'lr': optimizer.param_groups[0]['lr'],
                     'epoch':epoch}, checkpoint_dir)
         print("Checkpoint is saved")
     elif mode == 'prediction':
@@ -177,13 +178,14 @@ def checkpoint_save(net, optimizer, save_dir, epoch, args, current_result=None, 
             torch.save({'backbone':net.module.backbone.state_dict(),
                         'FClayers':net.module.FClayers.state_dict(),
                         'optimizer':optimizer.state_dict(),
+                        'lr': optimizer.param_groups[0]['lr'],
                         'epoch': epoch}, checkpoint_dir)
             print("Best iteration until now is %d" % (epoch + 1))
 
     return checkpoint_dir
 
 
-def checkpoint_load(net, checkpoint_dir, optimizer, mode='simCLR'):
+def checkpoint_load(net, checkpoint_dir, optimizer, args, mode='simCLR'):
     if mode == 'simCLR':
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net.backbone.load_state_dict(model_state['backbone'])
@@ -209,7 +211,9 @@ def checkpoint_load(net, checkpoint_dir, optimizer, mode='simCLR'):
         optimizer.load_state_dict(model_state['optimizer'])
         print('The best checkpoint is loaded')
     
-    return net, optimizer, model_state['epoch']
+
+    return net, optimizer, model_state['epoch'], model_state['lr']
+
 
 
 def load_pretrained_model(net, checkpoint_dir):

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 import torch
 import torch.nn as nn
@@ -37,7 +38,7 @@ def train(net, partition, optimizer, args):
                                              batch_size=args.train_batch_size,
                                              shuffle=True,
                                              pin_memory=True,
-                                             num_workers=24)
+                                             num_workers=len(net.device_ids)*4)
 
     net.train()
 
@@ -97,7 +98,7 @@ def validate(net,partition,scheduler,args):
                                            batch_size=args.val_batch_size,
                                            shuffle=True,
                                            pin_memory=True,
-                                           num_workers=24)
+                                           num_workers=len(net.device_ids)*4)
 
     net.eval()
 
@@ -156,7 +157,7 @@ def test(net,partition,args):
                                             batch_size=args.test_batch_size,
                                             shuffle=False,
                                             pin_memory=True,
-                                            num_workers=24)
+                                            num_workers=4)
 
     net.eval()
     if hasattr(net, 'module'):
@@ -251,7 +252,7 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
     net = prediction_model(subject_data, args)
     checkpoint_dir = args.checkpoint_dir
     pretrained_model_dir = args.pretrained_model_dir
-   
+
     # setting optimizer 
     if args.optim == 'SGD':
         optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
@@ -259,7 +260,10 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
         optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
     else:
         raise ValueError('In-valid optimizer choice')
-    
+
+    # learning rate schedluer
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
+
     # loading pre-trained SSL backbone model or resume training 
     if args.resume == 'False':
         if args.pretrained_model_dir != None:
@@ -269,7 +273,8 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
             raise ValueError('IF YOU WANT TO FINETUNING WITH PRE-TRAINED MODEL, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --pretrained_model_dir OPTION')
     else:
         if args.checkpoint_dir != None:
-            net, optimizer, last_epoch = checkpoint_load(net, checkpoint_dir, optimizer, mode='finetuing')
+            net, optimizer, last_epoch, args.lr = checkpoint_load(net, checkpoint_dir, optimizer, mode='finetuing')
+            print('Training start from epoch {} and learning rate {}.'.format(last_epoch, args.lr))
         else:
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
         
@@ -289,9 +294,6 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
     # attach network to cuda device
     net.to(f'cuda:{net.device_ids[0]}')
 
-
-    # learning rate schedluer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
 
     # setting for results' data frame
     train_losses = {}
