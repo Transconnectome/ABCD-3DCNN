@@ -156,8 +156,9 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     result['train_acc'] = train_acc
     result['val_acc'] = val_acc
     result['test_acc'] = test_acc
-
-    result['confusion_matrices'] = confusion_matrices
+    
+    if confusion_matrices != None:
+        result['confusion_matrices'] = confusion_matrices
 
     return vars(args), result
 ## ==================================== ##
