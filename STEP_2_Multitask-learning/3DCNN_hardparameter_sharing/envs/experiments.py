@@ -224,6 +224,7 @@ def test(net,partition,args):
             y_var = torch.var(y_true[num_target])
             r_square = 1 - (loss / y_var)
             test_acc.append(r_square.item())
+            confusion_matrices = None
 
 
     #if args.cat_target:
