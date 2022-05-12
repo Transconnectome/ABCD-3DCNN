@@ -223,7 +223,7 @@ def test(net,partition,args):
             loss = criterion(predicted, y_true[num_target].float().unsqueeze(1))
             y_var = torch.var(y_true[num_target])
             r_square = 1 - (loss / y_var)
-            test_acc.append(r_square.item())
+            test_acc[num_target].append(r_square.item())
             confusion_matrices = None
 
 
