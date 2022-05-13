@@ -215,13 +215,19 @@ def checkpoint_load(net, checkpoint_dir, optimizer, args, mode='simCLR'):
     return net, optimizer, model_state['epoch'], model_state['lr']
 
 
-
 def load_pretrained_model(net, checkpoint_dir):
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
     net.backbone.load_state_dict(model_state['backbone'])
     print('The pre-trained model is loaded')
 
     return net    
+
+
+def freezing_layers(module):
+    for param in module.parameters():
+        param.requires_grad = False
+    return module
+
 
 # define result-saving function
 def save_exp_result(save_dir, setting, result, resume='False'):
