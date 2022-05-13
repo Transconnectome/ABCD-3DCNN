@@ -1,7 +1,56 @@
 ## The flow of data load 
+### Data Structure
+The data structure is as follow.
+```
+DATA
+|-- image data
+|    |-- Fractional Anisotropy 
+|    |-- Mean Diffusivity
+|    |-- Radial Diffusivity
+|
+|-- phenotype data
+     |--- phenotype.csv
+
+```
+### the flow of data loading
+1. Making dataset as follow
+```
+Dataset = {'FA':['sub-01_FA.nii.gz', 'sub-02_FA.nii.gz',...],  
+           'MD':['sub-01_MD.nii.gz', 'sub-02_MD.nii.gz',...],  
+           'RD':['sub-01_RD.nii.gz', 'sub-02_RD.nii.gz',...],
+           'label':{'sex':[1, 0,...], 'age':[121, 124,...]}}
+```
+
+2. Loading images, Transform (scale intensity, resize,...) and concatenate FA, MD, RD each images.
+This process is done by custom collate_fn. 
+collate_fn define how to each images is fed into mini-batches.
+Thus, it could be said that mini-batches are made by torch.utils.data.DataLoader with this collate_fn.
+```
+def collate_fn(batch):
+  images = []
+  labels = []
+  for i in batch:
+    #batch[i] = {'FA': 'FA_image.nii.gz', 'MD': 'MD_image.nii.gz',RD:' RD_image.nii.gz',label:{'sex':1, 'age':121}}
+    FA = Loading(batch[i]['FA'])
+    FA = Transform(FA)
+    MD = Loading(batch[i]['MD'])
+    MD = Transform(FA)
+    RD = Loading(batch[i]['RD'])
+    RD = Transform(FA)
+    image = concatenate([FA, MD, RD])
+    images.append(image)
+    labels.append(batch[i]['label'])
+    
+   return images, labels
+```
+ 
+4. With custom collate_fn, mini-batches are made by torch.utils.data.DataLoader.  
+ 
 
 
-### Models 
+
+
+## Models 
 The list of models are as follows 
 - **simple 3DCNN**
 - **VGGNet** (11 layers, 13 layers, 16 layers, 19 layers)
@@ -11,6 +60,8 @@ The list of models are as follows
   
 This python script could be used in both **single task learning** and **multi task learning**  
 
+
+## Running codes 
 ### The example of single task learning
 
 ```
