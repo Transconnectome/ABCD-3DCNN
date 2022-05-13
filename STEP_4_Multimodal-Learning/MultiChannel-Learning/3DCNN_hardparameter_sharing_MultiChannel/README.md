@@ -1,3 +1,7 @@
+## The flow of data load 
+
+
+### Models 
 The list of models are as follows 
 - **simple 3DCNN**
 - **VGGNet** (11 layers, 13 layers, 16 layers, 19 layers)
