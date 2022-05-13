@@ -9,15 +9,30 @@ from tqdm import tqdm
 #I've changed it to "when fill_value = None, minimum number of each images is filled into dropout patch "
 from monai_custom_augmentation.RandCoarseDropout import RandCoarseDropout
 
-"""Flow of data augmentation is as follows. 
-    intensity_crop_resize (together image set1 and image set2) at CPU -> cuda -> transform (sepreately applied to image set1 and image set2) at GPU. 
-    By applying scale intensity, crop, and resize, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
-    That's because we can apply augmentation technique to all of samples in mini-batches simulateously by tensor operation at GPU.
-    However, GPUs have limitations in their RAM memory. Thus, too large matrix couldn't be attached. 
-    So, in this code, crop and resizing operatiins are done at CPU, afterward other augmentations are applied at GPU."""
+"""
+Flow of data augmentation is as follows. 
+intensity_crop_resize (together image set1 and image set2) at CPU -> cuda -> transform (sepreately applied to image set1 and image set2) at GPU. 
+By applying scale intensity, crop, and resize, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
+That's because we can apply augmentation technique to all of samples in mini-batches simulateously by tensor operation at GPU.
+However, GPUs have limitations in their RAM memory. Thus, too large matrix couldn't be attached. 
+So, in this code, crop and resizing operatiins are done at CPU, afterward other augmentations are applied at GPU.
+
+================================================
+
+It need to be considered, whether to apply augmentation in mini batch-wise or image-wise.
+
+If you set mode option of applying_augmentation() as 'batch_wise', random augmentation from the same random seed would be applied to each mini batches. 
+In other word, the same level of random augmentations are applied simultaneously to each mini batches. 
+
+Whereas, if you set mode option of applying_augmentation() as 'image_wise', all images in the same mini batches would be transformed by random augmentations from the different random seed. 
+In other word, different level of random augmentations are applied seperately to each images in the same mini batches. 
+
+'batch_wise' would reduce the training time, but network would have limited opportunities to compare much more diverse augmented images. 
+'image_wise' would slightly increase the training time (however, it still solve the bottleneck problem), but network would have much more opportunities to compare much more diverse augmented images. 
+"""
 
 
-def applying_augmentation(img, args):
+def applying_augmentation(img, args, mode='image_wise'):
     augmentation_list = [] # basic transformation
 
     if 'RandRotate90' in args.augmentation:
@@ -40,8 +55,13 @@ def applying_augmentation(img, args):
     
     augmentation = Compose(augmentation_list)
     
-    for batch in range(img.size()[0]):
-        img[batch] = augmentation(img[batch])
+    if mode == 'image_wise':
+        for batch in range(img.size()[0]):
+            img[batch] = augmentation(img[batch])
+    elif mode == 'batch_wise':
+        img = img.squeeze(1)
+        img = augmentation(img)
+        img = img.unsqueeze(1)
     
     return  img
 
