@@ -21,7 +21,6 @@ from utils.optimizers import LAMB, LARS
 
 from dataloaders.data_augmentation import applying_augmentation
 
-
 import time
 from tqdm import tqdm
 import copy
@@ -45,7 +44,7 @@ def simCLR_train(net, partition, optimizer, args):
                                              shuffle=True,
                                              drop_last = True,
                                              pin_memory=True,
-                                             num_workers=len(net.device_ids)*4)
+                                             num_workers=len(net.device_ids)*8)
 
     net.train()
 
@@ -60,8 +59,8 @@ def simCLR_train(net, partition, optimizer, args):
         image1 = image1.to(f'cuda:{net.device_ids[0]}')
         image2 = image2.to(f'cuda:{net.device_ids[0]}')
 
-        image1 = applying_augmentation(image1, args)
-        image2 = applying_augmentation(image2, args)
+        image1 = applying_augmentation(image1, args, mode='image_wise')
+        image2 = applying_augmentation(image2, args, mode='image_wise')
 
         z1 = net(image1)
         z2 = net(image2)
@@ -101,13 +100,14 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         raise ValueError('In-valid optimizer choice')
 
     # setting learning rate scheduler 
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2, eta_min=0)
 
     # loading last checkpoint if resume training
     if args.resume == 'True':
         if args.checkpoint_dir != None:
-            net, optimizer, last_epoch, args.lr = checkpoint_load(net, checkpoint_dir, optimizer, args, mode='simCLR')
+            net, optimizer, scheduler, last_epoch, args.lr = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args, mode='simCLR')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, args.lr))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
@@ -138,15 +138,15 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         ts = time.time()
         net, loss = simCLR_train(net, partition, optimizer, args)
         train_losses.append(loss)
-        scheduler.step(loss)
-        #scheduler.step()
+        #scheduler.step(loss)
+        scheduler.step()
         te = time.time()
 
         # visualize the result
         print('Epoch {}. Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, loss, optimizer.param_groups[0]['lr'],te-ts))
 
         # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, args, mode='simCLR')
+        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, args, mode='simCLR')
 
     # summarize results
     result = {}
