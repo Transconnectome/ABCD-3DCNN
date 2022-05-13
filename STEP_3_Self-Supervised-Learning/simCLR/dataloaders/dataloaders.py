@@ -59,6 +59,7 @@ def combining_image_target(subject_data, image_files, target_list):
 
     image_list = pd.DataFrame({'eid':subj, 'image_files': image_files})
     subject_data = pd.merge(subject_data, image_list, how='inner', on='eid')
+    subject_data = subject_data.sort_values(by='eid')
 
     col_list = target_list + ['image_files']
     
