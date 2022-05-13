@@ -48,7 +48,8 @@ def collate_fn(batch):
 we define collate_fn as object class. For details, please refer to 'dataloaders/dataloaders.py'.**  
  
 
-
+- reference 1: [https://sanghyu.tistory.com/90]  
+- reference 2: [https://intrepidgeeks.com/tutorial/add-parameter-to-torch-collate-fn]
 
 
 ## Models 
