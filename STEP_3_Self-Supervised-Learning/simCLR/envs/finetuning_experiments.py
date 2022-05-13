@@ -13,7 +13,7 @@ from models.prediction_model import prediction_model
 from models.prediction_model import prediction_model #model script
 
 from envs.loss_functions import calculating_loss, calculating_acc
-from utils.utils import CLIreporter, load_pretrained_model, save_exp_result, checkpoint_save, checkpoint_load, load_pretrained_model
+from utils.utils import CLIreporter, load_pretrained_model, save_exp_result, checkpoint_save, checkpoint_load, load_pretrained_model, freezing_layers
 
 import time
 from tqdm import tqdm
@@ -268,6 +268,7 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
     if args.resume == 'False':
         if args.pretrained_model_dir != None:
             net = load_pretrained_model(net, pretrained_model_dir)
+            net.backbone = freezing_layers(net.backbone)
             last_epoch = 0
         else:
             raise ValueError('IF YOU WANT TO FINETUNING WITH PRE-TRAINED MODEL, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --pretrained_model_dir OPTION')
