@@ -44,7 +44,8 @@ def collate_fn(batch):
    return images, labels
 ```
  
-4. With custom collate_fn, mini-batches are made by torch.utils.data.DataLoader.  
+**+ Because we need to set some arguments for transform (like size of images) and def collate_fn only get 'batch' as input,  
+we define collate_fn as object class. For details, please refer to 'dataloaders/dataloaders.py'.**  
  
 
 
