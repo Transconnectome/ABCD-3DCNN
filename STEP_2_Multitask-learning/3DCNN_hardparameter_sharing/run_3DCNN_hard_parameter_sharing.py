@@ -81,13 +81,18 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = densenet3d.densenet3D201(subject_data, args)
              
 
+    # setting DataParallel
     if args.sbatch == "True":
-        net = nn.DataParallel(net)
+        devices = []
+        for d in range(torch.cuda.device_count()):
+            devices.append(d)
+        net = nn.DataParallel(net, device_ids = devices)
     else:
         if not args.gpus:
             raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
+            
     
     net.to(f'cuda:{net.device_ids[0]}')
 
