@@ -24,7 +24,7 @@ from monai.data import ImageDataset, Dataset, NibabelReader
 def loading_images(image_dir, args):
     image_files = glob.glob(os.path.join(image_dir ,'*.nii.gz'))
     image_files = sorted(image_files)
-    #image_files = image_files[:1000]
+    image_files = image_files[:1000]
     print("Loading image file names as list is completed")
     return image_files
 
@@ -148,34 +148,47 @@ def partition_dataset(imageFiles_labels,args):
 ## how to make custom dataloader. Especially, how to make dataloaders for map-style dataset (dictionary type dataset) 
 
 class _custom_collate_fn(object):
-    def __init__(self, resize):
+    def __init__(self, resize, targets):
         self.transform = Compose([ScaleIntensity(),
-                                          Resize(tuple(resize)),
-                                          AddChannel(),
-                                          ToTensor()])
+                                  AddChannel(),
+                                  Resize(tuple(resize)),
+                                  ToTensor()])
         self.ImageReader = NibabelReader()
+        self.targets = targets
 
     def __call__(self, batch):
         images = []
-        labels = []
+        
+        labels = {}
+        for target in self.targets:
+            labels[target] = []
 
         for i in range(len(batch)):
-            img_FA = self.ImageReader.read(batch[i]['FA'])
-            img_FA, _ = self.ImageReader.get_data(img_FA)
-            img_FA = self.transform(img_FA)
+            img = []
+            img_tmp = self.ImageReader.read(batch[i]['FA'])
+            img_tmp, _ = self.ImageReader.get_data(img_tmp)
+            img_tmp = self.transform(img_tmp)
+            img.append(img_tmp)
 
-            img_MD = self.ImageReader.read(batch[i]['MD'])
-            img_MD, _ = self.ImageReader.get_data(img_MD)
-            img_MD = self.transform(img_MD)
+            img_tmp = self.ImageReader.read(batch[i]['MD'])
+            img_tmp, _ = self.ImageReader.get_data(img_tmp)
+            img_tmp = self.transform(img_tmp)
+            img.append(img_tmp)
 
-            img_RD = self.ImageReader.read(batch[i]['RD'])
-            img_RD, _ = self.ImageReader.get_data(img_RD)
-            img_RD = self.transform(img_RD)
+            img_tmp = self.ImageReader.read(batch[i]['RD'])
+            img_tmp, _ = self.ImageReader.get_data(img_tmp)
+            img_tmp = self.transform(img_tmp)
+            img.append(img_tmp)
 
-            img = torch.cat([img_FA, img_MD, img_RD], dim=0)
+            img = torch.cat(img, dim=0)
             img = img.unsqueeze(0)
 
             images.append(img)
-            labels.append(batch[i]['label'])
+            
+            for target in self.targets:
+                labels[target].append(batch[i]['label'][target])
+
+        for target in self.targets:
+            labels[target] = torch.Tensor(labels[target])
         
         return torch.cat(images,dim=0), labels

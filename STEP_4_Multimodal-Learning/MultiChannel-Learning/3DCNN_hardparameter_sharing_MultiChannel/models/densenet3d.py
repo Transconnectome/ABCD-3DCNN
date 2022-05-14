@@ -106,7 +106,7 @@ class DenseNet(nn.Module):
     """
 
     def __init__(self, subject_data, args,
-                 n_input_channels=2,conv1_t_size=7,conv1_t_stride=1,no_max_pool=False,
+                 n_input_channels=3,conv1_t_size=7,conv1_t_stride=1,no_max_pool=False,
                  growth_rate=32,block_config=(6, 12, 24, 16),num_init_features=64,
                  bn_size=4,drop_rate=0,num_classes=1000):
 

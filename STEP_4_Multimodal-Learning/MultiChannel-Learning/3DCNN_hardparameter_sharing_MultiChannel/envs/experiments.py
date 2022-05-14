@@ -25,10 +25,12 @@ def train(net,partition,optimizer,args):
     '''GradScaler is for calculating gradient with float 16 type'''
     scaler = torch.cuda.amp.GradScaler()
 
+    targets= args.cat_target + args.num_target
+
     trainloader = torch.utils.data.DataLoader(partition['train'],
                              batch_size=args.train_batch_size,
                              shuffle=False,
-                             collate_fn = _custom_collate_fn(args.resize),
+                             collate_fn = _custom_collate_fn(args.resize, targets),
                              pin_memory=True,
                              num_workers=24)
     net.train()
@@ -57,8 +59,6 @@ def train(net,partition,optimizer,args):
     for i, data in enumerate(trainloader,0):
         optimizer.zero_grad()
         image, targets = data
-        print(image, targets)
-
         image = image.to(f'cuda:{net.device_ids[0]}')
         output = net(image)
 
