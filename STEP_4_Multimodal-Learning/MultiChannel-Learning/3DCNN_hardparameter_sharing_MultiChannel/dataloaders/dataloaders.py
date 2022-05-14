@@ -159,7 +159,7 @@ class _custom_collate_fn(object):
         images = []
         labels = []
 
-        for i in tqdm(range(len(batch))):
+        for i in range(len(batch)):
             img_FA = self.ImageReader.read(batch[i]['FA'])
             img_FA, _ = self.ImageReader.get_data(img_FA)
             img_FA = self.transform(img_FA)
