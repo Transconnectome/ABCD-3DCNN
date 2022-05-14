@@ -33,6 +33,7 @@ def argument_setting():
     parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
     parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
+    parser.add_argument("--resume", type=str, default='True', required=True)
 
     args = parser.parse_args()
     print("Categorical target labels are {} and Numerical target labels are {}".format(args.cat_target, args.num_target))
@@ -82,7 +83,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args):
+def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, current_result, previous_result,  args):
     if os.path.isdir(os.path.join(save_dir,'model')) == False:
         makedir(os.path.join(save_dir,'model'))
     
@@ -99,21 +100,27 @@ def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args
                 best_checkpoint_votes += 1
         
     if best_checkpoint_votes == len(args.cat_target + args.num_target):
-        torch.save(net.module.state_dict(), checkpoint_dir)
+        torch.save({'model': net.module.state_dict(),
+                    'optimizer':optimizer.state_dict(),
+                    'lr': optimizer.param_groups[0]['lr'],
+                    'scheduler': scheduler.state_dict(),
+                    'epoch': epoch}, checkpoint_dir)
         print("Best iteration until now is %d" % (epoch + 1))
 
     return checkpoint_dir
 
 
-def checkpoint_load(net, checkpoint_dir):
+def checkpoint_load(net, checkpoint_dir, optimizer, scheduler):
     if hasattr(net, 'module'):
         net = net.module
 
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-    net.load_state_dict(model_state)
+    net.load_state_dict(model_state['model'])
+    optimizer.load_state_dict(model_state['optimizer'])
+    scheduler.load_state_dict(model_state['scheduler'])
     print('The best checkpoint is loaded')
 
-    return net
+    return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'] 
             
 
 # define result-saving function
