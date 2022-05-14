@@ -176,9 +176,9 @@ class LAMB(Optimizer):
                 #print(exp_avg.get_device())
                 #print(grad.get_device())
 
-                exp_avg.mul_(beta1).add_(grad.cpu(), alpha=1 - beta1)
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
                 # v_t
-                exp_avg_sq.mul_(beta2).addcmul_(grad.cpu(), grad.cpu(), value=1 - beta2)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
                 # Paper v3 does not use debiasing.
                 # bias_correction1 = 1 - beta1 ** state['step']
@@ -190,7 +190,7 @@ class LAMB(Optimizer):
 
                 adam_step = exp_avg / exp_avg_sq.sqrt().add(group['eps'])
                 if group['weight_decay'] != 0:
-                    adam_step.add_(p.data.cpu(), alpha=group['weight_decay'])
+                    adam_step.add_(p.data, alpha=group['weight_decay'])
 
                 adam_norm = adam_step.pow(2).sum().sqrt()
                 if weight_norm == 0 or adam_norm == 0:
