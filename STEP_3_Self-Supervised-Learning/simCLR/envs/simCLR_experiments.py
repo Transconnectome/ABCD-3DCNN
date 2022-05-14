@@ -107,7 +107,7 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
     # loading last checkpoint if resume training
     if args.resume == 'True':
         if args.checkpoint_dir != None:
-            net, optimizer, scheduler, last_epoch, args.lr = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args, mode='simCLR')
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'] = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args, mode='simCLR')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, args.lr))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
