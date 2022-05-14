@@ -275,7 +275,7 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
     else:
         if args.checkpoint_dir != None:
             net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'] = checkpoint_load(net, checkpoint_dir, optimizer, mode='finetuing')
-            print('Training start from epoch {} and learning rate {}.'.format(last_epoch, args.lr))
+            print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else:
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
         
