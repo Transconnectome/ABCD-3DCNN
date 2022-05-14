@@ -157,7 +157,8 @@ class LAMB(Optimizer):
                     raise RuntimeError('Lamb does not support sparse gradients, consider SparseAdam instad.')
 
                 state = self.state[p]
-
+                # getting device 
+                device = grad.get_device()
                 # State initialization
                 if len(state) == 0:
                     state['step'] = 0
@@ -167,6 +168,7 @@ class LAMB(Optimizer):
                     state['exp_avg_sq'] = torch.zeros_like(p.data)
 
                 exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
+                exp_avg, exp_avg_sq = exp_avg.to(f'cuda:{device}'), exp_avg_sq.to(f'cuda:{device}')
                 beta1, beta2 = group['betas']
 
                 state['step'] += 1
