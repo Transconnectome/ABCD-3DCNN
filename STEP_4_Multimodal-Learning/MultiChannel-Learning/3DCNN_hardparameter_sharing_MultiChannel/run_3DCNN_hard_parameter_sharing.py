@@ -81,17 +81,6 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = densenet3d.densenet3D201(subject_data, args)
              
 
-    if args.sbatch == "True":
-        net = nn.DataParallel(net)
-    else:
-        if not args.gpus:
-            raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
-        else:
-            net = nn.DataParallel(net, device_ids=args.gpus)
-    
-    net.to(f'cuda:{net.device_ids[0]}')
-
-
     if args.optim == 'SGD':
         optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
     elif args.optim == 'Adam':
@@ -100,7 +89,35 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         raise ValueError('In-valid optimizer choice')
 
     # learning rate schedluer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
+
+    # loading last checkpoint if resume training
+    if args.resume == 'True':
+        if args.checkpoint_dir != None:
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'] = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args, mode='simCLR')
+            print('Training start from epoch {} and learning rate {}.'.format(last_epoch, args.lr))
+        else: 
+            raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
+    else:
+        last_epoch = 0 
+
+
+    # setting DataParallel
+    if args.sbatch == "True":
+        devices = []
+        for d in range(torch.cuda.device_count()):
+            devices.append(d)
+        net = nn.DataParallel(net, device_ids = devices)
+    else:
+        if not args.gpus:
+            raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
+        else:
+            net = nn.DataParallel(net, device_ids=args.gpus)
+    
+    # attach network to cuda device
+    net.to(f'cuda:{net.device_ids[0]}')
+
 
     # setting for results' data frame
     train_losses = {}
@@ -115,7 +132,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         val_accs[target_name] = []
         
 
-    for epoch in tqdm(range(args.epoch)):
+    for epoch in tqdm(range(last_epoch, args.epoch)):
         ts = time.time()
         net, train_loss, train_acc = train(net,partition,optimizer,args)
         val_loss, val_acc = validate(net,partition,scheduler,args)
@@ -133,13 +150,13 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
 
         # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
+        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, val_acc, val_accs, args)
 
     # test
     net.to('cpu')
     torch.cuda.empty_cache()
 
-    net = checkpoint_load(net, checkpoint_dir)
+    net, _, _, _, _ = checkpoint_load(net, checkpoint_dir, optimizer, scheduler)
     if args.sbatch == 'True':
         net.cuda()
     else:
