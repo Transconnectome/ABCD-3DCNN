@@ -11,6 +11,7 @@ class simCLR(nn.Module):
         self.backbone, self.num_features = set_backbone(args)
         self.embedding_size = embedding_size
         self.projection_head = self._projection_head()
+        self.version = args.version
 
 
     def _projection_head(self):
@@ -33,12 +34,18 @@ class simCLR(nn.Module):
         
 
         FClayer = nn.Linear(in_features=self.num_features, out_features=self.embedding_size)
-        
-        projection_head = nn.Sequential(collections.OrderedDict([
-            ('head1',head1),
-            ('head2',head2),
-            ('FClayer', FClayer)
-        ]))
+
+        if self.version == 'simCLR_v1':
+            projection_head = nn.Sequential(collections.OrderedDict([
+                ('head1',head1),
+                ('FClayer', FClayer)
+            ]))
+        elif self.version == 'simCLR_v2':            
+            projection_head = nn.Sequential(collections.OrderedDict([
+                ('head1',head1),
+                ('head2',head2),
+                ('FClayer', FClayer)
+            ]))
         
         return projection_head
                                                     
