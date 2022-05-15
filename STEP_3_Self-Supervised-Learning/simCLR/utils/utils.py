@@ -18,6 +18,7 @@ def argument_setting_simCLR():
 
     #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
     parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
+    parser.add_argument("--version",required=True,type=str,help='',choices=['simCLR_v1, simCLR_v2'])
     parser.add_argument("--finetuning_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
@@ -143,7 +144,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, optimizer, save_dir, epoch, args, current_result=None, previous_result=None, mode=None):
+def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, args, current_result=None, previous_result=None, mode=None):
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
     if args.resume == 'False':
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
@@ -160,6 +161,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, args, current_result=None, 
                     'projection_head': net.module.projection_head.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr': optimizer.param_groups[0]['lr'],
+                    'scheduler': scheduler.state_dict(),
                     'epoch':epoch}, checkpoint_dir)
         print("Checkpoint is saved")
     elif mode == 'prediction':
@@ -185,20 +187,30 @@ def checkpoint_save(net, optimizer, save_dir, epoch, args, current_result=None, 
     return checkpoint_dir
 
 
-def checkpoint_load(net, checkpoint_dir, optimizer, args, mode='simCLR'):
+
+def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args,  mode='simCLR'):
     if mode == 'simCLR':
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net.backbone.load_state_dict(model_state['backbone'])
         net.projection_head.load_state_dict(model_state['projection_head'])
         optimizer.load_state_dict(model_state['optimizer'])
+        scheduler.load_state_dict(model_state['scheduler'])
         print('The last checkpoint is loaded')
         #return net, optimizer, model_state['epoch']
     
     elif mode == 'finetuing':
         model_state = torch.load(checkpoint_dir, map_location='cpu')
+        # loading network
         net.backbone.load_state_dict(model_state['backbone'])
-        net.FClayers.load_state_dict(model_state['FClayers'])
+        FClayers = model_state['FClayers']
+        if args.version == 'simCLR_v1':
+            net.FClayers.FClayer.load_state_dict(FClayers['FClayer'])
+        elif args.version == 'simCLR_v2':
+            net.FClayers.head1.load_state_dict(FClayers['head1'])
+            net.FClayers.FClayer.load_state_dict(FClayers['FClayer'])
+        #loading optimizers
         optimizer.load_state_dict(model_state['optimizer'])
+        scheduler.load_state_dict(model_state['scheduler'])
         print('The last checkpoint is loaded')
         #return net, optimizer, model_state['epoch']
     
@@ -209,10 +221,12 @@ def checkpoint_load(net, checkpoint_dir, optimizer, args, mode='simCLR'):
         net.backbone.load_state_dict(model_state['backbone'])
         net.FClayers.load_state_dict(model_state['FClayers'])
         optimizer.load_state_dict(model_state['optimizer'])
+        scheduler.load_state_dict(model_state['scheduler'])
         print('The best checkpoint is loaded')
     
 
-    return net, optimizer, model_state['epoch'], model_state['lr']
+    return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'] 
+ 
 
 
 def load_pretrained_model(net, checkpoint_dir):
@@ -223,10 +237,12 @@ def load_pretrained_model(net, checkpoint_dir):
     return net    
 
 
+
 def freezing_layers(module):
     for param in module.parameters():
         param.requires_grad = False
     return module
+
 
 
 # define result-saving function
