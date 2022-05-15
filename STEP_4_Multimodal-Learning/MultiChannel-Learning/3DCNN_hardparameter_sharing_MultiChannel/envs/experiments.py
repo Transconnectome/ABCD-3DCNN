@@ -90,7 +90,7 @@ def validate(net,partition,scheduler,args):
     valloader = torch.utils.data.DataLoader(partition['val'],
                                             batch_size=args.val_batch_size,
                                             shuffle=False,
-                                            collate_fn = _custom_collate_fn(args.resize),
+                                            collate_fn = _custom_collate_fn(args.resize, targets),
                                             pin_memory=True,
                                             num_workers=24)
 
@@ -150,7 +150,7 @@ def test(net,partition,args):
     testloader = torch.utils.data.DataLoader(partition['test'],
                                              batch_size=args.test_batch_size,
                                              shuffle=False,
-                                             collate_fn = _custom_collate_fn(args.resize),
+                                             collate_fn = _custom_collate_fn(args.resize, targets),
                                              pin_memory=True,
                                              num_workers=24)
 
