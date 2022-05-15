@@ -87,8 +87,8 @@ def train(net,partition,optimizer,args):
 
 # define validation step
 def validate(net,partition,scheduler,args):
-   
     targets= args.cat_target + args.num_target
+
     valloader = torch.utils.data.DataLoader(partition['val'],
                                             batch_size=args.val_batch_size,
                                             shuffle=False,
@@ -150,6 +150,7 @@ def validate(net,partition,scheduler,args):
 # define test step
 def test(net,partition,args):
     targets= args.cat_target + args.num_target
+    
     testloader = torch.utils.data.DataLoader(partition['test'],
                                              batch_size=args.test_batch_size,
                                              shuffle=False,
