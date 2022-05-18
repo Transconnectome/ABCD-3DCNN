@@ -56,8 +56,8 @@ def simCLR_train(net, partition, optimizer, args):
         image1 = images[0]
         image2 = images[1]
 
-        image1 = image1.to(f'cuda:{net.device_ids[0]}', non_blocking=True)
-        image2 = image2.to(f'cuda:{net.device_ids[0]}', non_blocking=True)
+        image1 = image1.to(f'cuda:{net.device_ids[0]}')
+        image2 = image2.to(f'cuda:{net.device_ids[0]}')
 
         image1 = applying_augmentation(image1, args, mode='image_wise')
         image2 = applying_augmentation(image2, args, mode='image_wise')
