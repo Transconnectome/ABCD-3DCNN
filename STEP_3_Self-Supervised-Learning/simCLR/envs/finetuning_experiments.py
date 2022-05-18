@@ -255,7 +255,7 @@ def finetuning_experiment(partition, subject_data, save_dir, args): #in_channels
 
     # setting optimizer 
     if args.optim == 'SGD':
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
+        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
     elif args.optim == 'Adam':
         optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
     else:
