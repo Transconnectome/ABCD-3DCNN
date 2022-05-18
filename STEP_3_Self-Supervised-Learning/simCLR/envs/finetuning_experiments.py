@@ -66,7 +66,7 @@ def train(net, partition, optimizer, args):
     for i, data in enumerate(trainloader,0):
         optimizer.zero_grad()
         image, targets = data
-        image = image.to(f'cuda:{net.device_ids[0]}')
+        image = image.to(f'cuda:{net.device_ids[0]}', non_blocking=True)
         output = net(image)
 
         loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
@@ -126,7 +126,7 @@ def validate(net,partition,scheduler,args):
     with torch.no_grad():
         for i, data in enumerate(valloader,0):
             image, targets = data
-            image = image.to(f'cuda:{net.device_ids[0]}')
+            image = image.to(f'cuda:{net.device_ids[0]}', non_blocking=True)
             output = net(image)
 
             loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
