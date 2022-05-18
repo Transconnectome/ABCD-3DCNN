@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 
 import monai
-from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor, RandSpatialCrop
+from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop
 from monai.data import ImageDataset
 
 def loading_images(image_dir, args):
@@ -95,16 +95,16 @@ def partition_dataset_simCLR(imageFiles,args):
     
     This strategy dramatically reduce training time by resolving the CPU ->GPU bottleneck problem
 
-    Of note, crop and resizing operations are done before data loader iterator stack mini-batches because each image size could be different.
+    Of note, crop and resizing operations are done before data loader iterator stack mini-batches because each image size could be different. 
     """
     
-    train_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
+    train_transform = Compose([AddChannel(),
                                RandSpatialCrop(roi_size= [78, 93, 78],max_roi_size=[156, 186, 156], random_center=True, random_size=True),
                                Resize(tuple(args.resize)),
                                ToTensor()]) #augmentation is done after data loader iteration. Refer to def simCLR_train
 
-    val_transform = Compose([ScaleIntensity(),
+
+    val_transform = Compose([NormalizeIntensity(),
                              Resize(tuple(args.resize)),
                              AddChannel(),
                              ToTensor()])

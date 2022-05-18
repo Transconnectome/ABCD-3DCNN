@@ -1,6 +1,6 @@
 import torch
 import monai
-from monai.transforms import AddChannel, Compose, RandSpatialCrop, RandRotate, RandFlip,RandRotate90, RandAdjustContrast, RandGaussianSmooth, RandGibbsNoise, RandKSpaceSpikeNoise, Resize, ScaleIntensity, Flip, ToTensor
+from monai.transforms import AddChannel, Compose, RandSpatialCrop, RandRotate, RandFlip,RandRotate90, RandAdjustContrast, RandGaussianSmooth, RandGibbsNoise, RandKSpaceSpikeNoise, Resize, ScaleIntensity, Flip, ToTensor, NormalizeIntensity
 from typing import Tuple, List
 from tqdm import tqdm
 
@@ -11,8 +11,8 @@ from monai_custom_augmentation.RandCoarseDropout import RandCoarseDropout
 
 """
 Flow of data augmentation is as follows. 
-intensity_crop_resize (together image set1 and image set2) at CPU -> cuda -> transform (sepreately applied to image set1 and image set2) at GPU. 
-By applying scale intensity, crop, and resize, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
+crop_resize (together image set1 and image set2) at CPU -> cuda -> transform (sepreately applied to image set1 and image set2) at GPU. 
+By applying cropping and resizing, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
 That's because we can apply augmentation technique to all of samples in mini-batches simulateously by tensor operation at GPU.
 However, GPUs have limitations in their RAM memory. Thus, too large matrix couldn't be attached. 
 So, in this code, crop and resizing operatiins are done at CPU, afterward other augmentations are applied at GPU.
@@ -53,11 +53,12 @@ def applying_augmentation(img, args, mode='image_wise'):
         """If RandCoarseDropout(fill_value=None), the minimun number of image is filled into dropout patch""" 
         augmentation_list.append(RandCoarseDropout(holes=24, spatial_size = (7, 7, 7), fill_value=None , prob = 0.5))  # It is setting for dropping out 25% of patches     
     
+    augmentation.append(NormalizeIntensity())
     augmentation = Compose(augmentation_list)
     
     if mode == 'image_wise':
-        for batch in range(img.size()[0]):
-            img[batch] = augmentation(img[batch])
+        for batch_idx in range(img.size()[0]):
+            img[batch_idx] = augmentation(img[batch_idx])
     elif mode == 'batch_wise':
         img = img.squeeze(1)
         img = augmentation(img)
