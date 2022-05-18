@@ -53,7 +53,7 @@ def applying_augmentation(img, args, mode='image_wise'):
         """If RandCoarseDropout(fill_value=None), the minimun number of image is filled into dropout patch""" 
         augmentation_list.append(RandCoarseDropout(holes=24, spatial_size = (7, 7, 7), fill_value=None , prob = 0.5))  # It is setting for dropping out 25% of patches     
     
-    augmentation.append(NormalizeIntensity())
+    augmentation_list.append(NormalizeIntensity())
     augmentation = Compose(augmentation_list)
     
     if mode == 'image_wise':
