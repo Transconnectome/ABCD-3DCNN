@@ -19,7 +19,6 @@ def argument_setting_simCLR():
     #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
     parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
     parser.add_argument("--version",required=True,type=str,help='',choices=['simCLR_v1, simCLR_v2'])
-    parser.add_argument("--finetuning_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
@@ -46,7 +45,6 @@ def argument_setting_finetuning():
 
     #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
     parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
-    parser.add_argument("--finetuning_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
