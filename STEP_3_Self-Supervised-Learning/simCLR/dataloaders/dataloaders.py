@@ -104,41 +104,36 @@ def partition_dataset_simCLR(imageFiles,args):
                                ToTensor()]) #augmentation is done after data loader iteration. Refer to def simCLR_train
 
 
-    val_transform = Compose([NormalizeIntensity(),
+    val_transform = Compose([AddChannel(),
                              Resize(tuple(args.resize)),
-                             AddChannel(),
+                             NormalizeIntensity(),
                              ToTensor()])
 
 
     # number of total / train,val, test
     num_total = len(imageFiles)
-    num_train = int(num_total*(1 - args.finetuning_size))
-
-    num_finetuning_all = num_total - num_train
-    num_finetuning = int(num_finetuning_all*(1 - args.val_size - args.test_size))
-    num_val = int((num_finetuning_all - num_finetuning)*args.val_size)
+    num_train = int(num_total*(1 - args.val_size - args.test_size))
+    num_val = int(num_total*args.val_size)
+    num_test = int(num_total*args.test_size)
     
 
-    # image information of SSL training
+    # image for SSL training and linear classifier training (linear classifier is trained during linear evaluation protocol) 
     images_train = imageFiles[:num_train]
 
-    # imageinformation of fine tuning
-    images_finetuning = imageFiles[num_train:num_train+num_finetuning]
+    # image for validation set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
+    images_val = imageFiles[num_train:num_train+num_val]
 
-    # image information of valid
-    images_val = imageFiles[num_train+num_finetuning:num_train+num_finetuning+num_val]
+    # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
+    images_test = imageFiles[num_train+num_val:]
 
-    # image information of test
-    images_test = imageFiles[num_train+num_finetuning+num_val:]
+    print("Training Sample: {}".format(len(images_train)))
 
     train_set = ImageDataset(image_files=images_train,transform=ContrastiveLearningViewGenerator(train_transform)) # return of ContrastiveLearningViewGenerator is [image1, image2]
-    finetuning_set = ImageDataset(image_files=images_finetuning,transform=val_transform)
     val_set = ImageDataset(image_files=images_val,transform=val_transform)
     test_set = ImageDataset(image_files=images_test,transform=val_transform)
 
     partition = {}
     partition['train'] = train_set
-    partition['finetuning'] = finetuning_set
     partition['val'] = val_set
     partition['test'] = test_set
 
@@ -168,45 +163,39 @@ def partition_dataset_finetuning(imageFiles_labels,args):
         labels.append(label)
 
 
-    val_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
-                               Resize(tuple(args.resize)),
-                              ToTensor()])
+    val_transform = Compose([AddChannel(),
+                             Resize(tuple(args.resize)),
+                             NormalizeIntensity(),
+                             ToTensor()])
 
 
     # number of total / train,val, test
     num_total = len(images)
-    num_train = int(num_total*(1 - args.finetuning_size))
-
-    num_finetuning_all = num_total - num_train
-    num_finetuning = int(num_finetuning_all*(1 - args.val_size - args.test_size))
-    num_val = int((num_finetuning_all - num_finetuning)*args.val_size)
+    num_train = int(num_total*(1 - args.val_size - args.test_size))
+    num_val = int(num_total*args.val_size)
+    num_test = int(num_total*args.test_size)
     
 
-    # image and label information of SSL training
+    # image and label for SSL training and linear classifier training (linear classifier is trained during linear evaluation protocol) 
     images_train = images[:num_train]
     labels_train = labels[:num_train]
 
-    # image and label information of fine tuning
-    images_finetuning = images[num_train:num_train+num_finetuning]
-    labels_finetuning = labels[num_train:num_train+num_finetuning]
+    # image for validation set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
+    images_val = images[num_train:num_train+num_val]
+    labels_val = labels[num_train:num_train+num_val]
 
-    # image and label information of valid
-    images_val = images[num_train+num_finetuning:num_train+num_finetuning+num_val]
-    labels_val = labels[num_train+num_finetuning:num_train+num_finetuning+num_val]
+    # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
+    images_test = images[num_train+num_val:]
+    labels_test = labels[num_train+num_val:]
 
-    # image and label information of test
-    images_test = images[num_train+num_finetuning+num_val:]
-    labels_test = labels[num_train+num_finetuning+num_val:]
+    print("Training Sample: {}. Validation Sample: {}. Test Sample: {}".format(len(images_train), len(images_val), len(images_test)))
 
     train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=val_transform) # return of ContrastiveLearningViewGenerator is [image1, image2]
-    finetuning_set = ImageDataset(image_files=images_finetuning,labels=labels_finetuning,transform=val_transform)
     val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
     test_set = ImageDataset(image_files=images_test,labels=labels_test,transform=val_transform)
 
     partition = {}
     partition['train'] = train_set
-    partition['finetuning'] = finetuning_set
     partition['val'] = val_set
     partition['test'] = test_set
 
