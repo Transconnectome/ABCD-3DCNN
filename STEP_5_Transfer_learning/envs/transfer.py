@@ -12,7 +12,7 @@ def setting_transfer(net, num_unfreezed):
         num_layers = len(layers_total)
 
         freeze_until = num_layers - num_unfreezed
-        frozen_layers = layers_total[:freeze_until-1]
+        frozen_layers = layers_total[:freeze_until]
         unfrozen_layers = layers_total[freeze_until:]
         
         freeze_layers(net, frozen_layers)
@@ -71,7 +71,6 @@ def initialize_weights(net, unfrozen_layers):
 # initialize layer's weights & biases ref: https://jh-bk.tistory.com/10            
 def weight_init_xavier_uniform(layer):
     if isinstance(layer, torch.nn.Conv3d) or isinstance(layer, torch.nn.Linear):
-        print(type(layer))
         torch.nn.init.xavier_uniform_(layer.weight)
         if layer.bias != None:
             layer.bias.data.fill_(0.01)
