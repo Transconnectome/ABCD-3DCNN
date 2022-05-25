@@ -16,7 +16,10 @@ from monai.data import ImageDataset
 def case_control_count(labels, dataset_type, args):
     if args.cat_target:
         for cat_target in args.cat_target:
-            target_labels = labels[cat_target]
+            target_labels = []
+
+            for label in labels:
+                target_labels.append(label[cat_target])
             
             n_control = target_labels.count(0)
             n_case = target_labels.count(1) + target_labels.count(2) # revising - count also 2 for UKB data
@@ -49,7 +52,7 @@ def loading_images(image_dir, args):
     image_files = pd.concat([image_files, pd.Series(glob.glob('*.nii.gz'))])
     image_files.sort_values(inplace=True) 
     subjects = image_files.map(lambda x: x.split('.')[0]) # revising  
-    #image_files = image_files[:1000]
+    #image_files = image_files[:100]
     return image_files
 
 
