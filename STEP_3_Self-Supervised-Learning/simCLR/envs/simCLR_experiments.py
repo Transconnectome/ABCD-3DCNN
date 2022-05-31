@@ -127,8 +127,13 @@ def simCLR_experiment(partition, save_dir, args): #in_channels,out_dim
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
 
-    # attach network to cuda device
+    # attach network and optimizer to cuda device
     net.to(f'cuda:{net.device_ids[0]}')
+    
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(f'cuda:{net.device_ids[0]}')
 
     # setting for results' data frame
     train_losses = []
