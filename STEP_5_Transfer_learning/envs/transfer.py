@@ -56,10 +56,9 @@ def freeze(layer):
 
 # initialize FC layer 
 def initialize_weights(net, unfrozen_layers):
-    ## initialize FC layer
-    net.FClayers.apply(weight_init_xavier_uniform)
-    
     if unfrozen_layers == None:
+        ## initialize FC layer
+        net.FClayers.apply(weight_init_xavier_uniform)
         return
     
     ## initialize other unfrozen layers

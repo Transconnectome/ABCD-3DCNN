@@ -132,7 +132,10 @@ def validate(net,partition,scheduler,args):
 
     # learning rate scheduler
     if scheduler:
-        scheduler.step()
+        if args.scheduler == 'on':
+            scheduler.step(sum(val_acc.values()))
+        else:
+            scheduler.step()
 
     return val_loss, val_acc
 

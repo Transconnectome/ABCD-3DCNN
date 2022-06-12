@@ -44,7 +44,6 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     # loading pretrained model if transfer option is given
     if args.transfer:
         net = checkpoint_load(net, args.transfer)
-        setting_transfer(net, num_unfreezed = args.freeze_layer)
         print("*** Model setting for transfer learning is done *** \n")
     
     # setting a DataParallel and model on GPU
@@ -76,10 +75,12 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     else:
         raise ValueError('In-valid optimizer choice')
     
-    if args.scheduler == 'on': # revising
-        #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
+    if args.scheduler != None:
+        if args.scheduler == 'on':
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10)
         #scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=0.5)
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
+        elif args.scheduler == 'cos':
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
     else:
         scheduler = None
 
@@ -100,6 +101,31 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         
     # training a model
     print("*** Start training a model *** \n")
+    
+    if args.freeze_layer > 0:
+        print("*** Transfer Learning - Training FC layers *** \n")
+        setting_transfer(net.module, num_unfreezed = 0)
+        for epoch in tqdm(range(epohc_FC)):
+            ts = time.time()
+            net, train_loss, train_acc = train(net,partition,optimizer,args)
+            val_loss, val_acc = validate(net,partition,scheduler,args)
+            te = time.time()
+
+            ## sorting the results
+            for target_name in targets:
+                train_losses[target_name].append(train_loss[target_name])
+                train_accs[target_name].append(train_acc[target_name])
+                val_losses[target_name].append(val_loss[target_name])
+                val_accs[target_name].append(val_acc[target_name])
+
+            ## visualize the result
+            CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
+            print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
+
+            
+    
+    print("*** Transfer Learning - Training unfrozen layers *** \n")
+    setting_transfer(net.module, num_unfreezed = args.freeze_layer)
     for epoch in tqdm(range(args.epoch)):
         ts = time.time()
         net, train_loss, train_acc = train(net,partition,optimizer,args)
@@ -157,6 +183,8 @@ if __name__ == "__main__":
 
     ## ========= Setting ========= ##
     args = argument_setting()
+    global epohc_FC
+    epohc_FC = 20
     if args.transfer:
         args.resize = (96, 96, 96) if args.transfer == 'age' else (80, 80, 80)
         if (args.val_size == 0.1) and (args.test_size == 0.1):
