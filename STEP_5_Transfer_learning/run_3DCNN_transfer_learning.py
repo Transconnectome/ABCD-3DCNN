@@ -1,5 +1,5 @@
 ## ======= load module ======= ##
-from utils.utils import argument_setting, select_model, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load  # revising
+from utils.utils import argument_setting, select_model, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load  #  
 #from utils.optimizer import CosineAnnealingWarmUpRestarts
 from dataloaders.dataloaders import make_dataset
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
@@ -53,7 +53,7 @@ def set_optimizer(args, net):
         
     return optimizer
     
-def set_lr_scheduler(args):
+def set_lr_scheduler(args, optimizer):
     if args.scheduler != None:
         if args.scheduler == 'on':
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10)
@@ -70,13 +70,16 @@ def set_lr_scheduler(args):
 ## ========= Experiment =============== ##
 def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     
+    
     # selecting a model
-    net = select_model(subject_data, args) # revising
+    net = select_model(subject_data, args) #  
+    
     
     # loading pretrained model if transfer option is given
     if args.transfer:
         print("*** Model setting for transfer learning *** \n")
         net = checkpoint_load(net, args.transfer)
+    
     
     # setting a DataParallel and model on GPU
     if args.sbatch == "True":
@@ -92,9 +95,6 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             
     net.to(f'cuda:{net.device_ids[0]}')
     
-    # set learning rate scheduler
-    
-    scheduler = set_lr_scheduler(args)
     
     # setting for results' DataFrame
     train_losses = {}
@@ -115,8 +115,10 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     
     if args.freeze_layer > 0:
         print("*** Transfer Learning - Training FC layers *** \n")
+        
         setting_transfer(net.module, num_unfreezed = 0)
         optimizer = set_optimizer(args, net)
+        scheduler = set_lr_scheduler(args, optimizer)
         
         for epoch in tqdm(range(epohc_FC)):
             ts = time.time()
@@ -137,8 +139,10 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
             
     print("*** Training unfrozen layers *** \n")
+    
     setting_transfer(net.module, num_unfreezed = args.freeze_layer)
     optimizer = set_optimizer(args, net)
+    scheduler = set_lr_scheduler(args, optimizer)
     
     for epoch in tqdm(range(args.epoch)):
         ts = time.time()
@@ -202,8 +206,8 @@ if __name__ == "__main__":
     if args.transfer:
         args.resize = (96, 96, 96) if args.transfer == 'age' else (80, 80, 80)
         
-    save_dir = os.getcwd() + '/result' # revising
-    partition, subject_data = make_dataset(args) # revising
+    save_dir = os.getcwd() + '/result' #  
+    partition, subject_data = make_dataset(args) #  
 
     ## ========= Run Experiment and saving result ========= ##
     # seed number
