@@ -35,6 +35,38 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
+## ========= Helper Functions =============== ##
+
+def set_optimizer(args, net):
+    if args.optim == 'SGD':
+        optimizer = optim.SGD(
+            params = filter(lambda p: p.requires_grad, net.parameters()),
+            lr = args.lr,
+            momentum = 0.9)
+    elif args.optim == 'Adam':
+        optimizer = optim.Adam(
+            params = filter(lambda p: p.requires_grad, net.parameters()),
+            lr = args.lr,
+            weight_decay = args.weight_decay)
+    else:
+        raise ValueError('In-valid optimizer choice')
+        
+    return optimizer
+    
+def set_lr_scheduler(args):
+    if args.scheduler != None:
+        if args.scheduler == 'on':
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10)
+        #scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=0.5)
+        elif args.scheduler == 'cos':
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
+    else:
+        scheduler = None
+        
+    return scheduler
+    
+
+
 ## ========= Experiment =============== ##
 def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     
@@ -43,8 +75,8 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     
     # loading pretrained model if transfer option is given
     if args.transfer:
+        print("*** Model setting for transfer learning *** \n")
         net = checkpoint_load(net, args.transfer)
-        print("*** Model setting for transfer learning is done *** \n")
     
     # setting a DataParallel and model on GPU
     if args.sbatch == "True":
@@ -60,30 +92,9 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             
     net.to(f'cuda:{net.device_ids[0]}')
     
+    # set learning rate scheduler
     
-    # setting an optimizer & learning rate scheduler
-    if args.optim == 'SGD':
-        optimizer = optim.SGD(
-            params = filter(lambda p: p.requires_grad, net.parameters()),
-            lr = args.lr,
-            momentum = 0.9)
-    elif args.optim == 'Adam':
-        optimizer = optim.Adam(
-            params = filter(lambda p: p.requires_grad, net.parameters()),
-            lr = args.lr,
-            weight_decay = args.weight_decay)
-    else:
-        raise ValueError('In-valid optimizer choice')
-    
-    if args.scheduler != None:
-        if args.scheduler == 'on':
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10)
-        #scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=0.5)
-        elif args.scheduler == 'cos':
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
-    else:
-        scheduler = None
-
+    scheduler = set_lr_scheduler(args)
     
     # setting for results' DataFrame
     train_losses = {}
@@ -105,6 +116,8 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     if args.freeze_layer > 0:
         print("*** Transfer Learning - Training FC layers *** \n")
         setting_transfer(net.module, num_unfreezed = 0)
+        optimizer = set_optimizer(args, net)
+        
         for epoch in tqdm(range(epohc_FC)):
             ts = time.time()
             net, train_loss, train_acc = train(net,partition,optimizer,args)
@@ -123,9 +136,10 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
 
             
-    
-    print("*** Transfer Learning - Training unfrozen layers *** \n")
+    print("*** Training unfrozen layers *** \n")
     setting_transfer(net.module, num_unfreezed = args.freeze_layer)
+    optimizer = set_optimizer(args, net)
+    
     for epoch in tqdm(range(args.epoch)):
         ts = time.time()
         net, train_loss, train_acc = train(net,partition,optimizer,args)
@@ -187,8 +201,6 @@ if __name__ == "__main__":
     epohc_FC = 20
     if args.transfer:
         args.resize = (96, 96, 96) if args.transfer == 'age' else (80, 80, 80)
-        if (args.val_size == 0.1) and (args.test_size == 0.1):
-            args.val_size, args.test_size = 0.4, 0.4
         
     save_dir = os.getcwd() + '/result' # revising
     partition, subject_data = make_dataset(args) # revising

@@ -27,7 +27,7 @@ def argument_setting():
     parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
     parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD'])
-    parser.add_argument("--scheduler",type=str,default='on',help='') # revising
+    parser.add_argument("--scheduler",type=str,default='',help='') # revising
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
     parser.add_argument("--epoch",type=int,required=True,help='')
