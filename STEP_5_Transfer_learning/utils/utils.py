@@ -31,6 +31,7 @@ def argument_setting():
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
     parser.add_argument("--epoch",type=int,required=True,help='')
+    parser.add_argument("--epoch_FC",type=int,required=False,default=None,help='')
     parser.add_argument("--exp_name",type=str,required=True,help='')
     parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
     parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
@@ -38,7 +39,7 @@ def argument_setting():
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
     parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
     parser.add_argument("--transfer", type=str, required=False, default=None, choices=['sex','age'])
-    parser.add_argument("--freeze_layer", type=int, required=False, default=0)
+    parser.add_argument("--unfrozen_layer", type=int, required=False, default=0)
     
     args = parser.parse_args()
     print("*** Categorical target labels are {} and Numerical target labels are {} *** \n".format(

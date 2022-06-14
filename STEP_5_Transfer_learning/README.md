@@ -14,7 +14,7 @@ If you want to use ABCD dataset, you should set **--dataset ABCD** and **--data 
 <code> <b> python3 /scratch/connectome/jubin/ABCD-3DCNN-jub/transfer_learning/run_3DCNN_transfer_learning.py \
     --transfer age --num_target age --dataset ABCD --data freesurfer --val_size 0.25 --test_size 0.5 \
     --lr 1e-3 --optim Adam --resize 96 96 96 --scheduler on --train_batch_size 128 --val_batch_size 128 \
-    --exp_name TL_age_UKB_ABCD_01 --model densenet3D121 --epoch 60 --sbatch True </code>
+    --exp_name TL_age_UKB_ABCD_01 --model densenet3D121 --epoch 60 --epoch_FC 15 --unfrozen_layer 1 --sbatch True </code>
 
 
 

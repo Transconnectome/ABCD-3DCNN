@@ -56,7 +56,7 @@ def set_optimizer(args, net):
 def set_lr_scheduler(args, optimizer):
     if args.scheduler != None:
         if args.scheduler == 'on':
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10)
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=5)
         #scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=0.5)
         elif args.scheduler == 'cos':
             scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
@@ -113,14 +113,18 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     # training a model
     print("*** Start training a model *** \n")
     
-    if args.freeze_layer > 0:
+    if args.unfrozen_layer > 0:
         print("*** Transfer Learning - Training FC layers *** \n")
         
         setting_transfer(net.module, num_unfreezed = 0)
         optimizer = set_optimizer(args, net)
         scheduler = set_lr_scheduler(args, optimizer)
         
-        for epoch in tqdm(range(epohc_FC)):
+        global epoch_FC
+        if args.epoch_FC != None:
+            epoch_FC = args.epoch_FC
+            
+        for epoch in tqdm(range(epoch_FC)):
             ts = time.time()
             net, train_loss, train_acc = train(net,partition,optimizer,args)
             val_loss, val_acc = validate(net,partition,scheduler,args)
@@ -140,7 +144,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             
     print("*** Training unfrozen layers *** \n")
     
-    setting_transfer(net.module, num_unfreezed = args.freeze_layer)
+    setting_transfer(net.module, num_unfreezed = args.unfrozen_layer)
     optimizer = set_optimizer(args, net)
     scheduler = set_lr_scheduler(args, optimizer)
     
@@ -201,8 +205,9 @@ if __name__ == "__main__":
 
     ## ========= Setting ========= ##
     args = argument_setting()
-    global epohc_FC
-    epohc_FC = 20
+
+    epoch_FC = 20
+    
     if args.transfer:
         args.resize = (96, 96, 96) if args.transfer == 'age' else (80, 80, 80)
         
