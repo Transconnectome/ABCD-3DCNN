@@ -73,10 +73,11 @@ class Bottleneck3d(nn.Module):
 class ResNet3d(nn.Module):
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None): # parameters for hard parameter sharing model 
+                 norm_layer=None, args=None): # parameters for hard parameter sharing model 
         
         super(ResNet3d, self).__init__()
-
+        self.args = args
+        
         # attribute for configuration
         self.layers = layers
         self.block_config = block
@@ -157,7 +158,8 @@ class ResNet3d(nn.Module):
 
 
     def forward(self, x):
-
+        x = applying_augmentation(x, self.args)
+        
         # stem layers
         x = self.conv1(x)
         x = self.bn1(x)
