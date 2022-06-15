@@ -96,25 +96,32 @@ def case_control_count(labels, dataset_type, args):
 def set_backbone(args):
     if args.model == 'resnet3D50':
         net = resnet3d.resnet3D50()
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     elif args.model == 'resnet3D101':
         net = resnet3d.resnet3D101()
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     elif args.model == 'resnet3D152':
         net = resnet3d.resnet3D152()
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     # DenseNet
     elif args.model == 'densenet3D121':
         net = densenet3d.densenet3D121()
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     elif args.model == 'densenet3D161':
         net = densenet3d.densenet3D161() 
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     elif args.model == 'densenet3D169':
         net = densenet3d.densenet3D169() 
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     elif args.model == 'densenet3D201':
         net = densenet3d.densenet3D201()
+        setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
 
     return net, num_features
