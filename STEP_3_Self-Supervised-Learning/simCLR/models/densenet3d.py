@@ -108,10 +108,11 @@ class DenseNet(nn.Module):
     def __init__(self,
                  n_input_channels=1,conv1_t_size=7,conv1_t_stride=1,no_max_pool=False,
                  growth_rate=32,block_config=(6, 12, 24, 16),num_init_features=64,
-                 bn_size=4,drop_rate=0,num_classes=1000):
+                 bn_size=4,drop_rate=0,num_classes=1000, args=None):
 
         super(DenseNet, self).__init__()
-
+        self.args = args
+        
         # First convolution                
         self.features = nn.Sequential(collections.OrderedDict([
             ('conv0',nn.Conv3d(n_input_channels,
@@ -155,6 +156,7 @@ class DenseNet(nn.Module):
     
 
     def forward(self, x):
+        x = applying_augmentation(x, self.args)
 
         x = self.features(x)
         x = F.relu(x, inplace=True)
