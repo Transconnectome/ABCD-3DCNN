@@ -7,9 +7,8 @@ Pretraining dataset does not need to be partitioned.
 Revising this code according to your experiment setup.**
 
 
-## Reference Paper and Code 
-- Paper: https://arxiv.org/abs/2006.09882
-- code: https://github.com/facebookresearch/swav/tree/06b1b7cbaf6ba2a792300d79c7299db98b93b7f9
+## Reference Code 
+
 
 ## About these code
 The list of models are as follows 
