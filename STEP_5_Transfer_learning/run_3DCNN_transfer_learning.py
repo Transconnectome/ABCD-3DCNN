@@ -56,7 +56,7 @@ def set_optimizer(args, net):
 def set_lr_scheduler(args, optimizer):
     if args.scheduler != None:
         if args.scheduler == 'on':
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=5)
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-9)
         #scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=0.5)
         elif args.scheduler == 'cos':
             scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
@@ -109,7 +109,13 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         val_losses[target_name] = []
         val_accs[target_name] = []
 
-        
+    result = {}
+    result['train_losses'] = train_losses
+    result['train_accs'] = train_accs
+    result['val_losses'] = val_losses
+    result['val_accs'] = val_accs
+    
+    
     # training a model
     print("*** Start training a model *** \n")
     
@@ -140,6 +146,17 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             ## visualize the result
             CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
             print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
+            
+            ## saving the checkpoint
+            checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
+            
+            if epoch%10 == 0:
+                save_exp_result(save_dir, vars(args).copy(), result)
+            
+        print("Adjust learning rate for Training unfrozen layers")
+        print(f"From {args.lr} to {args.lr/100}")    
+        args.lr /= 100
+        result['lr_adjusted'] = args.lr
 
             
     print("*** Training unfrozen layers *** \n")
@@ -167,6 +184,9 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
         ## saving the checkpoint
         checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
+        
+        if epoch%10 == 0:
+                save_exp_result(save_dir, vars(args).copy(), result)
 
         
     # testing a model
@@ -180,18 +200,13 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     else:
         net.to(f'cuda:{args.gpus[0]}')
     test_acc, confusion_matrices = test(net, partition, args)
-
+    print("Test result: ",test_acc)
     
     # summarizing results
-    result = {}
-    result['train_losses'] = train_losses
-    result['train_accs'] = train_accs
-    result['val_losses'] = val_losses
-    result['val_accs'] = val_accs
-
+    
+    result['test_acc'] = test_acc
     result['train_acc'] = train_acc
     result['val_acc'] = val_acc
-    result['test_acc'] = test_acc
     
     if confusion_matrices != None:
         result['confusion_matrices'] = confusion_matrices
@@ -229,5 +244,6 @@ if __name__ == "__main__":
 
     # Save result
     save_exp_result(save_dir, setting, result)
+    print("*** Experiment Done ***\n")
     ## ====================================== ##
 
