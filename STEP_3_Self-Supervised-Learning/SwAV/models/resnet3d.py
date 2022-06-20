@@ -76,8 +76,7 @@ class ResNet3d(nn.Module):
                  norm_layer=None, args=None): # parameters for hard parameter sharing model 
         
         super(ResNet3d, self).__init__()
-        self.args = args
-        
+
         # attribute for configuration
         self.layers = layers
         self.block_config = block
@@ -158,8 +157,7 @@ class ResNet3d(nn.Module):
 
 
     def forward(self, x):
-        x = applying_augmentation(x, self.args)
-        
+
         # stem layers
         x = self.conv1(x)
         x = self.bn1(x)

@@ -5,6 +5,7 @@ import models.densenet3d as densenet3d #model script
 from genericpath import isdir
 import os
 import pandas as pd
+import numpy as np
 import hashlib
 import json
 import argparse 
@@ -13,28 +14,64 @@ import copy
 from copy import deepcopy
 
 
-def argument_setting_simCLR():
+def argument_setting_SwAV():
     parser = argparse.ArgumentParser()
 
-    #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
-    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
-    parser.add_argument("--version",required=True,type=str,help='',choices=['simCLR_v1, simCLR_v2'])
+    #########################
+    #### data parameters ####
+    #########################
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
+    parser.add_argument("--augmentation", type=str, nargs='*', required=True, choices=['RandRotate','RandRotate90','RandFlip','RandAdjustContrast','RandGaussianSmooth', 'RandGibbsNoise','RandCoarseDropout'])
+
+    #########################
+    ### batch size params ###
+    #########################
     parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
-    parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
+
+    #########################
+    ## swav specific params #
+    #########################
+    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
+    parser.add_argument("--nmb_standard_views", default=2, type=int, help = 'number of standard resolution views (= n_views in simCLR). This is for multi crop strategy')
+    parser.add_argument("--nmb_low_views", default=4, type=int, help = 'number of low resolution views. This is for multi crop strategy')
+    parser.add_argument("--nmb_prototypes", default=3000, type=int, help="number of prototypes")
+    parser.add_argument("--queue_length", type=int, default=0, help="length of the queue (0 for no queue). In other words, the number of stored features in the dictionary from the previous batches.")
+    parser.add_argument("--epoch_queue_starts", type=int, default=15, help="from this epoch, we start using a queue")
+    parser.add_argument("--feat_dim", default=128, type=int, help="feature dimension")
+    parser.add_argument("--sinkhorn_iterations", default=3, type=int, help="number of iterations in Sinkhorn-Knopp algorithm")
+    parser.add_argument("--temperature", default=0.1, type=float, help="temperature parameter in training loss")
+    parser.add_argument("--epsilon", default=0.05, type=float, help="regularization parameter for Sinkhorn-Knopp algorithm")
+
+    ##########################
+    #### optim parameters ####
+    ##########################
     parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD', 'LARS', 'LAMB'])
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
     parser.add_argument("--epoch",type=int,required=True,help='')
+    parser.add_argument("--freeze_prototypes_niters", default=313, type=int, help="freeze the prototypes during this many iterations from the start")
+    
+    ##########################
+    #### other parameters ####
+    ##########################
+    parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
     parser.add_argument("--exp_name",type=str,required=True,help='')
-    parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
-    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
-    parser.add_argument("--augmentation", type=str, nargs='*', required=True, choices=['RandRotate','RandRotate90','RandFlip','RandAdjustContrast','RandGaussianSmooth', 'RandGibbsNoise','RandCoarseDropout'])
-    parser.add_argument("--accumulation_steps", type=int, required=True)
     parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
     parser.add_argument("--resume", type=str, default='True', required=True)
+    
+    #########################
+    #### dist parameters ####
+    #########################
+    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
+    parser.add_argument("--world_size", default=-1, type=int, help="""number of processes: it is set automatically and should not be passed as argument""")
+    parser.add_argument("--rank", default=0, type=int, help="""rank of this process:it is set automatically and should not be passed as argument""")
+    parser.add_argument("--local_rank", default=0, type=int,help="this argument is not used and should be ignored")
+
+
+
+    ####global args
     args = parser.parse_args()
 
     return args
@@ -43,28 +80,42 @@ def argument_setting_simCLR():
 def argument_setting_finetuning():
     parser = argparse.ArgumentParser()
 
-    #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
-    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
+    #########################
+    #### data parameters ####
+    #########################
+    parser.add_argument("--finetuning_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-    parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
     parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--val_batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
+    parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
+    parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
+    parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
+
+    ##########################
+    #### model parameters ####
+    ##########################
+    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
+
+    ##########################
+    #### optim parameters ####
+    ##########################
     parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD'])
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
     parser.add_argument("--epoch",type=int,required=True,help='')
-    parser.add_argument("--exp_name",type=str,required=True,help='')
-    parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
-    parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
-    parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
-    parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
-    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
+
+    ##########################
+    #### other parameters ####
+    ##########################
     parser.add_argument("--pretrained_model_dir", type=str, required=False)
     parser.add_argument("--checkpoint_dir", type=str, default=None, required=False)
     parser.add_argument("--resume", type=str, default='True', required=True)
+    parser.add_argument("--exp_name",type=str,required=True,help='')
+    parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
+    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
 
     args = parser.parse_args()
     print("Categorical target labels are {} and Numerical target labels are {}".format(args.cat_target, args.num_target))
@@ -77,6 +128,12 @@ def argument_setting_finetuning():
         raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
     return args
+
+
+def set_random_seed(seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
 
 
 def case_control_count(labels, dataset_type, args):
@@ -116,8 +173,8 @@ def set_backbone(args):
         setattr(net, 'args', args)
         num_features = getattr(net,'num_features')
     elif args.model == 'densenet3D169':
-        net = densenet3d.densenet3D169() 
-        setattr(net, 'args', args)
+        net = densenet3d.densenet3D169()
+        setattr(net, 'args', args) 
         num_features = getattr(net,'num_features')
     elif args.model == 'densenet3D201':
         net = densenet3d.densenet3D201()
@@ -126,9 +183,18 @@ def set_backbone(args):
 
     return net, num_features
 
+
 def device_as(t1, t2):
     """Moves tensor1 (t1) to the device of tensor2 (t2)"""
     return t1.to(t2.device)
+
+
+def get_queue_path(save_dir, args): 
+    if os.path.isdir(os.path.join(save_dir)) == False:
+        makedir(os.path.join(save_dir,"queue"))
+    return os.path.join(save_dir, "queue", "queue" + str(args.rank) + ".path") 
+        
+
 
 def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
     '''command line interface reporter per every epoch during experiments'''

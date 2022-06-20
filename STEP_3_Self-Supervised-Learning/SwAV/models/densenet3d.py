@@ -3,6 +3,7 @@
 ## =================================== ##
 
 # model
+from dataloaders.data_augmentation import applying_augmentation
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -112,7 +113,7 @@ class DenseNet(nn.Module):
 
         super(DenseNet, self).__init__()
         self.args = args
-        
+
         # First convolution                
         self.features = nn.Sequential(collections.OrderedDict([
             ('conv0',nn.Conv3d(n_input_channels,
@@ -157,7 +158,6 @@ class DenseNet(nn.Module):
 
     def forward(self, x):
         x = applying_augmentation(x, self.args)
-
         x = self.features(x)
         x = F.relu(x, inplace=True)
         x = F.adaptive_avg_pool3d(x, output_size=(1, 1, 1))
