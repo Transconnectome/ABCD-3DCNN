@@ -26,7 +26,7 @@ def argument_setting():
     parser.add_argument("--val_batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
-    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD'])
+    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD','RAdam'])
     parser.add_argument("--scheduler",type=str,default='',help='') # revising
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
@@ -38,8 +38,9 @@ def argument_setting():
     parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
     parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
-    parser.add_argument("--transfer", type=str, required=False, default=None, choices=['sex','age'])
+    parser.add_argument("--transfer", type=str, required=False, default=None, choices=['sex','age','simclr'])
     parser.add_argument("--unfrozen_layer", type=int, required=False, default=0)
+    parser.add_argument("--load", type=str, required=False, default="")    
     
     args = parser.parse_args()
     print("*** Categorical target labels are {} and Numerical target labels are {} *** \n".format(
@@ -137,6 +138,7 @@ def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args
 
 sex_model_dir = '/scratch/connectome/dhkdgmlghks/3DCNN_test/3DCNN_hardparameter_sharing/result/model/UKB_sex_densenet3D121_6cbde7.pth'
 age_model_dir = '/scratch/connectome/dhkdgmlghks/UKB_sex_densenet3D121_6cbde7.pth'
+simclr_dir = '/scratch/connectome/jubin/Simclr_Contrastive_MRI_epoch_99.pth'
 
 def checkpoint_load(net, checkpoint_dir):
     if hasattr(net, 'module'):
@@ -146,6 +148,8 @@ def checkpoint_load(net, checkpoint_dir):
         checkpoint_dir = sex_model_dir
     elif checkpoint_dir == 'age':
         checkpoint_dir = age_model_dir
+    elif checkpoint_dir == 'simclr':
+        checkpoint_dir = simclr_dir
     
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
     net.load_state_dict(model_state, strict=False)

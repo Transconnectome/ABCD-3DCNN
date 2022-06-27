@@ -11,6 +11,7 @@ import datetime
 import os
 from os import listdir
 from os.path import isfile, join
+import glob
 from tqdm.auto import tqdm ##progress
 import time
 import math
@@ -48,6 +49,12 @@ def set_optimizer(args, net):
             params = filter(lambda p: p.requires_grad, net.parameters()),
             lr = args.lr,
             weight_decay = args.weight_decay)
+    elif args.optim =='RAdam':
+        optimizer = optim.RAdam(
+            params = filter(lambda p: p.requires_grad, net.parameters()),
+            lr = args.lr,
+            weight_decay = args.weight_decay,
+            betas=(0.9, 0.999), eps=1e-08, )
     else:
         raise ValueError('In-valid optimizer choice')
         
@@ -57,9 +64,9 @@ def set_lr_scheduler(args, optimizer):
     if args.scheduler != None:
         if args.scheduler == 'on':
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-9)
-        #scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=0.5)
         elif args.scheduler == 'cos':
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=0)
+#             scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=1)
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=1, eta_min=0)
     else:
         scheduler = None
         
@@ -76,9 +83,13 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     
     
     # loading pretrained model if transfer option is given
-    if args.transfer:
+    if (args.transfer != None) and (args.load == ""):
         print("*** Model setting for transfer learning *** \n")
         net = checkpoint_load(net, args.transfer)
+    elif args.load:
+        print("*** Model setting for transfer learning & fine tuning *** \n")
+        model_dir = glob.glob(f'/scratch/connectome/jubin/result/model/*_{args.load}*.pth')[0]
+        net = checkpoint_load(net, model_dir)
     
     
     # setting a DataParallel and model on GPU
@@ -101,6 +112,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     train_accs = {}
     val_losses = {}
     val_accs = {}
+    test_accs = {}
     
     targets = args.cat_target + args.num_target
     for target_name in targets:
@@ -108,33 +120,35 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         train_accs[target_name] = []
         val_losses[target_name] = []
         val_accs[target_name] = []
+        test_accs[target_name] = []
 
     result = {}
     result['train_losses'] = train_losses
     result['train_accs'] = train_accs
     result['val_losses'] = val_losses
     result['val_accs'] = val_accs
+    result['test_accs'] = test_accs
     
     
     # training a model
     print("*** Start training a model *** \n")
     
-    if args.unfrozen_layer > 0:
+    if (args.unfrozen_layer > 0) and (args.load == ""):
         print("*** Transfer Learning - Training FC layers *** \n")
         
         setting_transfer(net.module, num_unfreezed = 0)
         optimizer = set_optimizer(args, net)
         scheduler = set_lr_scheduler(args, optimizer)
-        
-        global epoch_FC
-        if args.epoch_FC != None:
-            epoch_FC = args.epoch_FC
-            
-        for epoch in tqdm(range(epoch_FC)):
+
+        for epoch in tqdm(range(args.epoch_FC)):
             ts = time.time()
             net, train_loss, train_acc = train(net,partition,optimizer,args)
             val_loss, val_acc = validate(net,partition,scheduler,args)
             te = time.time()
+                        
+            if args.transfer == 'simclr':
+                test_acc, confusion_matrices = test(net, partition, args)
+                print(f"Test result for epoch {epoch}: ",test_acc)
 
             ## sorting the results
             for target_name in targets:
@@ -142,6 +156,9 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
                 train_accs[target_name].append(train_acc[target_name])
                 val_losses[target_name].append(val_loss[target_name])
                 val_accs[target_name].append(val_acc[target_name])
+                if args.transfer == 'simclr':
+                    test_accs[target_name].append(test_acc[target_name])
+
 
             ## visualize the result
             CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
@@ -149,6 +166,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             
             ## saving the checkpoint
             checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
+
             
             if epoch%10 == 0:
                 save_exp_result(save_dir, vars(args).copy(), result)
@@ -170,13 +188,19 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net, train_loss, train_acc = train(net,partition,optimizer,args)
         val_loss, val_acc = validate(net,partition,scheduler,args)
         te = time.time()
-
+        
+        if args.transfer == 'simclr':
+            test_acc, confusion_matrices = test(net, partition, args)
+            print(f"Test result for epoch {epoch}: ",test_acc)
+            
         ## sorting the results
         for target_name in targets:
             train_losses[target_name].append(train_loss[target_name])
             train_accs[target_name].append(train_acc[target_name])
             val_losses[target_name].append(val_loss[target_name])
             val_accs[target_name].append(val_acc[target_name])
+            if args.transfer == 'simclr' and (epoch+1) < args.epoch:
+                test_accs[target_name].append(test_acc[target_name])            
 
         ## visualize the result
         CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
@@ -186,7 +210,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
         
         if epoch%10 == 0:
-                save_exp_result(save_dir, vars(args).copy(), result)
+            save_exp_result(save_dir, vars(args).copy(), result)
 
         
     # testing a model
@@ -217,11 +241,10 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
 
 if __name__ == "__main__":
+    cwd = os.getcwd()
 
     ## ========= Setting ========= ##
     args = argument_setting()
-
-    epoch_FC = 20
     
     if args.transfer:
         args.resize = (96, 96, 96) if args.transfer == 'age' else (80, 80, 80)
@@ -240,6 +263,7 @@ if __name__ == "__main__":
     args.exp_name = args.exp_name + f'_{hash_key}'
 
     # Run Experiment
+    print(f"*** Experiment {args.exp_name} Start ***")
     setting, result = experiment(partition, subject_data, save_dir, deepcopy(args))
 
     # Save result

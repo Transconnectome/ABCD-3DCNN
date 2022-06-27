@@ -19,8 +19,8 @@ def setting_transfer(net, num_unfreezed):
         initialize_weights(net, unfrozen_layers)
         
     elif num_unfreezed == 0:
-        freeze_layers(net, None)
-        initialize_weights(net, None)
+        freeze_layers(net, 0)
+        initialize_weights(net, 0)
         
     else:
         print("ERROR!! Invalid freeze layer number")
@@ -41,7 +41,7 @@ def is_layer(module_name):
     
 # freeze non-FC layers from last layer to first layer 
 def freeze_layers(net, frozen_layers):    
-    if frozen_layers == None:
+    if frozen_layers == 0:
         net.features.apply(freeze)
     else:
         for name, module in frozen_layers:
@@ -56,15 +56,15 @@ def freeze(layer):
 
 # initialize FC layer 
 def initialize_weights(net, unfrozen_layers):
-    if unfrozen_layers == None:
+    if unfrozen_layers == 0:
         ## initialize FC layer
-        net.FClayers.apply(weight_init_xavier_uniform)
+        net.FClayers.apply(weight_init_kaiming_normal)
         return
     
     ## initialize other unfrozen layers
     for name, module in unfrozen_layers:
         for name, module in unfrozen_layers:
-            module.apply(weight_init_xavier_uniform)
+            module.apply(weight_init_kaiming_normal)
 
             
 # initialize layer's weights & biases ref: https://jh-bk.tistory.com/10            
@@ -77,3 +77,14 @@ def weight_init_xavier_uniform(layer):
         layer.weight.data.fill_(1.0)
         if layer.bias != None:
             layer.bias.data.zero_()
+            
+def weight_init_kaiming_normal(layer):
+    if isinstance(layer, torch.nn.Conv3d) or isinstance(layer, torch.nn.Linear):
+        torch.nn.init.kaiming_normal_(layer.weight, mode='fan_out', nonlinearity='relu')
+        if layer.bias != None:
+            layer.bias.data.fill_(0.01)
+    elif isinstance(layer, torch.nn.BatchNorm3d):
+        layer.weight.data.fill_(1.0)
+        if layer.bias != None:
+            layer.bias.data.zero_()
+    
