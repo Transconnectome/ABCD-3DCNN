@@ -33,7 +33,7 @@ import copy
 
 class _DenseLayer(nn.Module):
 
-    def __init__(self, num_input_features, growth_rate, bn_size):
+    def __init__(self, num_input_features, growth_rate, bn_size, drop_rate):
         super().__init__()
 
         ## DenseNet Composite function: BN -> relu -> 3x3 conv
@@ -46,7 +46,8 @@ class _DenseLayer(nn.Module):
         self.add_module('norm2', nn.BatchNorm3d(bn_size * growth_rate))
         self.add_module('relu2', nn.ReLU(inplace=True))
         self.add_module('conv2', nn.Conv3d(bn_size * growth_rate, growth_rate, kernel_size=3, stride=1, padding=1, bias=False))
-
+        
+        self.drop_rate = float(drop_rate)
         #self.memory_efficient = memory_efficient
     
     def bn_function(self, inputs) -> Tensor:
@@ -62,17 +63,19 @@ class _DenseLayer(nn.Module):
 
         bottleneck_output = self.bn_function(prev_features)
         new_features = self.conv2(self.relu2(self.norm2(bottleneck_output)))
+        if self.drop_rate > 0: 
+            new_features = F.dropout(new_features, p=self.drop_rate, training=self.training)
         return new_features  ## **
 
 class _DenseBlock(nn.ModuleDict):
     # receive and concatenate the outputs of all previous blocks as inputs 
     # growth rate? the number of channel of feature map in each layer
-    def __init__(self, num_layers, num_input_features, bn_size, growth_rate):
+    def __init__(self, num_layers, num_input_features, bn_size, growth_rate, drop_rate):
         super().__init__()
         
         for i in range(num_layers):
             layer = _DenseLayer(num_input_features + i * growth_rate,
-                                growth_rate, bn_size)
+                                growth_rate, bn_size, drop_rate)
             self.add_module("denselayer%d" % (i + 1), layer)
     
     def forward(self, init_features):
@@ -135,7 +138,8 @@ class DenseNet(nn.Module):
             block = _DenseBlock(num_layers=num_layers,
                                 num_input_features=self.num_features,
                                 bn_size=bn_size,
-                                growth_rate=growth_rate)
+                                growth_rate=growth_rate,
+                                drop_rate=drop_rate)
             self.features.add_module('denseblock{}'.format(i + 1), block)
             self.num_features = self.num_features + num_layers * growth_rate
             
