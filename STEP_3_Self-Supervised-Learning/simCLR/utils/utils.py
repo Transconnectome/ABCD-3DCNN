@@ -226,7 +226,6 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args,  mode='simC
         net.backbone.load_state_dict(model_state['backbone'])
         net.FClayers.load_state_dict(model_state['FClayers'])
         optimizer.load_state_dict(model_state['optimizer'])
-        scheduler.load_state_dict(model_state['scheduler'])
         print('The best checkpoint is loaded')
     
 
