@@ -29,13 +29,14 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, spatial_dims=3):
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, spatial_dims=3, mask_ratio=0.75):
         super().__init__()
 
         # --------------------------------------------------------------------------
         # MAE encoder specifics
         self.in_channels = in_channels
         self.spatial_dims = spatial_dims
+        self.mask_ratio = mask_ratio
         if self.spatial_dims == 2:
             self.patch_embed = PatchEmbed_2D(img_size, patch_size, self.in_channels, embed_dim)
         elif self.spatial_dims == 3:
@@ -271,11 +272,27 @@ class MaskedAutoencoderViT(nn.Module):
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
-    def forward(self, imgs, mask_ratio=0.75):
-        latent, mask, ids_restore = self.forward_encoder(imgs, mask_ratio)
+    def forward(self, imgs):
+        latent, mask, ids_restore = self.forward_encoder(imgs, self.mask_ratio)
         pred = self.forward_decoder(latent, ids_restore)  # In case 2D, [N, L, p*p*in_channels], in case 3D [N, L, p*p*p*in_channels]
-        loss = self.forward_loss(imgs, pred, mask)
-        return loss, pred, mask
+        
+        #loss = self.forward_loss(imgs, pred, mask)
+        #return loss, pred, mask
+        
+        if self.spatial_dims == 2:
+            target = self.patchify_2D(imgs)
+        elif self.spatial_dims == 3:
+            target = self.patchify_3D(imgs)
+        
+        if self.norm_pix_loss:
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            target = (target - mean) / (var + 1.e-6)**.5
+
+        return pred, target, mask 
+        
+
+        
 
 
 def mae_vit_base_patch16_dec512d8b_2D(**kwargs):

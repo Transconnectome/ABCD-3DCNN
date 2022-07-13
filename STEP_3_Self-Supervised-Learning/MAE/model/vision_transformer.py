@@ -25,7 +25,6 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.checkpoint
 
 from model.layers.mlp import Mlp
 from model.layers.drop_path import DropPath
