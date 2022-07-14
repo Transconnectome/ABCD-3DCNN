@@ -13,7 +13,7 @@ from sklearn.metrics import confusion_matrix
 ## ======= load module ======= ##
 import model.model_MAE as MAE
 
-from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, set_random_seed
+from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed
 from util.optimizers import LAMB, LARS 
 
 
@@ -22,17 +22,6 @@ from tqdm import tqdm
 import copy
 
 def MAE_train(net, partition, optimizer, args):
-    """
-    Flow of data augmentation is as follows. 
-    intensity_crop_resize (together image set1 and image set2) at CPU -> cuda -> transform (sepreately applied to image set1 and image set2) at GPU. 
-    By applying scale intensity, crop, and resize, it can resolve CPU -> GPU bottleneck problem which occur when too many augmentation techniques are sequentially operated at CPU.
-    That's because we can apply augmentation technique to all of samples in mini-batches simulateously by tensor operation at GPU.
-    However, GPUs have limitations in their RAM memory. Thus, too large matrix couldn't be attached. 
-    So, in this code, crop and resizing operatiins are done at CPU, afterward other augmentations are applied at GPU.
-    
-    This strategy dramatically reduce training time by resolving the CPU ->GPU bottleneck problem
-    """
-
     scaler = torch.cuda.amp.GradScaler()
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
@@ -58,7 +47,11 @@ def MAE_train(net, partition, optimizer, args):
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         losses.append(loss.item())
-        
+
+        # saving example images 
+        #if i == 1000:
+        #    saving_outputs(net, pred, target, mask, os.getcwd())
+
         assert args.accumulation_steps >= 1
         if args.accumulation_steps == 1:
             scaler.scale(loss).backward()
