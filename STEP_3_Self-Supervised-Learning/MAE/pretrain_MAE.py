@@ -1,3 +1,6 @@
+######### The Code is referred from https://github.com/facebookresearch/mae
+
+
 ## ======= load module ======= ##
 import model.model_MAE as MAE
 from envs.pretraining_experiments import MAE_experiment
@@ -60,6 +63,8 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 #########################
 parser.add_argument("--model",required=True,type=str,help='',choices=['mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D','mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D'])
 parser.add_argument("--mask_ratio",required=False,default=0.75,type=float,help='the ratio of random masking')
+parser.add_argument("--norm_pix_loss",action='store_true',help='Use (per-patch) normalized pixels as targets for computing loss')
+parser.set_defaults(norm_pix_loss=False)
 
 ##########################
 #### optim parameters ####
@@ -75,13 +80,16 @@ parser.add_argument("--epoch",type=int,required=True,help='')
 parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
 parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
-parser.add_argument("--resume", type=str, default='True', required=True)
+parser.add_argument("--resume", action='store_true', help = 'if you add this option in the command line like --resume, args.resume would change to be True')
+parser.set_defaults(resume=False)
     
 #########################
 #### dist parameters ####
 #########################
 parser.add_argument("--gpus", type=int, nargs='*',required=False)
-parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
+parser.add_argument("--sbatch", action='store_true')
+parser.set_defaults(sbatch=False)
+
 
 ####global args
 args = parser.parse_args()

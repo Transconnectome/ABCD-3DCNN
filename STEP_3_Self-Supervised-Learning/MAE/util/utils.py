@@ -60,7 +60,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 """checkpoint is saved only when validation performance for all target tasks are improved """
 def checkpoint_save(net, optimizer, save_dir, epoch, scheduler,  args, current_result=None, previous_result=None, mode=None):
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
-    if args.resume == 'False':
+    if args.resume == False:
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
             makedir(os.path.join(save_dir,'model'))
         checkpoint_dir = os.path.join(save_dir, 'model/{}_{}.pth'.format(args.model, args.exp_name))
@@ -144,9 +144,9 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args,  mode='pret
 
 def saving_outputs(net, pred, mask, target, save_dir):
     img_with_mask = mask.unsqueeze(-1) * target 
-    np.save(os.path.join(save_dir,'img_with_mask.npy'), net.module.unpatchify_3D(img_with_mask).detach().cpu().numpy())
-    np.save(os.path.join(save_dir,'target.npy'),net.module.unpatchify_3D(target).detach().cpu().numpy())
-    np.save(os.path.join(save_dir,'pred.npy'),net.module.unpatchify_3D(pred).detach().cpu().numpy())
+    np.save(os.path.join(save_dir,'img_with_mask.npy'), net.module.unpatchify_3D(img_with_mask)[:10].detach().cpu().numpy())
+    np.save(os.path.join(save_dir,'target.npy'),net.module.unpatchify_3D(target)[:10].detach().cpu().numpy())
+    np.save(os.path.join(save_dir,'pred.npy'),net.module.unpatchify_3D(pred).detach()[:10].cpu().numpy())
     print('==== DONE SAVING EXAMPLE IMAGES ====')
 
 

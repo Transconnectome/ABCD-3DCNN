@@ -28,8 +28,7 @@ def MAE_train(net, partition, optimizer, args):
                                              batch_size=args.train_batch_size,
                                              shuffle=True,
                                              drop_last = True,
-                                             pin_memory=True,
-                                             num_workers=len(net.device_ids)*9)
+                                             num_workers=16)
 
     net.train()
 
@@ -49,8 +48,9 @@ def MAE_train(net, partition, optimizer, args):
         losses.append(loss.item())
 
         # saving example images 
-        #if i == 1000:
-        #    saving_outputs(net, pred, target, mask, os.getcwd())
+        if i == 0:
+            saving_outputs(net, pred, mask, target, '/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE')
+            print(loss.item())
 
         assert args.accumulation_steps >= 1
         if args.accumulation_steps == 1:
@@ -62,9 +62,10 @@ def MAE_train(net, partition, optimizer, args):
         elif args.accumulation_steps > 1:           # gradient accumulation
             loss = loss / args.accumulation_steps
             scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            optimizer.zero_grad()    
+            if  (i + 1) % args.accumulation_steps == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()    
             
 
     return net, np.mean(losses) 
@@ -74,7 +75,7 @@ def MAE_train(net, partition, optimizer, args):
 def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = MAE.__dict__[args.model](img_size = args.img_size, norm_pix_loss=False, mask_ratio = args.mask_ratio)
+    net = MAE.__dict__[args.model](img_size = args.img_size, norm_pix_loss=args.norm_pix_loss, mask_ratio = args.mask_ratio)
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -96,7 +97,7 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2, eta_min=0)
 
     # loading last checkpoint if resume training
-    if args.resume == 'True':
+    if args.resume == True:
         if args.checkpoint_dir != None:
             net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'] = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
@@ -107,7 +108,7 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
 
     # setting DataParallel
-    if args.sbatch == "True":
+    if args.sbatch == True:
         devices = []
         for d in range(torch.cuda.device_count()):
             devices.append(d)
@@ -142,7 +143,7 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
         print('Epoch {}. Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, loss, optimizer.param_groups[0]['lr'],te-ts))
 
         # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, args, mode='simCLR')
+        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, args, mode='pretrain')
 
 
     # summarize results

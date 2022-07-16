@@ -14,7 +14,7 @@ import pandas as pd
 import numpy as np
 
 import monai
-from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop, ScaleIntensity
+from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop, ScaleIntensity, RandAxisFlip
 from monai.data import ImageDataset
 
 def loading_images(image_dir, args):
@@ -75,13 +75,14 @@ def combining_image_target(subject_data, image_files, target_list):
 def partition_dataset_pretrain(imageFiles,args):
 
     train_transform = Compose([AddChannel(),
-                               ScaleIntensity(),
                                Resize((args.img_size, args.img_size, args.img_size)),
+                               RandAxisFlip(prob=0.5),
+                               NormalizeIntensity(),
                                ToTensor()])
 
     val_transform = Compose([AddChannel(),
-                             ScaleIntensity(),
                              Resize((args.img_size, args.img_size, args.img_size)),
+                             NormalizeIntensity(),
                              ToTensor()])
 
 
