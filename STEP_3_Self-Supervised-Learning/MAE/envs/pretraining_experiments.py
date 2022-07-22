@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from model.layers.drop_path import drop_path
 
 import torch
 import torch.nn as nn
@@ -21,13 +22,13 @@ import time
 from tqdm import tqdm
 import copy
 
-def MAE_train(net, partition, optimizer, args):
-    scaler = torch.cuda.amp.GradScaler()
+def MAE_train(net, partition, optimizer, scaler, args):
+    
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
-                                             batch_size=args.train_batch_size,
+                                             batch_size=args.batch_size,
                                              shuffle=True,
-                                             drop_last = True,
+                                             drop_last = False,
                                              num_workers=16)
 
     net.train()
@@ -41,20 +42,20 @@ def MAE_train(net, partition, optimizer, args):
         if loss is calculated inside the model class, the output from the model forward method would be [loss] * number of devices. In other words, len(net(images)) == n_gpus
         """
         #loss, pred, mask  = net(images)
-        pred, target, mask = net(images)
-        loss = (pred - target) ** 2
-        loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
-        loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
+        with torch.cuda.amp.autocast():
+            pred, target, mask = net(images)
+            loss = (pred - target) ** 2
+            loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
+            loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         losses.append(loss.item())
-
-        # saving example images 
-        if i == 0:
-            saving_outputs(net, pred, mask, target, '/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE')
-            print(loss.item())
 
         assert args.accumulation_steps >= 1
         if args.accumulation_steps == 1:
             scaler.scale(loss).backward()
+            # gradient clipping 
+            if args.gradient_clipping == True:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=True)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
@@ -63,6 +64,10 @@ def MAE_train(net, partition, optimizer, args):
             loss = loss / args.accumulation_steps
             scaler.scale(loss).backward()
             if  (i + 1) % args.accumulation_steps == 0:
+                # gradient clipping 
+                if args.gradient_clipping == True:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=True)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()    
@@ -71,11 +76,37 @@ def MAE_train(net, partition, optimizer, args):
     return net, np.mean(losses) 
         
 
+def MAE_validation(net, partition, args):
+    valloader = torch.utils.data.DataLoader(partition['val'],
+                                            batch_size=args.batch_size,
+                                            shuffle=False,
+                                            num_workers=16)
+
+    net.eval()
+    
+    losses = []
+    
+    with torch.no_grad():
+        for i, images in enumerate(valloader,0):
+            images = images.to(f'cuda:{net.device_ids[0]}')
+            with torch.cuda.amp.autocast():
+                pred, target, mask = net(images)
+                loss = (pred - target) ** 2
+                loss = loss.mean(dim=-1)    # [N, L], mean loss per patch
+                loss = (loss * mask).sum() / mask.sum() # mean loss on removed patches
+            losses.append(loss.item())
+                
+            # saving example images 
+            if i == 0:
+                saving_outputs(net, pred, mask, target, '/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE')
+                
+    return net, np.mean(losses)
+
 
 def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = MAE.__dict__[args.model](img_size = args.img_size, norm_pix_loss=args.norm_pix_loss, mask_ratio = args.mask_ratio)
+    net = MAE.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, norm_pix_loss=args.norm_pix_loss, mask_ratio = args.mask_ratio)
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -94,12 +125,15 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
     # setting learning rate scheduler 
     #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2, eta_min=0)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
+
+    # setting AMP scaler 
+    scaler = torch.cuda.amp.GradScaler()
 
     # loading last checkpoint if resume training
     if args.resume == True:
         if args.checkpoint_dir != None:
-            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'] = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args, mode='pretrain')
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
@@ -129,26 +163,31 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting for results' data frame
     train_losses = []
+    val_losses = []
 
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
-        net, loss = MAE_train(net, partition, optimizer, args)
-        train_losses.append(loss)
+        net, train_loss = MAE_train(net, partition, optimizer, scaler, args)
+        net, val_loss = MAE_validation(net, partition, args)
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
         #scheduler.step(loss)
         scheduler.step()
         te = time.time()
 
         # visualize the result
-        print('Epoch {}. Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, loss, optimizer.param_groups[0]['lr'],te-ts))
+        print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, optimizer.param_groups[0]['lr'],te-ts))
+        torch.cuda.empty_cache()
 
         # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, args, mode='pretrain')
+        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, mode='pretrain')
 
 
     # summarize results
     result = {}
     result['train_losses'] = train_losses
+    result['validation_losses'] = val_losses
 
     return vars(args), result
         

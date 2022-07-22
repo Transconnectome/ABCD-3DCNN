@@ -58,7 +58,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, optimizer, save_dir, epoch, scheduler,  args, current_result=None, previous_result=None, mode=None):
+def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, current_result=None, previous_result=None, mode=None):
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
     if args.resume == False:
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
@@ -75,6 +75,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler,  args, current_r
                     'optimizer': optimizer.state_dict(),
                     'lr': optimizer.param_groups[0]['lr'],
                     'scheduler': scheduler.state_dict(),
+                    'scaler': scaler.state_dict(),
                     'epoch':epoch}, checkpoint_dir)
 
         print("Checkpoint is saved")
@@ -103,12 +104,13 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler,  args, current_r
 
 
 
-def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args,  mode='pretrain'):
+def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mode='pretrain'):
     if mode == 'pretrain':
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net.load_state_dict(model_state['net'])
         optimizer.load_state_dict(model_state['optimizer'])
         scheduler.load_state_dict(model_state['scheduler'])
+        scaler.load_state_dict(model_state['scaler'])
         print('The last checkpoint is loaded')
         #return net, optimizer, model_state['epoch']
     """
@@ -139,7 +141,7 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, args,  mode='pret
         print('The best checkpoint is loaded')
     """
 
-    return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'] 
+    return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'], scaler  
  
 
 def saving_outputs(net, pred, mask, target, save_dir):

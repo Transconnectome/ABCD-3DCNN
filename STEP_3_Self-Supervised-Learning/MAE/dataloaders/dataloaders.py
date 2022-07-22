@@ -75,13 +75,13 @@ def combining_image_target(subject_data, image_files, target_list):
 def partition_dataset_pretrain(imageFiles,args):
 
     train_transform = Compose([AddChannel(),
-                               Resize((args.img_size, args.img_size, args.img_size)),
+                               Resize(tuple(args.img_size)),
                                RandAxisFlip(prob=0.5),
                                NormalizeIntensity(),
                                ToTensor()])
 
     val_transform = Compose([AddChannel(),
-                             Resize((args.img_size, args.img_size, args.img_size)),
+                             Resize(tuple(args.img_size)),
                              NormalizeIntensity(),
                              ToTensor()])
 
@@ -97,20 +97,20 @@ def partition_dataset_pretrain(imageFiles,args):
     images_train = imageFiles[:num_train]
 
     # image for validation set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
-    #images_val = imageFiles[num_train:num_train+num_val]
+    images_val = imageFiles[num_train:num_train+num_val]
 
     # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
     #images_test = imageFiles[num_train+num_val:]
 
     print("Training Sample: {}".format(len(images_train)))
 
-    train_set = ImageDataset(image_files=images_train,transform=train_transform) # return of ContrastiveLearningViewGenerator is [image1, image2]
-    #val_set = ImageDataset(image_files=images_val,transform=val_transform)
+    train_set = ImageDataset(image_files=images_train,transform=train_transform) 
+    val_set = ImageDataset(image_files=images_val,transform=val_transform)
     #test_set = ImageDataset(image_files=images_test,transform=val_transform)
 
     partition = {}
     partition['train'] = train_set
-    #partition['val'] = val_set
+    partition['val'] = val_set
     #partition['test'] = test_set
 
     return partition
