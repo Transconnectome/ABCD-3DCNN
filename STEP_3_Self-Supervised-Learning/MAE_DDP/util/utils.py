@@ -10,6 +10,7 @@ from copy import deepcopy
 
 
 
+
 def set_random_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -33,11 +34,6 @@ def device_as(t1, t2):
     """Moves tensor1 (t1) to the device of tensor2 (t2)"""
     return t1.to(t2.device)
 
-
-def get_queue_path(save_dir, args): 
-    if os.path.isdir(os.path.join(save_dir)) == False:
-        makedir(os.path.join(save_dir,"queue"))
-    return os.path.join(save_dir, "queue", "queue" + str(args.rank) + ".path") 
         
 
 def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
@@ -67,11 +63,6 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, cu
     
     else:
         checkpoint_dir = copy.copy(args.checkpoint_dir)
-        
-    
-    # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
-    if args.gpu != 0:
-        return checkpoint_dir
     
 
     if mode == 'pretrain':
@@ -187,6 +178,7 @@ def save_exp_result(save_dir, setting, result, resume='False'):
 def makedir(path):
     if not os.path.isdir(path):
         os.makedirs(path)
+
 
 
 

@@ -75,13 +75,13 @@ def combining_image_target(subject_data, image_files, target_list):
 def partition_dataset_pretrain(imageFiles,args):
 
     train_transform = Compose([AddChannel(),
-                               Resize((args.img_size, args.img_size, args.img_size)),
+                               Resize(tuple(args.img_size)),
                                RandAxisFlip(prob=0.5),
                                NormalizeIntensity(),
                                ToTensor()])
 
     val_transform = Compose([AddChannel(),
-                             Resize((args.img_size, args.img_size, args.img_size)),
+                             Resize(tuple(args.img_size)),
                              NormalizeIntensity(),
                              ToTensor()])
 

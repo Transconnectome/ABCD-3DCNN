@@ -29,7 +29,7 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, spatial_dims=3, mask_ratio=0.75):
+                 mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, norm_pix_loss=False, spatial_dims=3, mask_ratio=0.75):
         super().__init__()
 
         # --------------------------------------------------------------------------
@@ -47,7 +47,7 @@ class MaskedAutoencoderViT(nn.Module):
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  # fixed sin-cos embedding
         self.blocks = nn.ModuleList([
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer)
             for i in range(depth)])
         self.norm = norm_layer(embed_dim)
         # --------------------------------------------------------------------------

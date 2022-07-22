@@ -51,7 +51,7 @@ parser = argparse.ArgumentParser()
 #########################
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-parser.add_argument("--img_size",default=96,type=int,nargs="*",required=False,help='')
+parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 
  #########################
  ### batch size params ###
@@ -63,6 +63,9 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 ## MAE specific params #
 #########################
 parser.add_argument("--model",required=True,type=str,help='',choices=['mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D','mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D'])
+parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
+parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
+parser.add_argument("--path_drop",default=0.3,type=float,required=False,help='dropout rate of encoder attention block')
 parser.add_argument("--mask_ratio",required=False,default=0.75,type=float,help='the ratio of random masking')
 parser.add_argument("--norm_pix_loss",action='store_true',help='Use (per-patch) normalized pixels as targets for computing loss')
 parser.set_defaults(norm_pix_loss=False)

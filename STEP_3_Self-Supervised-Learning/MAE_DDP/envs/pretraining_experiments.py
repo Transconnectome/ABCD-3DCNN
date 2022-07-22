@@ -114,7 +114,7 @@ def MAE_validation(net, partition, epoch,args):
 def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = MAE.__dict__[args.model](img_size = args.img_size, norm_pix_loss=args.norm_pix_loss, mask_ratio = args.mask_ratio)
+    net = MAE.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, norm_pix_loss=args.norm_pix_loss, mask_ratio = args.mask_ratio)
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -148,13 +148,13 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
     else:
         last_epoch = 0 
     
-    # attach network and optimizer to cuda device. This line should come before wrapping the model with DDP 
+    # attach network to cuda device. This line should come before wrapping the model with DDP 
     net.cuda()
 
     # setting DataParallel
     net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu])
     
-
+    # attach optimizer to cuda device.
     for state in optimizer.state.values():
         for k, v in state.items():
             if isinstance(v, torch.Tensor):
@@ -163,25 +163,29 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
     # setting for results' data frame
     train_losses = []
     val_losses = []
+    
 
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
         net, train_loss = MAE_train(net, partition, optimizer, scaler, epoch, args)
         net, val_loss = MAE_validation(net, partition, epoch, args)
+        
+        # store result per epoch 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
         #scheduler.step(loss)
         scheduler.step()
         te = time.time()
 
-        # visualize the result
-        print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, optimizer.param_groups[0]['lr'],te-ts))
+        # visualize the result and saving the checkpoint
+        # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
+        if args.gpu == 0:
+            print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, optimizer.param_groups[0]['lr'],te-ts))
+            checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, mode='pretrain')
+        
         torch.cuda.empty_cache()
-
-        # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, mode='pretrain')
-
+            
 
     # summarize results
     result = {}
