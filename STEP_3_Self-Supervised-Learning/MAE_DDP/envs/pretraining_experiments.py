@@ -17,7 +17,7 @@ import model.model_MAE as MAE
 
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed
 from util.optimizers import LAMB, LARS 
-
+from util.lr_sched import CosineAnnealingWarmUpRestarts
 
 import time
 from tqdm import tqdm
@@ -59,7 +59,7 @@ def MAE_train(net, partition, optimizer, scaler, epoch, args):
             # gradient clipping 
             if args.gradient_clipping == True:
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=True)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
+                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
@@ -71,7 +71,7 @@ def MAE_train(net, partition, optimizer, scaler, epoch, args):
                 # gradient clipping 
                 if args.gradient_clipping == True:
                     scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=True)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()    
@@ -120,20 +120,23 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting optimizer 
     if args.optim == 'SGD':
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
+        optimizer = optim.SGD(net.parameters(), lr=0, momentum=0.9)
     elif args.optim == 'Adam':
-        optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
+        optimizer = optim.Adam(net.parameters(),lr=0,weight_decay=args.weight_decay)
     elif args.optim == 'LARS':
-        optimizer = LARS(net.parameters(), lr=args.lr, momentum=0.9)
+        optimizer = LARS(net.parameters(), lr=0, momentum=0.9)
     elif args.optim == 'LAMB':
-        optimizer = LAMB(net.parameters(), lr=args.lr, weight_decay=args.weight_decay)        
+        optimizer = LAMB(net.parameters(), lr=0, weight_decay=args.weight_decay)        
+    elif args.optim == 'AdamW':
+        optimizer = optim.AdamW(net.parameters(), lr=0, weight_decay=args.weight_decay,betas=(0.9, 0.95))
     else:
         raise ValueError('In-valid optimizer choice')
 
     # setting learning rate scheduler 
     #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2, eta_min=0)
+    #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=2, eta_max=args.lr,  T_up=5, gamma=0.5)
 
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()
