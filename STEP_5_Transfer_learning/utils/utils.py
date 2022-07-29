@@ -21,26 +21,28 @@ def argument_setting():
     parser.add_argument("--data", type=str, help='select data type') # revising
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-    parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
+    parser.add_argument("--resize",default=(96, 96, 96),type=int,nargs="*",required=False,help='')
     parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--val_batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
-    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD','RAdam'])
+    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD','RAdam','AdamW'])
     parser.add_argument("--scheduler",type=str,default='',help='') # revising
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
+    parser.add_argument("--lr_adjust", default=0.01, type=float, required=False,help='')   
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
     parser.add_argument("--epoch",type=int,required=True,help='')
-    parser.add_argument("--epoch_FC",type=int,required=False,default=None,help='')
+    parser.add_argument("--epoch_FC",type=int,required=False,default=0,help='')
     parser.add_argument("--exp_name",type=str,required=True,help='')
     parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
     parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
     parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
     parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
-    parser.add_argument("--transfer", type=str, required=False, default=None, choices=['sex','age','simclr'])
-    parser.add_argument("--unfrozen_layer", type=int, required=False, default=0)
-    parser.add_argument("--load", type=str, required=False, default="")    
+    parser.add_argument("--transfer", type=str, required=False, default="", choices=['sex','age','simclr','MAE'])
+    parser.add_argument("--unfrozen_layer", type=str, required=False, default='0') 
+    parser.add_argument("--load", type=str, required=False, default="")
+    parser.add_argument("--init_unfrozen", type=str, required=False, default="",help='init unfrozen layers')
     
     args = parser.parse_args()
     print("*** Categorical target labels are {} and Numerical target labels are {} *** \n".format(
@@ -138,6 +140,7 @@ def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args
 
 sex_model_dir = '/scratch/connectome/dhkdgmlghks/3DCNN_test/3DCNN_hardparameter_sharing/result/model/UKB_sex_densenet3D121_6cbde7.pth'
 age_model_dir = '/scratch/connectome/dhkdgmlghks/UKB_sex_densenet3D121_6cbde7.pth'
+MAE_model_dir = '/scratch/connectome/dhkdgmlghks/3DCNN_test/3DCNN_hardparameter_sharing/result/model/densenet3D121_UKB_age_d167e4.pth'
 simclr_dir = '/scratch/connectome/jubin/Simclr_Contrastive_MRI_epoch_99.pth'
 
 def checkpoint_load(net, checkpoint_dir):
@@ -150,6 +153,8 @@ def checkpoint_load(net, checkpoint_dir):
         checkpoint_dir = age_model_dir
     elif checkpoint_dir == 'simclr':
         checkpoint_dir = simclr_dir
+    elif checkpoint_dir == 'MAE':
+        checkpoint_dir = MAE_model_dir
     
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
     net.load_state_dict(model_state, strict=False)

@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import confusion_matrix
 
-from envs.loss_functions import calculating_loss, calculating_acc
+from envs.loss_functions import calculating_loss_acc
 from tqdm import tqdm
 
 ### ========= Train,Validate, and Test ========= ###
@@ -26,7 +26,7 @@ def train(net,partition,optimizer,args):
     trainloader = torch.utils.data.DataLoader(partition['train'],
                                              batch_size=args.train_batch_size,
                                              shuffle=True,
-                                             num_workers=24)
+                                             num_workers=4)
 
     net.train()
 
@@ -57,8 +57,7 @@ def train(net,partition,optimizer,args):
         image = image.to(f'cuda:{net.device_ids[0]}')
         output = net(image)
 
-        loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
-        train_acc = calculating_acc(targets, output, correct, total, train_acc, net, args)
+        loss, train_loss, train_acc = calculating_loss_acc(targets, output, train_loss, correct, total, train_acc, net, args)
         
         scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
         scaler.step(optimizer)
@@ -85,7 +84,7 @@ def validate(net,partition,scheduler,args):
     valloader = torch.utils.data.DataLoader(partition['val'],
                                            batch_size=args.val_batch_size,
                                            shuffle=True,
-                                           num_workers=24)
+                                           num_workers=4)
 
     net.eval()
 
@@ -116,8 +115,7 @@ def validate(net,partition,scheduler,args):
             image = image.to(f'cuda:{net.device_ids[0]}')
             output = net(image)
 
-            loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
-            val_acc = calculating_acc(targets, output, correct, total, val_acc, net, args)
+            loss, val_loss, val_acc = calculating_loss_acc(targets, output, val_loss, correct, total, val_acc, net, args)
 
     if args.cat_target:
         for cat_target in args.cat_target:
@@ -146,7 +144,7 @@ def test(net,partition,args):
     testloader = torch.utils.data.DataLoader(partition['test'],
                                             batch_size=args.test_batch_size,
                                             shuffle=False,
-                                            num_workers=24)
+                                            num_workers=4)
 
     net.eval()
     if hasattr(net, 'module'):
