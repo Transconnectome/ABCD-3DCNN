@@ -131,7 +131,6 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         ts = time.time()
         net, train_loss, train_acc = train(net,partition,optimizer,args)
         val_loss, val_acc = validate(net,partition,scheduler,args)
-        scheduler.step()
         te = time.time()
 
          # sorting the results
