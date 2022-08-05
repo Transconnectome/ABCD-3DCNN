@@ -79,6 +79,19 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = densenet3d.densenet3D169(subject_data, args) 
     elif args.model == 'densenet3D201':
         net = densenet3d.densenet3D201(subject_data, args)
+
+    net.to(f'cuda:{net.device_ids[0]}')
+
+
+    if args.optim == 'SGD':
+        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
+    elif args.optim == 'Adam':
+        optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
+    else:
+        raise ValueError('In-valid optimizer choice')
+
+    # learning rate schedluer
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
              
 
     # setting DataParallel
@@ -92,21 +105,15 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
-            
     
+    # attach network and optimizer to cuda device
     net.to(f'cuda:{net.device_ids[0]}')
 
-
-    if args.optim == 'SGD':
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
-    elif args.optim == 'Adam':
-        optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
-    else:
-        raise ValueError('In-valid optimizer choice')
-
-    # learning rate schedluer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
-
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(f'cuda:{net.device_ids[0]}')
+    
     # setting for results' data frame
     train_losses = {}
     train_accs = {}
@@ -124,6 +131,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         ts = time.time()
         net, train_loss, train_acc = train(net,partition,optimizer,args)
         val_loss, val_acc = validate(net,partition,scheduler,args)
+        scheduler.step()
         te = time.time()
 
          # sorting the results
