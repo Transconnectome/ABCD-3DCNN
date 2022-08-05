@@ -92,7 +92,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         raise ValueError('In-valid optimizer choice')
 
     # learning rate schedluer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4) #if you want to use this scheduler, you should activate the line 134 of envs/experiments.py
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=50, T_mult=1, eta_max=args.lr, T_up=5, gamma=0.7)
              
 
