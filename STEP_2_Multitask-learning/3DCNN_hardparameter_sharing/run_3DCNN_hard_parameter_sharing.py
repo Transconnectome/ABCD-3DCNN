@@ -4,6 +4,7 @@ import models.vgg3d as vgg3d #model script
 import models.resnet3d as resnet3d #model script
 import models.densenet3d as densenet3d #model script
 from utils.utils import argument_setting, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load
+from utils.lr_scheduler import *
 from dataloaders.dataloaders import loading_images, loading_phenotype, combining_image_target, partition_dataset
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.experiments import train, validate, test 
@@ -92,6 +93,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
     # learning rate schedluer
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=50, T_mult=1, eta_max=args.lr, T_up=5, gamma=0.7)
              
 
     # setting DataParallel
