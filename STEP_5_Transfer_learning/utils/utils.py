@@ -106,8 +106,8 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
     for label_name in targets:
         var_column.append(label_name)
 
-        loss_value = '{:2.2f} / {:2.2f}'.format(train_loss[label_name],val_loss[label_name])
-        acc_value = '{:2.2f} / {:2.2f}'.format(train_acc[label_name],val_acc[label_name])
+        loss_value = '{:2.4f} / {:2.4f}'.format(train_loss[label_name],val_loss[label_name])
+        acc_value = '{:2.4f} / {:2.4f}'.format(train_acc[label_name],val_acc[label_name])
         visual_report['Loss (train/val)'].append(loss_value)
         visual_report['R2 or ACC (train/val)'].append(acc_value)
 

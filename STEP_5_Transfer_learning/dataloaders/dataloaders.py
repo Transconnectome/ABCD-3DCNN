@@ -65,9 +65,8 @@ def loading_phenotype(phenotype_dir, target_list, args):
     subject_data = subject_data.sort_values(by=subjectkey)
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values in sex
-#     if args.transfer == 'MAE' and args.dataset == 'ABCD':
-#         subject_data.age /= 12
-#         return subject_data
+    if args.transfer == 'MAE' and args.dataset == 'ABCD':
+        return subject_data
 
     ### preprocessing categorical variables and numerical variables
     subject_data = preprocessing_cat(subject_data, args)

@@ -228,6 +228,11 @@ if __name__ == "__main__":
     cwd = os.getcwd()
 
     ## ========= Setting ========= ##
+    # seed number
+    seed = 1234
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
     args = argument_setting()
     
     if args.transfer in ['age','MAE']:
