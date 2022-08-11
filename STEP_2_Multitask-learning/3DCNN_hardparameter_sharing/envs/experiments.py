@@ -131,8 +131,8 @@ def validate(net,partition,scheduler,args):
 
 
     # learning rate scheduler
-    scheduler.step(sum(val_acc.values()))
-
+    #scheduler.step(sum(val_acc.values())) #if you want to use ReduceLROnPlateau lr scheduler, activate this line and deactivate the below line 
+    scheduler.step()
 
     return val_loss, val_acc
 

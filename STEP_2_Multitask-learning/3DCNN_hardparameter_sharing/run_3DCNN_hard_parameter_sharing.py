@@ -4,6 +4,7 @@ import models.vgg3d as vgg3d #model script
 import models.resnet3d as resnet3d #model script
 import models.densenet3d as densenet3d #model script
 from utils.utils import argument_setting, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load
+from utils.lr_scheduler import *
 from dataloaders.dataloaders import loading_images, loading_phenotype, combining_image_target, partition_dataset
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.experiments import train, validate, test 
@@ -79,6 +80,20 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = densenet3d.densenet3D169(subject_data, args) 
     elif args.model == 'densenet3D201':
         net = densenet3d.densenet3D201(subject_data, args)
+
+    net.to(f'cuda:{net.device_ids[0]}')
+
+
+    if args.optim == 'SGD':
+        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
+    elif args.optim == 'Adam':
+        optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
+    else:
+        raise ValueError('In-valid optimizer choice')
+
+    # learning rate schedluer
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4) #if you want to use this scheduler, you should activate the line 134 of envs/experiments.py
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=50, T_mult=1, eta_max=args.lr, T_up=5, gamma=0.7)
              
 
     # setting DataParallel
@@ -92,21 +107,15 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
         else:
             net = nn.DataParallel(net, device_ids=args.gpus)
-            
     
+    # attach network and optimizer to cuda device
     net.to(f'cuda:{net.device_ids[0]}')
 
-
-    if args.optim == 'SGD':
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
-    elif args.optim == 'Adam':
-        optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
-    else:
-        raise ValueError('In-valid optimizer choice')
-
-    # learning rate schedluer
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4)
-
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(f'cuda:{net.device_ids[0]}')
+    
     # setting for results' data frame
     train_losses = {}
     train_accs = {}
