@@ -100,7 +100,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, cu
 
 
 
-def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mode='pretrain'):
+def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain'):
     if mode == 'pretrain':
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net.load_state_dict(model_state['net'])
@@ -109,6 +109,14 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mo
         scaler.load_state_dict(model_state['amp_state'])
         print('The last checkpoint is loaded')
         #return net, optimizer, model_state['epoch']
+        return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'], scaler  
+
+    elif mode == 'finetuning': 
+        model_state = torch.load(checkpoint_dir, map_location = 'cpu')
+        net = load_pretrained_model(net, model_state)
+        print('The pre-trained model is loaded')
+        return net 
+
     """
     elif mode == 'finetuing':
         model_state = torch.load(checkpoint_dir, map_location='cpu')
@@ -137,7 +145,7 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mo
         print('The best checkpoint is loaded')
     """
 
-    return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'], scaler  
+    
  
 
 def saving_outputs(net, pred, mask, target, save_dir):
@@ -148,19 +156,47 @@ def saving_outputs(net, pred, mask, target, save_dir):
     print('==== DONE SAVING EXAMPLE IMAGES ====')
 
 
-def load_pretrained_model(net, checkpoint_dir):
-    model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-    net.backbone.load_state_dict(model_state['backbone'])
-    print('The pre-trained model is loaded')
+def load_attention_blocks(net, model_state):
+    for i, block in enumerate(net.blocks): 
+        # initial norm layer
+        setattr(net, 'blocks[%s].norm1.weight.data' % str(i), model_state['net']['blocks.%s.norm1.weight' % str(i)])
+        setattr(net, 'blocks[%s].norm1.bias.data' % str(i), model_state['net']['blocks.%s.norm1.bias' % str(i)])
+        # attention qkv parameters 
+        setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), model_state['net']['blocks.%s.attn.qkv.weight' % str(i)])
+        setattr(net, 'blocks[%s].attn.qkv.bias.data' % str(i), model_state['net']['blocks.%s.attn.qkv.bias' % str(i)])
+        # attention projection layer
+        setattr(net, 'blocks[%s].attn.proj.weight.data' % str(i), model_state['net']['blocks.%s.attn.proj.weight' % str(i)])
+        setattr(net, 'blocks[%s].attn.proj.bias.data' % str(i), model_state['net']['blocks.%s.attn.proj.bias' % str(i)])
+        # last norm layer
+        setattr(net, 'blocks[%s].norm2.weight.data' % str(i), model_state['net']['blocks.%s.norm2.weight' % str(i)])
+        setattr(net, 'blocks[%s].norm2.bias.data' % str(i), model_state['net']['blocks.%s.norm2.bias' % str(i)])
+        # fc layer 
+        setattr(net, 'blocks[%s].mlp.fc1.weight.data' % str(i), model_state['net']['blocks.%s.mlp.fc1.weight' % str(i)])
+        setattr(net, 'blocks[%s].mlp.fc1.bias.data' % str(i), model_state['net']['blocks.%s.mlp.fc1.bias' % str(i)])
+        setattr(net, 'blocks[%s].mlp.fc2.weight.data' % str(i), model_state['net']['blocks.%s.mlp.fc2.weight' % str(i)])
+        setattr(net, 'blocks[%s].mlp.fc2.bias.data' % str(i), model_state['net']['blocks.%s.mlp.fc2.bias' % str(i)])
+        return net
 
+
+def load_pretrained_model(net, model_state):
+    # load positional embedding
+    net.pos_embed.data = model_state['net']['pos_embed']
+    # load patch embedding
+    setattr(net, 'patch_embed.proj.weight.data', model_state['net']['patch_embed.proj.weight'])
+    setattr(net, 'patch_embed.proj.bias.data', model_state['net']['patch_embed.proj.bias'])
+    # load attention blocks 
+    net = load_attention_blocks(net, model_state)
+    # load last norm layer 
+    setattr(net, 'norm.weight.data', model_state['net']['norm.weight'])
+    setattr(net, 'norm.bias.data', model_state['net']['norm.bias'])
     return net    
+
 
 
 def freezing_layers(module):
     for param in module.parameters():
         param.requires_grad = False
     return module
-
 
 
 # define result-saving function
@@ -178,6 +214,8 @@ def save_exp_result(save_dir, setting, result, resume='False'):
 def makedir(path):
     if not os.path.isdir(path):
         os.makedirs(path)
+
+
 
 
 

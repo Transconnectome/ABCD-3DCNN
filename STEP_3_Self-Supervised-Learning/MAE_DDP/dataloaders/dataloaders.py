@@ -37,10 +37,14 @@ def loading_phenotype(phenotype_dir, args):
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values in sex
 
     ### preprocessing categorical variables and numerical variables
-    subject_data = preprocessing_cat(subject_data, args)
-    subject_data = preprocessing_num(subject_data, args)
+    if args.cat_target:
+        subject_data = preprocessing_cat(subject_data, args)
+        num_classes = int(subject_data[args.cat_target].nunique().values)
+    if args.num_target:
+        subject_data = preprocessing_num(subject_data, args)
+        num_classes = 1 
     
-    return subject_data, targets
+    return subject_data, targets, num_classes
 
 
 ## combine categorical + numeric
@@ -48,7 +52,7 @@ def combining_image_target(subject_data, image_files, target_list):
     imageFiles_labels = []
     
     
-    subj= []
+    subj = []
     if type(subject_data['eid'][0]) == np.str_ or type(subject_data['eid'][0]) == str:
         for i in range(len(image_files)):
             subj.append(str(image_files[i][:-12]))
@@ -60,12 +64,10 @@ def combining_image_target(subject_data, image_files, target_list):
     subject_data = pd.merge(subject_data, image_list, how='inner', on='eid')
     subject_data = subject_data.sort_values(by='eid')
 
-    col_list = target_list + ['image_files']
+    assert len(target_list) == 1  
     
     for i in tqdm(range(len(subject_data))):
-        imageFile_label = {}
-        for j, col in enumerate(col_list):
-            imageFile_label[col] = subject_data[col][i]
+        imageFile_label = (subject_data['image_files'][i], subject_data[target_list[0]][i])
         imageFiles_labels.append(imageFile_label)
         
     return imageFiles_labels
@@ -118,7 +120,7 @@ def partition_dataset_pretrain(imageFiles,args):
 
 
 
-def partition_dataset_finetuning(imageFiles_labels,args):
+def partition_dataset_finetuning(imageFiles_labels, args):
     """train_set for training simCLR
         finetuning_set for finetuning simCLR for prediction task 
         tests_set for evaluating simCLR for prediction task"""
@@ -126,22 +128,21 @@ def partition_dataset_finetuning(imageFiles_labels,args):
 
     images = []
     labels = []
-    targets = args.cat_target + args.num_target
 
     for imageFile_label in imageFiles_labels:
-        image = imageFile_label['image_files']
-        label = {}
-
-        for label_name in targets[:len(targets)]:
-            label[label_name]=imageFile_label[label_name]
-
+        image, label = imageFile_label
         images.append(image)
         labels.append(label)
 
+    train_transform = Compose([AddChannel(),
+                               Resize(tuple(args.img_size)),
+                               RandAxisFlip(prob=0.5),
+                               NormalizeIntensity(),
+                               ToTensor()])
 
     val_transform = Compose([AddChannel(),
-                             ScaleIntensity(),
-                             Resize(tuple(args.resize)),
+                             Resize(tuple(args.img_size)),
+                             NormalizeIntensity(),
                              ToTensor()])
 
 
@@ -166,7 +167,7 @@ def partition_dataset_finetuning(imageFiles_labels,args):
 
     print("Training Sample: {}. Validation Sample: {}. Test Sample: {}".format(len(images_train), len(images_val), len(images_test)))
 
-    train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=val_transform) # return of ContrastiveLearningViewGenerator is [image1, image2]
+    train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
     val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
     test_set = ImageDataset(image_files=images_test,labels=labels_test,transform=val_transform)
 
