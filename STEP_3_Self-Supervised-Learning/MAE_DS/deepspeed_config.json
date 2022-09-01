@@ -1,0 +1,54 @@
+{
+    "train_batch_size": 32,
+    "gradient_accumulation_steps": 4,
+    "optimizer": {
+      "type": "AdamW",
+      "params": {
+        "lr": 0.0001,
+        "betas": [
+          0.8,
+          0.999
+        ],
+        "eps": 1e-8,
+        "weight_decay": 0.05
+        }
+      },
+    "scheduler": {
+      "type": "OneCycle",
+      "params": {
+          "cycle_first_step_size": 1000,
+          "cycle_first_stair_count": 500,
+          "cycle_second_step_size": 1000,
+          "cycle_second_stair_count": 500,
+          "decay_step_size": 1000,
+          "cycle_min_lr": 0.0,
+          "cycle_max_lr": 0.0001,
+          "decay_lr_rate": 0.001,
+          "cycle_min_mom": 0.85,
+          "cycle_max_mom": 0.99,
+          "decay_mom_rate": 0.0
+      }
+    },
+    "fp16": {
+      "enabled": true
+    },
+    "quantize_training": {
+      "enabled": true,
+      "quantize_verbose": true,
+      "quantizer_kernel": true,
+      "quantize-algo": {
+        "q_type": "symmetric"
+      },
+      "quantize_bits": {
+        "start_bits": 32,
+        "target_bits": 16
+      },
+      "quantize_schedule": {
+        "quantize_period": 400,
+        "schedule_offset": 0
+      },
+      "quantize_groups": 8
+    },
+    "zero_optimization": true
+  }
+  
