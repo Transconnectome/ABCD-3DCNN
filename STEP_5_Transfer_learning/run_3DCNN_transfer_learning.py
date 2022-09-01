@@ -1,5 +1,5 @@
 ## ======= load module ======= ##
-from utils.utils import argument_setting, select_model, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load  #  
+from utils.utils import argument_setting, select_model, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load #  
 #from utils.optimizer import CosineAnnealingWarmUpRestarts
 from dataloaders.dataloaders import make_dataset
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
@@ -63,6 +63,8 @@ def set_lr_scheduler(args, optimizer):
         elif args.scheduler == 'cos':
 #             scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=1)
             scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=2, eta_min=0)
+        elif args.scheduler == 'step':
+            scheduler = optim.lr_scheduler.StepLR(optimizer, 80, gamma=0.1)
     else:
         scheduler = None
         
@@ -87,6 +89,8 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         model_dir = glob.glob(f'/scratch/connectome/jubin/result/model/*{args.load}*')[0]
         print(f"Loaded {model_dir[:-4]}")
         net = checkpoint_load(net, model_dir)
+    else:
+        print("*** Model setting for learning from scratch ***")
     
     # setting a DataParallel and model on GPU
     if args.sbatch == "True":
@@ -126,14 +130,14 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     # training a model
     print("*** Start training a model *** \n")
     
-    if (args.unfrozen_layer > '0') and (args.load == ""):
+    if (args.unfrozen_layer > '0') and (args.load == "") and (args.transfer != '') and args.epoch_FC != 0:
         print("*** Transfer Learning - Training FC layers *** \n")
         
         setting_transfer(args, net.module, num_unfreezed = 0)
         optimizer = set_optimizer(args, net)
         scheduler = set_lr_scheduler(args, optimizer)
         
-        best_val_loss = 1e+10
+        best_val_loss = float('inf')
         patience = 0
 
         for epoch in tqdm(range(args.epoch_FC)):
@@ -149,18 +153,28 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
                 val_losses[target_name].append(val_loss[target_name])
                 val_accs[target_name].append(val_acc[target_name])
 
-
+            if val_loss[targets[0]] < best_val_loss:
+                best_val_loss = val_loss[targets[0]]
+                patience = 0
+            else:
+                patience += 1
+            
             ## visualize the result
             CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
             print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
             
-            ## saving the checkpoint
-            checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)            
-            
+            ## saving the checkpoint and results
+            checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)                     
             if epoch%10 == 0:
                 save_exp_result(save_dir, vars(args).copy(), result)
                 
-            
+            ## Early-Stopping
+            if args.early_stopping != None and patience == args.early_stopping:
+                    print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
+                    break
+                    
+        result['best_val_loss_FC'] = best_val_loss
+                
         print("Adjust learning rate for Training unfrozen layers")
         print(f"From {args.lr} to {args.lr*args.lr_adjust}")    
         args.lr *= args.lr_adjust
@@ -168,6 +182,9 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
             
     print("*** Training unfrozen layers *** \n")
+    
+    best_val_loss = float('inf')
+    patience = 0
     
     setting_transfer(args, net.module, num_unfreezed = args.unfrozen_layer)
     optimizer = set_optimizer(args, net)
@@ -184,19 +201,29 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             train_losses[target_name].append(train_loss[target_name])
             train_accs[target_name].append(train_acc[target_name])
             val_losses[target_name].append(val_loss[target_name])
-            val_accs[target_name].append(val_acc[target_name])          
+            val_accs[target_name].append(val_acc[target_name])
 
+        if val_loss[targets[0]] < best_val_loss:
+            best_val_loss = val_loss[targets[0]]
+            patience = 0
+        else:
+            patience += 1
         ## visualize the result
         CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
         print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
 
-        ## saving the checkpoint
+        ## saving the checkpoint and results
         checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
-        
         if epoch%10 == 0:
             save_exp_result(save_dir, vars(args).copy(), result)
 
-        
+        ## Early-Stopping
+        if args.early_stopping != None and patience == args.early_stopping:
+            print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
+            break
+                    
+    result['best_val_loss'] = best_val_loss
+                    
     # testing a model
     print("\n*** Start testing a model *** \n")
     net.to('cpu')
@@ -208,7 +235,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     else:
         net.to(f'cuda:{args.gpus[0]}')
     test_acc, confusion_matrices = test(net, partition, args)
-    print("Test result: ",test_acc)
+    print(f"Test result: {test_acc} for {args.exp_name}")
     
     # summarizing results
     
@@ -236,9 +263,9 @@ if __name__ == "__main__":
     args = argument_setting()
     
     if args.transfer in ['age','MAE']:
-        assert 96 in args.resize
-    else:
-        assert 80 in args.resize
+        assert 96 in args.resize, "age(MSE/MAE) transfer model's resize should be 96"
+    elif args.transfer == 'sex':
+        assert 80 in args.resize, "sex transfer model's resize should be 80"
         
     save_dir = os.getcwd() + '/result' #  
     partition, subject_data = make_dataset(args) #  
@@ -256,7 +283,7 @@ if __name__ == "__main__":
     # Run Experiment
     print(f"*** Experiment {args.exp_name} Start ***")
     setting, result = experiment(partition, subject_data, save_dir, deepcopy(args))
-
+    print("setting was",args)
     # Save result
     save_exp_result(save_dir, setting, result)
     print("*** Experiment Done ***\n")

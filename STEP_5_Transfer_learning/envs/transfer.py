@@ -2,7 +2,7 @@ import torch
 
 ## Main function that freezes layers & re-initialize FC layer
 def setting_transfer(args, net, num_unfreezed):
-    if num_unfreezed == 'all':
+    if num_unfreezed in ['all', 'no']:
         return
     
     elif num_unfreezed != '0':

@@ -50,10 +50,19 @@ def loading_images(image_dir, args):
     os.chdir(image_dir)
     image_files = pd.Series(glob.glob('*.npy')) # revising
     image_files = pd.concat([image_files, pd.Series(glob.glob('*.nii.gz'))])
-    image_files.sort_values(inplace=True) 
-    subjects = image_files.map(lambda x: x.split('.')[0]) # revising  
+    image_files.sort_values(inplace=True)
+    subjects = image_files.map(lambda x: x.split('.')[0]) # revising
     #image_files = image_files[:100]
     return image_files
+
+
+def filter_phenotype(subject_data, filters):
+    for fil in filters:
+        fil_name, fil_option = fil.split(':')
+        fil_option = np.float64(fil_option)
+        subject_data = subject_data[subject_data[fil_name] == fil_option]
+        
+    return subject_data
 
 
 def loading_phenotype(phenotype_dir, target_list, args):
@@ -61,11 +70,14 @@ def loading_phenotype(phenotype_dir, target_list, args):
 
     ### get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
+    subject_data = filter_phenotype(subject_data, args.filter)
     subject_data = subject_data.loc[:,col_list]
     subject_data = subject_data.sort_values(by=subjectkey)
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values in sex
     if args.transfer == 'MAE' and args.dataset == 'ABCD':
+        return subject_data
+    elif args.scratch == 'MAE':
         return subject_data
 
     ### preprocessing categorical variables and numerical variables
@@ -136,6 +148,7 @@ def partition_dataset(imageFiles_labels, target_list, args):
     num_train = int(num_total*(1 - args.val_size - args.test_size))
     num_val = int(num_total*args.val_size)
     num_test = int(num_total*args.test_size)
+    print(f"Total subjects={num_total}, train={num_train}, val={num_val}, test={num_test}")
 
     # image and label information of train, val, test
     images_train, images_val, images_test = np.split(images, [num_train, num_train+num_val]) # revising

@@ -32,7 +32,12 @@ def calculating_loss_acc(targets, output, loss_dict, correct, total, acc_dict, n
             y_true = targets[num_target]
             y_true = y_true.to(f'cuda:{net.device_ids[0]}')
             tmp_output = output[num_target]
-            criterion = nn.MSELoss() if args.transfer != 'MAE' else nn.L1Loss()
+            if args.transfer != '' and args.transfer != 'MAE':
+                criterion = nn.MSELoss()
+            elif args.transfer == 'MAE' or args.scratch == 'MAE':
+                criterion = nn.L1Loss()
+            else:
+                assert args.transfer == 'MAE', print("Invalid option")
             tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
             loss += tmp_loss * num_weight
             
@@ -40,7 +45,7 @@ def calculating_loss_acc(targets, output, loss_dict, correct, total, acc_dict, n
             # restoring train loss and r-square for each task (target variable)
             loss_dict[num_target].append(tmp_loss.item())     # train_loss is for restoring loss from predicting each target variable
             # Acc
-            if args.transfer == 'MAE':
+            if args.transfer == 'MAE' or args.scratch =='MAE':
                 criterion = nn.MSELoss() 
                 tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
                 

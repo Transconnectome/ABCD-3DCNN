@@ -28,6 +28,7 @@ def argument_setting():
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
     parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD','RAdam','AdamW'])
     parser.add_argument("--scheduler",type=str,default='',help='') # revising
+    parser.add_argument("--early_stopping",type=int,default=None,help='') # revising
     parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
     parser.add_argument("--lr_adjust", default=0.01, type=float, required=False,help='')   
     parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
@@ -43,6 +44,9 @@ def argument_setting():
     parser.add_argument("--unfrozen_layer", type=str, required=False, default='0') 
     parser.add_argument("--load", type=str, required=False, default="")
     parser.add_argument("--init_unfrozen", type=str, required=False, default="",help='init unfrozen layers')
+    parser.add_argument("--scratch", type=str, required=False, default='',help='option for learning from scratch')
+    parser.add_argument("--filter",required=False, nargs="+", default=[],
+                        help='options for filter data by phenotype. usage: --filter abcd_site:10 sex:1')
     
     args = parser.parse_args()
     print("*** Categorical target labels are {} and Numerical target labels are {} *** \n".format(
@@ -161,8 +165,8 @@ def checkpoint_load(net, checkpoint_dir):
     print('The best checkpoint is loaded')
 
     return net
-            
-
+    
+    
 # define result-saving function
 def save_exp_result(save_dir, setting, result):
     makedir(save_dir)
