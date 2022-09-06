@@ -205,11 +205,11 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
             print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. \n Training Prediction Performance: {}. \n Validation Prediction Performance: {}. \n Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, train_performance, val_performance, optimizer.param_groups[0]['lr'],te-ts))
             if 'ACC' in val_performance.keys():
                 previous_performance['ACC'].append(val_performance['ACC'])
-                if val_performance['ACC'] > max(previous_performance['ACC'][:-2]):
+                if val_performance['ACC'] > max(previous_performance['ACC'][:-1]):
                     checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
             elif 'abs_loss' in val_performance.keys():
                 previous_performance['abs_loss'].append(val_performance['abs_loss'])
-                if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-2]):
+                if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
                     checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
         
         torch.cuda.empty_cache()
