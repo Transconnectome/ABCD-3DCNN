@@ -11,9 +11,6 @@ def init_distributed(args):
 
         args.distributed = True
         torch.cuda.set_device(args.gpu)
-        os.environ['MASTER_ADDR']= '127.0.0.1'
-        os.environ['MASTER_PORT']= '29500'
-    
         torch.distributed.init_process_group(backend='nccl', init_method='env://', world_size=args.world_size)
         torch.distributed.barrier()
     else:

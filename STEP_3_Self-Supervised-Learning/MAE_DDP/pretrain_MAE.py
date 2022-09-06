@@ -5,7 +5,7 @@
 import model.model_MAE as MAE
 from envs.pretraining_experiments import MAE_experiment
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, set_random_seed
-from dataloaders.dataloaders import loading_images,  partition_dataset_pretrain
+from dataloaders.dataloaders import check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.pretraining_experiments import *
 from util.distributed_parallel import *
@@ -49,6 +49,7 @@ parser = argparse.ArgumentParser()
 #########################
 #### data parameters ####
 #########################
+parser.add_argument("--study_sample",default='UKB',type=str,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
@@ -107,23 +108,19 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    ## ========= Setting ========= ##
+    ## ========= Settingfor data ========= ##
     current_dir = os.getcwd()
-    image_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
-    phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
-    #image_dir = '/master_ssd/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
-    #phenotype_dir = '/master_ssd/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'    
-    image_files = loading_images(image_dir, args)
-    #subject_data, target_list = loading_phenotype(phenotype_dir, args)
-    os.chdir(image_dir)
-    ## ====================================== ##
-
-    ## ========= data preprocesing categorical variable and numerical variables ========= ##
-    #imageFiles_labels = combining_image_target(subject_data, image_files, target_list)
+    image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
+    image_files = loading_images(image_dir, args, study_sample=args.study_sample)
+    subject_data, target_list, _ = loading_phenotype(phenotype_dir, args, study_sample=args.study_sample)
+    
+    ## data preprocesing categorical variable and numerical variables
+    imageFiles_labels = combining_image_target(subject_data, image_files, target_list)
 
     # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables )
-    partition = partition_dataset_pretrain(image_files,args)
+    partition = partition_dataset_pretrain(imageFiles_labels, args)
     ## ====================================== ##
+
 
 
     ## ========= Run Experiment and saving result ========= ##

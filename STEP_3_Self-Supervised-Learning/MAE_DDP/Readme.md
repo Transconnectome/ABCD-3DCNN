@@ -27,7 +27,7 @@ Pretraining Vision Transformer in a self-supervised way by maksed autoencoder.
 torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss
 ```  
   
-## Finetuning 
+## Finetuning
 Finetuning Vision Transformer for downstream tasks.  
 **You should set ```--pretrained_model {/dir/to/model/pth}```.**  
 **Furthermore, you should set either ```--cat_target``` or ```--num_target```.**   

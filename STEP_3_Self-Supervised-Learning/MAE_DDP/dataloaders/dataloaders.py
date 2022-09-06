@@ -17,22 +17,46 @@ import monai
 from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop, ScaleIntensity, RandAxisFlip
 from monai.data import ImageDataset
 
-def loading_images(image_dir, args):
+def check_study_sample(study_sample):
+    if study_sample == 'UKB':
+        image_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
+    elif study_sample == 'ABCD':
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+    return image_dir, phenotype_dir 
+
+
+
+def loading_images(image_dir, args, study_sample='UKB'):
     os.chdir(image_dir)
-    image_files = glob.glob('*.nii.gz')
+    if study_sample == 'UKB':
+        image_files = glob.glob('*.nii.gz')
+    elif study_sample == 'ABCD':
+        image_files = glob.glob('*.npy')
     image_files = sorted(image_files)
-    #image_files = image_files[:10000]
+    #image_files = image_files[:1000]
+
+    # add absolute path to image files
+    for i, image_file in enumerate(image_files):
+        image_files[i] = os.path.join(image_dir, image_file)
+    
     print("Loading image file names as list is completed")
     return image_files
 
-def loading_phenotype(phenotype_dir, args):
+def loading_phenotype(phenotype_dir, args, study_sample='UKB'):
+    if study_sample == 'UKB':
+        subject_id_col = 'eid'
+    elif study_sample == 'ABCD':
+        subject_id_col = 'subjectkey'
+
     targets = args.cat_target + args.num_target
-    col_list = targets + ['eid']
+    col_list = targets + [subject_id_col]
 
     ### get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
     subject_data = subject_data.loc[:,col_list]
-    subject_data = subject_data.sort_values(by='eid')
+    subject_data = subject_data.sort_values(by=subject_id_col)
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values in sex
 
@@ -41,28 +65,36 @@ def loading_phenotype(phenotype_dir, args):
         subject_data = preprocessing_cat(subject_data, args)
         num_classes = int(subject_data[args.cat_target].nunique().values)
     if args.num_target:
-        subject_data = preprocessing_num(subject_data, args)
+        #subject_data = preprocessing_num(subject_data, args)
         num_classes = 1 
     
     return subject_data, targets, num_classes
 
 
 ## combine categorical + numeric
-def combining_image_target(subject_data, image_files, target_list):
+def combining_image_target(subject_data, image_files, target_list, study_sample='UKB'):
+    if study_sample == 'UKB':
+        subject_id_col = 'eid'
+        suffix_len = -12
+    elif study_sample == 'ABCD':
+        subject_id_col = 'subjectkey'
+        suffix_len = -4
     imageFiles_labels = []
     
     
     subj = []
-    if type(subject_data['eid'][0]) == np.str_ or type(subject_data['eid'][0]) == str:
+    if type(subject_data[subject_id_col][0]) == np.str_ or type(subject_data[subject_id_col][0]) == str:
         for i in range(len(image_files)):
-            subj.append(str(image_files[i][:-12]))
-    elif type(subject_data['eid'][0]) == np.int_ or type(subject_data['eid'][0]) == int:
+            subject_id = os.path.split(image_files[i])[-1]
+            subj.append(str(subject_id[:suffix_len]))
+    elif type(subject_data[subject_id_col][0]) == np.int_ or type(subject_data[subject_id_col][0]) == int:
         for i in range(len(image_files)):
-            subj.append(int(image_files[i][:-12]))
+            subject_id = os.path.split(image_files[i])[-1]
+            subj.append(int(subject_id[:suffix_len]))
 
-    image_list = pd.DataFrame({'eid':subj, 'image_files': image_files})
-    subject_data = pd.merge(subject_data, image_list, how='inner', on='eid')
-    subject_data = subject_data.sort_values(by='eid')
+    image_list = pd.DataFrame({subject_id_col:subj, 'image_files': image_files})
+    subject_data = pd.merge(subject_data, image_list, how='inner', on=subject_id_col)
+    subject_data = subject_data.sort_values(by=subject_id_col)
 
     assert len(target_list) == 1  
     

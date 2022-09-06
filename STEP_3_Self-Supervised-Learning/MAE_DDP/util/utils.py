@@ -54,7 +54,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, current_result=None, previous_result=None, mode=None):
+def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, performance_result, mode=None):
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
     if args.resume == False:
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
@@ -74,6 +74,16 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, cu
                     'epoch':epoch}, checkpoint_dir)
 
         print("Checkpoint is saved")
+    elif mode == 'finetune':
+        torch.save({'net':net.module.state_dict(), 
+                    'optimizer': optimizer.state_dict(),
+                    'lr': optimizer.param_groups[0]['lr'],
+                    'scheduler': scheduler.state_dict(),
+                    'amp_state': scaler.state_dict(),
+                    'performance': performance_result,
+                    'epoch':epoch}, checkpoint_dir) 
+        print("Checkpoint is saved")       
+
             
     """
     elif mode == 'prediction':
