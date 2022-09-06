@@ -115,7 +115,7 @@ if __name__ == "__main__":
     subject_data, target_list, _ = loading_phenotype(phenotype_dir, args, study_sample=args.study_sample)
     
     ## data preprocesing categorical variable and numerical variables
-    imageFiles_labels = combining_image_target(subject_data, image_files, target_list)
+    imageFiles_labels = combining_image_target(subject_data, image_files, target_list, study_sample=args.study_sample)
 
     # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables )
     partition = partition_dataset_pretrain(imageFiles_labels, args)
