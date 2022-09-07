@@ -3,29 +3,31 @@ When you want to run this code with specific gpu devices, **you should set gpu d
 ```--nproc_per_node``` is the number of gpus per node.   
 ```
 export CUDA_VISIBLE_DEVICES=2,3
-torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss
+torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss --gradient_clipping
 ```   
 or  
 ```
-CUDA_VISIBLE_DEVICES=2,3 torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss
+CUDA_VISIBLE_DEVICES=2,3 torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss --gradient_clipping
 ``` 
    
 When you want to run this code with slurm, **you don't need to set gpu device ids** as shell global environment.  
 ```
-torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss
+torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss --gradient_clipping
 ```   
 
 To avoid overload of CPU multiprocessing, it would be recommended to set ```OMP_NUM_THREADS={}```. 
 ```
 export OMP_NUM_THREADS=14 
-torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss
+torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss --gradient_clipping
 ``` 
 
 ## Pretraining 
 Pretraining Vision Transformer in a self-supervised way by maksed autoencoder.  
 ```
-torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss
+torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitLARGE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss --gradient_clipping
 ```  
+You can choose data by setting ```--study_sample=UKB``` or ```--study_sample=ABCD```.  
+In default, ```--study_sample=UKB```
   
 ## Finetuning
 Finetuning Vision Transformer for downstream tasks.  
@@ -34,5 +36,9 @@ Finetuning Vision Transformer for downstream tasks.
 **If you want to predict categorical variable, you should set ```--cat_target```.**   
 **If you want to predict continuous variable, you should set ```--num_target```.**  
 ```
-torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitLARGE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age
+torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitLARGE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
 ```
+
+You can choose whether use cls token for classification (or regression) or use average pooled latent features for classification (or regression).  
+In default, using average pooled latent features for classification (or regression). Or you can explicitly set ```--global_pool```.  
+If you set ```--cls_token```, then cls token would be used for classification (or regression).  

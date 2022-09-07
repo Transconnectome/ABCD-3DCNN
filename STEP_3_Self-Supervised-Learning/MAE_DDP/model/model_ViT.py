@@ -53,7 +53,7 @@ class VisionTransformer(nn.Module):
         self.global_pool = global_pool
         self.spatial_dims = spatial_dims
         self.num_prefix_tokens = 1 if use_cls_tokens else 0
-        use_fc_norm = global_pool == 'avg' if fc_norm is None else fc_norm
+        global_pool == 'avg' if fc_norm is None else fc_norm
 
         if self.spatial_dims == 2:
             self.patch_embed = PatchEmbed_2D(img_size, patch_size, self.in_channels, embed_dim)
@@ -67,10 +67,11 @@ class VisionTransformer(nn.Module):
         self.blocks = nn.ModuleList([
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer)
             for i in range(depth)])
-        self.norm = norm_layer(embed_dim)
+        self.norm = norm_layer(embed_dim) if not self.global_pool else nn.Identity()
         
         # Classifier Head
-        self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
+        #self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
+        self.fc_norm = norm_layer(embed_dim) if self.global_pool else nn.Identity()
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
         # --------------------------------------------------------------------------
         self.initialize_weights()
@@ -149,15 +150,25 @@ class VisionTransformer(nn.Module):
         # apply Transformer blocks
         for blk in self.blocks:
             x = blk(x)
-        x = self.norm(x)
-
-        return x
+        
+        if self.global_pool:
+            return x
+        else:
+            return self.norm(x)
+        
 
     def forward_head(self, x):
         if self.global_pool:
-             x = x[:, self.num_prefix_tokens:].mean(dim=1) if self.global_pool == 'avg' else x[:, 0]  
-        x = self.fc_norm(x)
+            x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
+            x = self.fc_norm(x)
+        else:
+            x = x[:, 0]
+            x = self.fc_norm(x)     # self.fc_norm = nn.Identity()
+        #if self.global_pool:
+        #    x = x[:, self.num_prefix_tokens:].mean(dim=1) if self.global_pool == 'avg' else x[:, 0]  
+        #x = self.fc_norm(x)
         x = self.head(x)
+
         return x 
 
     def forward(self, x):

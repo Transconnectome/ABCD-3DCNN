@@ -122,7 +122,7 @@ def ViT_validation(net, partition, epoch, num_classes, args):
 def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = ViT.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, num_classes=num_classes)
+    net = ViT.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes)
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -182,8 +182,8 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     val_losses = []
 
     previous_performance = {}
-    previous_performance['ACC'] = []
-    previous_performance['abs_loss'] = []
+    previous_performance['ACC'] = [0.0]
+    previous_performance['abs_loss'] = [100000.0]
 
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):

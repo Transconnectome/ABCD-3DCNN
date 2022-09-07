@@ -53,6 +53,16 @@ parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 
+
+#############################
+#### finetune parameters ####
+#############################
+parser.add_argument('--global_pool', action='store_true')
+parser.set_defaults(global_pool=True)
+parser.add_argument('--cls_token', action='store_false', dest='global_pool',
+                        help='Use class token instead of global pool for classification')
+
+
 #########################
 #### task parameters ####
 #########################
