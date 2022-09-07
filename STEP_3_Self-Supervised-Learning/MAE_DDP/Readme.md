@@ -38,7 +38,7 @@ Finetuning Vision Transformer for downstream tasks.
 ```
 torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitLARGE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
 ```
-
-You can choose whether use cls token for classification (or regression) or use average pooled latent features for classification (or regression).  
-In default, using average pooled latent features for classification (or regression). Or you can explicitly set ```--global_pool```.  
+  
+**You can choose whether use cls token for classification (or regression) or use average pooled latent features for classification (or regression)**.  
+**In default, using average pooled latent features for classification (or regression)**. Or you can explicitly set ```--global_pool```.  
 If you set ```--cls_token```, then cls token would be used for classification (or regression).  
