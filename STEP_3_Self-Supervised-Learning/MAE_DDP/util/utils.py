@@ -54,7 +54,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, performance_result, mode=None):
+def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, performance_result=None, mode=None):
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
     if args.resume == False:
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
