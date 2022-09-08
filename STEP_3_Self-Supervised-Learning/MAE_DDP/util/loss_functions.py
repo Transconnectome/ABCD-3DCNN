@@ -5,11 +5,12 @@ class loss_forward(torch.nn.Module):
     def __init__(self, num_classes):
         super().__init__()
         self.num_classes = num_classes
-        self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
+        self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss(label_smoothing=0.1)
 
     def forward(self, pred_y, true_y):
         assert pred_y.shape[-1] == self.num_classes 
         if self.num_classes > 1:
+            pred_y = torch.nn.functional.softmax(pred_y, dim=1)
             loss = self.criterion(pred_y, true_y.long()) 
         elif self.num_classes == 1: 
             loss = self.criterion(pred_y, true_y.unsqueeze(-1)) 

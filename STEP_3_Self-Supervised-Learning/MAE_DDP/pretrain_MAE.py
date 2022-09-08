@@ -63,7 +63,7 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 #########################
 ## MAE specific params #
 #########################
-parser.add_argument("--model",required=True,type=str,help='',choices=['mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D','mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D'])
+parser.add_argument("--model",required=True,type=str,help='',choices=['mae_vit_base_patch16_2D','mae_vit_large_patch16_2D','mae_vit_huge_patch14_2D','mae_vit_base_patch16_3D','mae_vit_large_patch16_3D','mae_vit_huge_patch14_3D'])
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
@@ -86,6 +86,8 @@ parser.set_defaults(gradient_accumulation=False)
 ##########################
 parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
 parser.add_argument("--exp_name",type=str,required=True,help='')
+parser.add_argument("--load_imagenet_pretrained", action='store_true', help = 'load imagenet pretrained model')
+parser.set_defaults(load_imagenet_pretrained=False)
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
 parser.add_argument("--resume", action='store_true', help = 'if you add this option in the command line like --resume, args.resume would change to be True')
 parser.set_defaults(resume=False)
@@ -112,13 +114,9 @@ if __name__ == "__main__":
     current_dir = os.getcwd()
     image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
     image_files = loading_images(image_dir, args, study_sample=args.study_sample)
-    subject_data, target_list, _ = loading_phenotype(phenotype_dir, args, study_sample=args.study_sample)
-    
-    ## data preprocesing categorical variable and numerical variables
-    imageFiles_labels = combining_image_target(subject_data, image_files, target_list, study_sample=args.study_sample)
 
-    # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables )
-    partition = partition_dataset_pretrain(imageFiles_labels, args)
+    # partitioning dataset and preprocessing 
+    partition = partition_dataset_pretrain(image_files, args)
     ## ====================================== ##
 
 

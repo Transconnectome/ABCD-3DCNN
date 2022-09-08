@@ -15,7 +15,7 @@ from sklearn.metrics import confusion_matrix
 ## ======= load module ======= ##
 import model.model_MAE as MAE
 
-from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed
+from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
 
@@ -106,7 +106,7 @@ def MAE_validation(net, partition, epoch,args):
                 
             # saving example images 
             if i == 0:
-                saving_outputs(net, pred, mask, target, '/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE')
+                saving_outputs(net, pred, mask, target, '/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP')
                 
     return net, np.mean(losses)
 
@@ -115,6 +115,8 @@ def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting network 
     net = MAE.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, norm_pix_loss=args.norm_pix_loss, mask_ratio = args.mask_ratio)
+    if args.load_imagenet_pretrained:
+        net = load_imagenet_pretrained_weight(net, args)
     checkpoint_dir = args.checkpoint_dir
 
 

@@ -124,7 +124,6 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pre
     elif mode == 'finetuning': 
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net = load_pretrained_model(net, model_state)
-        print('The pre-trained model is loaded')
         return net 
 
     """
@@ -199,9 +198,81 @@ def load_pretrained_model(net, model_state):
     # load last norm layer 
     setattr(net, 'norm.weight.data', model_state['net']['norm.weight'])
     setattr(net, 'norm.bias.data', model_state['net']['norm.bias'])
+    print('The pre-trained model is loaded')
     return net    
 
 
+
+def _n2p(w, t=True):
+    if w.ndim == 4 and w.shape[0] == w.shape[1] == w.shape[2] == 1:
+        w = w.flatten()
+    if t:
+        if w.ndim == 4:
+             w = w.transpose([3, 2, 0, 1])
+        elif w.ndim == 3:
+            w = w.transpose([2, 0, 1])
+        elif w.ndim == 2:
+            w = w.transpose([1, 0])
+    return torch.from_numpy(w)
+
+
+def load_imagenet_pretrained_attention_blocks(net, w):
+    for i, block in enumerate(net.blocks):
+        # initial norm layer
+        setattr(net, 'blocks[%s].norm1.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/scale' % str(i)]))
+        setattr(net, 'blocks[%s].norm1.bias.data' % str(i),  _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/bias' % str(i)]))
+        # attention qkv parameters 
+        #setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/scale' % str(i)]))
+        setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), torch.cat([_n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/%s/kernel' % (str(i), n)], t=False).flatten(1).T for n in ('query', 'key', 'value')]))
+        setattr(net, 'blocks[%s].attn.qkv.bias.data' % str(i), torch.cat([_n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/%s/bias' % (str(i), n)], t=False).flatten(1).T for n in ('query', 'key', 'value')]))
+        # attention projection layer
+        setattr(net, 'blocks[%s].attn.proj.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/out/kernel' % str(i)]))
+        setattr(net, 'blocks[%s].attn.proj.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/out/bias' % str(i)]))
+        # last norm layer
+        setattr(net, 'blocks[%s].norm2.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_2/scale' % str(i)]))
+        setattr(net, 'blocks[%s].norm2.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_2/scale' % str(i)]))
+        # fc layer 
+        setattr(net, 'blocks[%s].mlp.fc1.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_0/kernel' % str(i)]))
+        setattr(net, 'blocks[%s].mlp.fc1.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_0/bias' % str(i)]))
+        setattr(net, 'blocks[%s].mlp.fc2.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_1/kernel' % str(i)]))
+        setattr(net, 'blocks[%s].mlp.fc2.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_1/bias' % str(i)]))
+    return net
+             
+
+def load_imagenet_pretrained_weight(net, args):
+    """ 
+    reference: https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
+    Load weights from .npz checkpoints for official Google Brain Flax implementation
+    """
+    if args.model == 'mae_vit_base_patch16_3D':
+        # load numpy file of imagenet pretrained model
+        w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/B_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.0-sd_0.0--imagenet2012-steps_20k-lr_0.01-res_384.npz')
+        # load weight on attention blocks 
+        net = load_imagenet_pretrained_attention_blocks(net, w)
+        # load weight on last norm layer
+        setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+        setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias']))    
+
+    elif args.model == 'mae_vit_large_patch16_3D':
+        # load numpy file of imagenet pretrained model
+        w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz')
+        # load weight on attention blocks 
+        net = load_imagenet_pretrained_attention_blocks(net, w)
+        # load weight on last norm layer
+        setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+        setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias'])) 
+    
+    elif args.model == 'mae_vit_huge_patch14_3D':
+        # load numpy file of imagenet pretrained model
+        w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/ViT-H_14.npz')
+        # load weight on attention blocks 
+        net = load_imagenet_pretrained_attention_blocks(net, w)
+        # load weight on last norm layer
+        setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+        setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias']))
+    print('The ImageNet21K pre-trained model is loaded')     
+
+    return net 
 
 def freezing_layers(module):
     for param in module.parameters():
