@@ -30,7 +30,13 @@ You can choose data by setting ```--study_sample=UKB``` or ```--study_sample=ABC
 In default, ```--study_sample=UKB```  
   
 If you want to use absolute sin-cos positional encoding, add argument ```--use_sincos_pos```.  
-In default, positional encoding is the zero-filled parameters update during training.
+In default, positional encoding is the zero-filled parameters update during training.  
+
+If you want to use relative positional bias **only for encoder**, add argument ```--use_rel_pos_bias```.  
+In default, positional encoding is the zero-filled parameters update during training.  
+
+If you add both argument ```--use_sincos_pos``` and ```--use_rel_pos_bias```, **relative positional bias is used only for encoder** and **absolute sin-cos positional encoding is used only for decoder**.
+
   
 ## Finetuning
 Finetuning Vision Transformer for downstream tasks.  
