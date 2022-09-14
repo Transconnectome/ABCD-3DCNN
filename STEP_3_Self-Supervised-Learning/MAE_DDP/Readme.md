@@ -27,7 +27,10 @@ Pretraining Vision Transformer in a self-supervised way by maksed autoencoder.
 torchrun --standalone --nnodes=1 --nproc_per_node=2 pretrain_MAE.py --model mae_vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 400 --exp_name vitBASE_MAE_MaskRatio0.75_Batch1024  --sbatch  --batch_size 64  --accumulation_steps 4 --norm_pix_loss --gradient_clipping
 ```  
 You can choose data by setting ```--study_sample=UKB``` or ```--study_sample=ABCD```.  
-In default, ```--study_sample=UKB```
+In default, ```--study_sample=UKB```  
+  
+If you want to use absolute sin-cos positional encoding, add argument ```--use_sincos_pos```.  
+In default, positional encoding is the zero-filled parameters update during training.
   
 ## Finetuning
 Finetuning Vision Transformer for downstream tasks.  
@@ -42,3 +45,7 @@ torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D 
 **You can choose whether use cls token for classification (or regression) or use average pooled latent features for classification (or regression)**.  
 **In default, using average pooled latent features for classification (or regression)**. Or you can explicitly set ```--global_pool```.  
 If you set ```--cls_token```, then cls token would be used for classification (or regression).  
+  
+If you want to use absolute sin-cos positional encoding, add argument ```--use_sincos_pos```.  
+If you want to use relative positional bias, add argument ```--use_rel_pos_bias```.  
+In default, positional encoding is the zero-filled parameters update during training.

@@ -52,6 +52,7 @@ parser.add_argument("--study_sample",default='UKB',type=str,required=False,help=
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
+parser.add_argument("--mixup",default=None,type=float,required=False,help='')
 
 
 #############################
@@ -69,11 +70,13 @@ parser.add_argument('--cls_token', action='store_false', dest='global_pool',
 parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
 parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
 
+
 #########################
 ### batch size params ###
 #########################
 parser.add_argument("--batch_size",default=16,type=int,required=False,help='Total batch size. This batch size would be divided by the number of (DDP) proccesses.')
 parser.add_argument("--accumulation_steps",default=1,type=int,required=False,help='mini batch size == accumulation_steps * args.train_batch_size')
+
 
 #########################
 ## ViT specific params #
@@ -82,6 +85,10 @@ parser.add_argument("--model",required=True,type=str,help='',choices=['vit_base_
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
+parser.add_argument("--use_rel_pos_bias",action='store_true',help='Use relative positional bias for positional encoding')
+parser.set_defaults(use_rel_pos_bias=False)
+parser.add_argument("--use_sincos_pos",action='store_true',help='Use relative positional bias for positional encoding')
+parser.set_defaults(use_sincos_pos=False)
 #parser.add_argument("--mask_ratio",required=False,default=0.75,type=float,help='the ratio of random masking')
 #parser.add_argument("--norm_pix_loss",action='store_true',help='Use (per-patch) normalized pixels as targets for computing loss')
 #parser.set_defaults(norm_pix_loss=False)

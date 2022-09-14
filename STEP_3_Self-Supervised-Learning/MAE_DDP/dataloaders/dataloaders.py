@@ -29,18 +29,12 @@ def check_study_sample(study_sample):
 
 
 def loading_images(image_dir, args, study_sample='UKB'):
-    os.chdir(image_dir)
     if study_sample == 'UKB':
-        image_files = glob.glob('*.nii.gz')
+        image_files = glob.glob(os.path.join(image_dir,'*.nii.gz'))
     elif study_sample == 'ABCD':
-        image_files = glob.glob('*.npy')
+        image_files = glob.glob(os.path.join(image_dir,'*.npy'))
     image_files = sorted(image_files)
     #image_files = image_files[:1000]
-
-    # add absolute path to image files
-    for i, image_file in enumerate(image_files):
-        image_files[i] = os.path.join(image_dir, image_file)
-    
     print("Loading image file names as list is completed")
     return image_files
 

@@ -17,7 +17,7 @@ import torch.nn as nn
 from model.layers.patch_embed import PatchEmbed_2D, PatchEmbed_3D
 from .vision_transformer import  Block
 
-from util.pos_embed import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed
+from util.pos_embed import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed, RelativePositionBias2D, RelativePositionBias3D
 
 
 class MaskedAutoencoderViT(nn.Module):
@@ -29,7 +29,7 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, norm_pix_loss=False, spatial_dims=3, mask_ratio=0.75):
+                 mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, norm_pix_loss=False, use_sincos_pos=False, spatial_dims=3, mask_ratio=0.75):
         super().__init__()
 
         # --------------------------------------------------------------------------
@@ -41,14 +41,21 @@ class MaskedAutoencoderViT(nn.Module):
             self.patch_embed = PatchEmbed_2D(img_size, patch_size, self.in_channels, embed_dim)
         elif self.spatial_dims == 3:
             self.patch_embed = PatchEmbed_3D(img_size, patch_size, self.in_channels, embed_dim)
+        self.use_sincos_pos = use_sincos_pos
         
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  # fixed sin-cos embedding
+
+        # positional embedding
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  #  using absolute positional bias for positional encoding. fixed sin-cos embedding  
+
+        # attention block 
         self.blocks = nn.ModuleList([
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer)
             for i in range(depth)])
+        
+        # the last layer normalization
         self.norm = norm_layer(embed_dim)
         # --------------------------------------------------------------------------
 
@@ -58,7 +65,9 @@ class MaskedAutoencoderViT(nn.Module):
 
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
-        self.decoder_pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, decoder_embed_dim), requires_grad=False)  # fixed sin-cos embedding
+        # positional embedding
+        self.decoder_pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, decoder_embed_dim), requires_grad=False)  #  using absolute positional bias for positional encoding. fixed sin-cos embedding  
+        
 
         self.decoder_blocks = nn.ModuleList([
             Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
@@ -78,18 +87,19 @@ class MaskedAutoencoderViT(nn.Module):
     def initialize_weights(self):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
-        if self.spatial_dims == 2:
-            pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
-        elif self.spatial_dims == 3:
-            pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1],int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
+        if self.use_sincos_pos:
+            if self.spatial_dims == 2:
+                pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
+            elif self.spatial_dims == 3:
+                pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1],int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
+            
+            self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         
-        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
-        
-        if self.spatial_dims == 2:
-            decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
-        elif self.spatial_dims == 3:
-            decoder_pos_embed = get_3d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
-        self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
+            if self.spatial_dims == 2:
+                decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
+            elif self.spatial_dims == 3:
+                decoder_pos_embed = get_3d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
+            self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         w = self.patch_embed.proj.weight.data
@@ -207,7 +217,7 @@ class MaskedAutoencoderViT(nn.Module):
         x = self.patch_embed(x)
 
         # add pos embed w/o cls token
-        x = x + self.pos_embed[:, 1:, :]
+        x = x + self.pos_embed[:, 1:, :]    # using absolute positional encoding for positional embedding. 
 
         # masking: length -> length * mask_ratio
         x, mask, ids_restore = self.random_masking(x, mask_ratio)
@@ -235,7 +245,7 @@ class MaskedAutoencoderViT(nn.Module):
         x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token
 
         # add pos embed
-        x = x + self.decoder_pos_embed
+        x = x + self.decoder_pos_embed          # using absolute positional encoding for positional embedding
 
         # apply Transformer blocks
         for blk in self.decoder_blocks:
@@ -320,7 +330,7 @@ def mae_vit_huge_patch14_dec512d8b_2D(**kwargs):
 
 def mae_vit_base_patch16_dec512d8b_3D(**kwargs):
     model = MaskedAutoencoderViT(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768
+        embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768
         decoder_embed_dim=576, decoder_depth=8, decoder_num_heads=16,
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
     return model

@@ -18,7 +18,9 @@ import model.model_ViT as ViT
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
-from util.loss_functions  import loss_forward, calculating_eval_metrics
+from util.loss_functions  import loss_forward, mixup_loss, calculating_eval_metrics
+from util.augmentation import mixup_data
+
 
 import time
 from tqdm import tqdm
@@ -38,7 +40,10 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
     trainloader.sampler.set_epoch(epoch)
 
     losses = []
-    loss_fn = loss_forward(num_classes)
+    if args.mixup:
+        loss_fn = mixup_loss(num_classes)
+    else:
+        loss_fn = loss_forward(num_classes)
 
     eval_metrics = calculating_eval_metrics(num_classes=num_classes)
     
@@ -56,9 +61,15 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
         if loss is calculated inside the model class, the output from the model forward method would be [loss] * number of devices. In other words, len(net(images)) == n_gpus
         """
         #loss, pred, mask  = net(images)
-        with torch.cuda.amp.autocast():
-            pred = net(images)
-            loss = loss_fn(pred, labels)
+        if args.mixup:
+            mixed_images, labels_a, labels_b, lam = mixup_data(images, labels)
+            with torch.cuda.amp.autocast():
+                pred = net(mixed_images)
+                loss = loss_fn(pred, labels_a, labels_b, lam)
+        else:
+            with torch.cuda.amp.autocast():
+                pred = net(images)
+                loss = loss_fn(pred, labels)
         losses.append(loss.item())
         eval_metrics.store(pred, labels)
 
@@ -101,7 +112,10 @@ def ViT_validation(net, partition, epoch, num_classes, args):
     valloader.sampler.set_epoch(epoch)
     
     losses = []
-    loss_fn = loss_forward(num_classes)
+    if args.mixup:
+        loss_fn = mixup_loss(num_classes)
+    else:
+        loss_fn = loss_forward(num_classes)
 
     eval_metrics = calculating_eval_metrics(num_classes=num_classes)    
     with torch.no_grad():
@@ -110,9 +124,15 @@ def ViT_validation(net, partition, epoch, num_classes, args):
             images, labels = data 
             labels = labels.cuda()
             images = images.cuda()
-            with torch.cuda.amp.autocast():
-                pred = net(images)
-                loss = loss_fn(pred, labels)
+            if args.mixup:
+                mixed_images, labels_a, labels_b, lam = mixup_data(images, labels)
+                with torch.cuda.amp.autocast():
+                    pred = net(mixed_images)
+                    loss = loss_fn(pred, labels_a, labels_b, lam)
+            else:
+                with torch.cuda.amp.autocast():
+                    pred = net(images)
+                    loss = loss_fn(pred, labels)
             losses.append(loss.item())
             eval_metrics.store(pred, labels)
                            
@@ -122,7 +142,7 @@ def ViT_validation(net, partition, epoch, num_classes, args):
 def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = ViT.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes)
+    net = ViT.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos)
     checkpoint_dir = args.checkpoint_dir
 
 
