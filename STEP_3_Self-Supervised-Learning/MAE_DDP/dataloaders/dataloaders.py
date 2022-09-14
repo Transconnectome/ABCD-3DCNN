@@ -17,55 +17,83 @@ import monai
 from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop, ScaleIntensity, RandAxisFlip
 from monai.data import ImageDataset
 
-def loading_images(image_dir, args):
-    os.chdir(image_dir)
-    image_files = glob.glob('*.nii.gz')
+def check_study_sample(study_sample):
+    if study_sample == 'UKB':
+        image_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
+    elif study_sample == 'ABCD':
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+    return image_dir, phenotype_dir 
+
+
+
+def loading_images(image_dir, args, study_sample='UKB'):
+    if study_sample == 'UKB':
+        image_files = glob.glob(os.path.join(image_dir,'*.nii.gz'))
+    elif study_sample == 'ABCD':
+        image_files = glob.glob(os.path.join(image_dir,'*.npy'))
     image_files = sorted(image_files)
-    #image_files = image_files[:10000]
+    #image_files = image_files[:1000]
     print("Loading image file names as list is completed")
     return image_files
 
-def loading_phenotype(phenotype_dir, args):
+def loading_phenotype(phenotype_dir, args, study_sample='UKB'):
+    if study_sample == 'UKB':
+        subject_id_col = 'eid'
+    elif study_sample == 'ABCD':
+        subject_id_col = 'subjectkey'
+
     targets = args.cat_target + args.num_target
-    col_list = targets + ['eid']
+    col_list = targets + [subject_id_col]
 
     ### get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
     subject_data = subject_data.loc[:,col_list]
-    subject_data = subject_data.sort_values(by='eid')
+    subject_data = subject_data.sort_values(by=subject_id_col)
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True) # removing subject have NA values in sex
 
     ### preprocessing categorical variables and numerical variables
-    subject_data = preprocessing_cat(subject_data, args)
-    subject_data = preprocessing_num(subject_data, args)
+    if args.cat_target:
+        subject_data = preprocessing_cat(subject_data, args)
+        num_classes = int(subject_data[args.cat_target].nunique().values)
+    if args.num_target:
+        #subject_data = preprocessing_num(subject_data, args)
+        num_classes = 1 
     
-    return subject_data, targets
+    return subject_data, targets, num_classes
 
 
 ## combine categorical + numeric
-def combining_image_target(subject_data, image_files, target_list):
+def combining_image_target(subject_data, image_files, target_list, study_sample='UKB'):
+    if study_sample == 'UKB':
+        subject_id_col = 'eid'
+        suffix_len = -12
+    elif study_sample == 'ABCD':
+        subject_id_col = 'subjectkey'
+        suffix_len = -4
     imageFiles_labels = []
     
     
-    subj= []
-    if type(subject_data['eid'][0]) == np.str_ or type(subject_data['eid'][0]) == str:
+    subj = []
+    if type(subject_data[subject_id_col][0]) == np.str_ or type(subject_data[subject_id_col][0]) == str:
         for i in range(len(image_files)):
-            subj.append(str(image_files[i][:-12]))
-    elif type(subject_data['eid'][0]) == np.int_ or type(subject_data['eid'][0]) == int:
+            subject_id = os.path.split(image_files[i])[-1]
+            subj.append(str(subject_id[:suffix_len]))
+    elif type(subject_data[subject_id_col][0]) == np.int_ or type(subject_data[subject_id_col][0]) == int:
         for i in range(len(image_files)):
-            subj.append(int(image_files[i][:-12]))
+            subject_id = os.path.split(image_files[i])[-1]
+            subj.append(int(subject_id[:suffix_len]))
 
-    image_list = pd.DataFrame({'eid':subj, 'image_files': image_files})
-    subject_data = pd.merge(subject_data, image_list, how='inner', on='eid')
-    subject_data = subject_data.sort_values(by='eid')
+    image_list = pd.DataFrame({subject_id_col:subj, 'image_files': image_files})
+    subject_data = pd.merge(subject_data, image_list, how='inner', on=subject_id_col)
+    subject_data = subject_data.sort_values(by=subject_id_col)
 
-    col_list = target_list + ['image_files']
+    assert len(target_list) == 1  
     
     for i in tqdm(range(len(subject_data))):
-        imageFile_label = {}
-        for j, col in enumerate(col_list):
-            imageFile_label[col] = subject_data[col][i]
+        imageFile_label = (subject_data['image_files'][i], subject_data[target_list[0]][i])
         imageFiles_labels.append(imageFile_label)
         
     return imageFiles_labels
@@ -118,7 +146,7 @@ def partition_dataset_pretrain(imageFiles,args):
 
 
 
-def partition_dataset_finetuning(imageFiles_labels,args):
+def partition_dataset_finetuning(imageFiles_labels, args):
     """train_set for training simCLR
         finetuning_set for finetuning simCLR for prediction task 
         tests_set for evaluating simCLR for prediction task"""
@@ -126,22 +154,21 @@ def partition_dataset_finetuning(imageFiles_labels,args):
 
     images = []
     labels = []
-    targets = args.cat_target + args.num_target
 
     for imageFile_label in imageFiles_labels:
-        image = imageFile_label['image_files']
-        label = {}
-
-        for label_name in targets[:len(targets)]:
-            label[label_name]=imageFile_label[label_name]
-
+        image, label = imageFile_label
         images.append(image)
         labels.append(label)
 
+    train_transform = Compose([AddChannel(),
+                               Resize(tuple(args.img_size)),
+                               RandAxisFlip(prob=0.5),
+                               NormalizeIntensity(),
+                               ToTensor()])
 
     val_transform = Compose([AddChannel(),
-                             ScaleIntensity(),
-                             Resize(tuple(args.resize)),
+                             Resize(tuple(args.img_size)),
+                             NormalizeIntensity(),
                              ToTensor()])
 
 
@@ -166,7 +193,7 @@ def partition_dataset_finetuning(imageFiles_labels,args):
 
     print("Training Sample: {}. Validation Sample: {}. Test Sample: {}".format(len(images_train), len(images_val), len(images_test)))
 
-    train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=val_transform) # return of ContrastiveLearningViewGenerator is [image1, image2]
+    train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
     val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
     test_set = ImageDataset(image_files=images_test,labels=labels_test,transform=val_transform)
 

@@ -54,7 +54,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 # define checkpoint-saving function
 """checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, current_result=None, previous_result=None, mode=None):
+def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, performance_result=None, mode=None):
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
     if args.resume == False:
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
@@ -74,6 +74,16 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, cu
                     'epoch':epoch}, checkpoint_dir)
 
         print("Checkpoint is saved")
+    elif mode == 'finetune':
+        torch.save({'net':net.module.state_dict(), 
+                    'optimizer': optimizer.state_dict(),
+                    'lr': optimizer.param_groups[0]['lr'],
+                    'scheduler': scheduler.state_dict(),
+                    'amp_state': scaler.state_dict(),
+                    'performance': performance_result,
+                    'epoch':epoch}, checkpoint_dir) 
+        print("Checkpoint is saved")       
+
             
     """
     elif mode == 'prediction':
@@ -100,7 +110,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, cu
 
 
 
-def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mode='pretrain'):
+def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain'):
     if mode == 'pretrain':
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net.load_state_dict(model_state['net'])
@@ -109,6 +119,13 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mo
         scaler.load_state_dict(model_state['amp_state'])
         print('The last checkpoint is loaded')
         #return net, optimizer, model_state['epoch']
+        return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'], scaler  
+
+    elif mode == 'finetuning': 
+        model_state = torch.load(checkpoint_dir, map_location = 'cpu')
+        net = load_pretrained_model(net, model_state)
+        return net 
+
     """
     elif mode == 'finetuing':
         model_state = torch.load(checkpoint_dir, map_location='cpu')
@@ -137,7 +154,7 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, args,  mo
         print('The best checkpoint is loaded')
     """
 
-    return net, optimizer, scheduler, model_state['epoch'] + 1, model_state['lr'], scaler  
+    
  
 
 def saving_outputs(net, pred, mask, target, save_dir):
@@ -148,19 +165,120 @@ def saving_outputs(net, pred, mask, target, save_dir):
     print('==== DONE SAVING EXAMPLE IMAGES ====')
 
 
-def load_pretrained_model(net, checkpoint_dir):
-    model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-    net.backbone.load_state_dict(model_state['backbone'])
-    print('The pre-trained model is loaded')
+def load_attention_blocks(net, model_state):
+    for i, block in enumerate(net.blocks): 
+        # initial norm layer
+        setattr(net, 'blocks[%s].norm1.weight.data' % str(i), model_state['net']['blocks.%s.norm1.weight' % str(i)])
+        setattr(net, 'blocks[%s].norm1.bias.data' % str(i), model_state['net']['blocks.%s.norm1.bias' % str(i)])
+        # attention qkv parameters 
+        setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), model_state['net']['blocks.%s.attn.qkv.weight' % str(i)])
+        setattr(net, 'blocks[%s].attn.qkv.bias.data' % str(i), model_state['net']['blocks.%s.attn.qkv.bias' % str(i)])
+        # attention projection layer
+        setattr(net, 'blocks[%s].attn.proj.weight.data' % str(i), model_state['net']['blocks.%s.attn.proj.weight' % str(i)])
+        setattr(net, 'blocks[%s].attn.proj.bias.data' % str(i), model_state['net']['blocks.%s.attn.proj.bias' % str(i)])
+        # last norm layer
+        setattr(net, 'blocks[%s].norm2.weight.data' % str(i), model_state['net']['blocks.%s.norm2.weight' % str(i)])
+        setattr(net, 'blocks[%s].norm2.bias.data' % str(i), model_state['net']['blocks.%s.norm2.bias' % str(i)])
+        # fc layer 
+        setattr(net, 'blocks[%s].mlp.fc1.weight.data' % str(i), model_state['net']['blocks.%s.mlp.fc1.weight' % str(i)])
+        setattr(net, 'blocks[%s].mlp.fc1.bias.data' % str(i), model_state['net']['blocks.%s.mlp.fc1.bias' % str(i)])
+        setattr(net, 'blocks[%s].mlp.fc2.weight.data' % str(i), model_state['net']['blocks.%s.mlp.fc2.weight' % str(i)])
+        setattr(net, 'blocks[%s].mlp.fc2.bias.data' % str(i), model_state['net']['blocks.%s.mlp.fc2.bias' % str(i)])
+        return net
 
+
+def load_pretrained_model(net, model_state):
+    # load positional embedding
+    net.pos_embed.data = model_state['net']['pos_embed']
+    # load patch embedding
+    setattr(net, 'patch_embed.proj.weight.data', model_state['net']['patch_embed.proj.weight'])
+    setattr(net, 'patch_embed.proj.bias.data', model_state['net']['patch_embed.proj.bias'])
+    # load attention blocks 
+    net = load_attention_blocks(net, model_state)
+    # load last norm layer 
+    setattr(net, 'norm.weight.data', model_state['net']['norm.weight'])
+    setattr(net, 'norm.bias.data', model_state['net']['norm.bias'])
+    print('The pre-trained model is loaded')
     return net    
 
+
+
+def _n2p(w, t=True):
+    if w.ndim == 4 and w.shape[0] == w.shape[1] == w.shape[2] == 1:
+        w = w.flatten()
+    if t:
+        if w.ndim == 4:
+             w = w.transpose([3, 2, 0, 1])
+        elif w.ndim == 3:
+            w = w.transpose([2, 0, 1])
+        elif w.ndim == 2:
+            w = w.transpose([1, 0])
+    return torch.from_numpy(w)
+
+
+def load_imagenet_pretrained_attention_blocks(net, w):
+    for i, block in enumerate(net.blocks):
+        # initial norm layer
+        setattr(net, 'blocks[%s].norm1.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/scale' % str(i)]))
+        setattr(net, 'blocks[%s].norm1.bias.data' % str(i),  _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/bias' % str(i)]))
+        # attention qkv parameters 
+        #setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/scale' % str(i)]))
+        setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), torch.cat([_n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/%s/kernel' % (str(i), n)], t=False).flatten(1).T for n in ('query', 'key', 'value')]))
+        setattr(net, 'blocks[%s].attn.qkv.bias.data' % str(i), torch.cat([_n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/%s/bias' % (str(i), n)], t=False).flatten(1).T for n in ('query', 'key', 'value')]))
+        # attention projection layer
+        setattr(net, 'blocks[%s].attn.proj.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/out/kernel' % str(i)]))
+        setattr(net, 'blocks[%s].attn.proj.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/out/bias' % str(i)]))
+        # last norm layer
+        setattr(net, 'blocks[%s].norm2.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_2/scale' % str(i)]))
+        setattr(net, 'blocks[%s].norm2.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_2/scale' % str(i)]))
+        # fc layer 
+        setattr(net, 'blocks[%s].mlp.fc1.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_0/kernel' % str(i)]))
+        setattr(net, 'blocks[%s].mlp.fc1.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_0/bias' % str(i)]))
+        setattr(net, 'blocks[%s].mlp.fc2.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_1/kernel' % str(i)]))
+        setattr(net, 'blocks[%s].mlp.fc2.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_1/bias' % str(i)]))
+    return net
+             
+
+def load_imagenet_pretrained_weight(net, args):
+    """ 
+    reference: https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
+    Load weights from .npz checkpoints for official Google Brain Flax implementation
+    """
+    if args.model == 'mae_vit_base_patch16_3D':
+        # load numpy file of imagenet pretrained model
+        w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/B_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.0-sd_0.0--imagenet2012-steps_20k-lr_0.01-res_384.npz')
+        # load weight on attention blocks 
+        net = load_imagenet_pretrained_attention_blocks(net, w)
+        # load weight on last norm layer
+        setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+        setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias']))    
+
+    elif args.model == 'mae_vit_large_patch16_3D':
+        # load numpy file of imagenet pretrained model
+        w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz')
+        # load weight on attention blocks 
+        net = load_imagenet_pretrained_attention_blocks(net, w)
+        # load weight on last norm layer
+        setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+        setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias'])) 
+    
+    elif args.model == 'mae_vit_huge_patch14_3D':
+        # load numpy file of imagenet pretrained model
+        w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/ViT-H_14.npz')
+        # load weight on attention blocks 
+        net = load_imagenet_pretrained_attention_blocks(net, w)
+        # load weight on last norm layer
+        setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+        setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias']))
+    print('The ImageNet21K pre-trained model is loaded')     
+    del w 
+
+    return net 
 
 def freezing_layers(module):
     for param in module.parameters():
         param.requires_grad = False
     return module
-
 
 
 # define result-saving function
@@ -178,6 +296,8 @@ def save_exp_result(save_dir, setting, result, resume='False'):
 def makedir(path):
     if not os.path.isdir(path):
         os.makedirs(path)
+
+
 
 
 
