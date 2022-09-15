@@ -15,7 +15,7 @@ from sklearn.metrics import confusion_matrix
 ## ======= load module ======= ##
 import model.model_ViT as ViT
 
-from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed
+from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
 from util.loss_functions  import loss_forward, mixup_loss, calculating_eval_metrics
@@ -143,6 +143,8 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
 
     # setting network 
     net = ViT.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos)
+    if args.load_imagenet_pretrained:
+        net = load_imagenet_pretrained_weight(net, args)
     checkpoint_dir = args.checkpoint_dir
 
 

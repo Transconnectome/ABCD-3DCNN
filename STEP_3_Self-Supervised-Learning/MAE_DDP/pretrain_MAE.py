@@ -71,8 +71,6 @@ parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dr
 parser.add_argument("--mask_ratio",required=False,default=0.75,type=float,help='the ratio of random masking')
 parser.add_argument("--norm_pix_loss",action='store_true',help='Use (per-patch) normalized pixels as targets for computing loss')
 parser.set_defaults(norm_pix_loss=False)
-parser.add_argument("--use_rel_pos_bias",action='store_true',help='Use relative positional bias for positional encoding')
-parser.set_defaults(use_rel_pos_bias=False)
 parser.add_argument("--use_sincos_pos",action='store_true',help='Use relative positional bias for positional encoding')
 parser.set_defaults(use_sincos_pos=False)
 
