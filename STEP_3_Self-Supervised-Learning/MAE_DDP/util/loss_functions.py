@@ -56,7 +56,8 @@ class calculating_eval_metrics(torch.nn.Module):
             self.total = torch.cat([self.total, torch.tensor([batch_size])])
             self.correct = torch.cat([self.correct, (predicted == true_y).sum().unsqueeze(0)])
         elif self.num_classes == 1:
-            assert true_y.shape[-1] == pred_y.shape[-1] == 1  
+            if len(true_y.shape) != len(pred_y.shape) != 1:
+                pred_y = pred_y.squeeze(-1)  
             self.true = torch.cat([self.true, true_y])
             self.pred = torch.cat([self.pred, pred_y])
     
@@ -68,6 +69,7 @@ class calculating_eval_metrics(torch.nn.Module):
             result['ACC'] = 100 * self.correct.sum().item() /self.total.sum().item() 
              
         elif self.num_classes == 1:
+            assert len(self.true.shape) == len(self.true.shape) == 1 
             abs_loss_fn = torch.nn.L1Loss() 
             mse_loss_fn = torch.nn.MSELoss()
             abs_loss = abs_loss_fn(self.true, self.pred)

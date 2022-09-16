@@ -244,7 +244,7 @@ def load_imagenet_pretrained_weight(net, args):
     reference: https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
     Load weights from .npz checkpoints for official Google Brain Flax implementation
     """
-    if args.model == 'mae_vit_base_patch16_3D':
+    if args.model.find('vit_base_patch16_3D') != -1:
         # load numpy file of imagenet pretrained model
         w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/B_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.0-sd_0.0--imagenet2012-steps_20k-lr_0.01-res_384.npz')
         # load weight on attention blocks 
@@ -253,7 +253,7 @@ def load_imagenet_pretrained_weight(net, args):
         setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
         setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias']))    
 
-    elif args.model == 'mae_vit_large_patch16_3D':
+    elif args.model.find('vit_large_patch16_3D') != -1:
         # load numpy file of imagenet pretrained model
         w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz')
         # load weight on attention blocks 
@@ -262,7 +262,7 @@ def load_imagenet_pretrained_weight(net, args):
         setattr(net, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
         setattr(net, 'norm.bias.data',_n2p(w['Transformer/encoder_norm/bias'])) 
     
-    elif args.model == 'mae_vit_huge_patch14_3D':
+    elif args.model.find('vit_huge_patch14_3D') != -1:
         # load numpy file of imagenet pretrained model
         w = np.load('/scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/pretrained_model/ViT-H_14.npz')
         # load weight on attention blocks 
