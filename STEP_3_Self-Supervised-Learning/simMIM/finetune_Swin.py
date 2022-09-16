@@ -6,7 +6,7 @@ import model.model_ViT as ViT
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, set_random_seed
 from dataloaders.dataloaders import check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
-from envs.finetuning_experiments import *
+from envs.finetuning_Swin import *
 from util.distributed_parallel import *
 import hashlib
 import datetime
@@ -81,7 +81,7 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 #########################
 ## ViT specific params #
 #########################
-parser.add_argument("--model",required=True,type=str,help='',choices=['vit_base_patch16_3D','vit_large_patch16_3D','vit_huge_patch14_3D','vit_base_patch16_3D','vit_large_patch16_3D','vit_huge_patch14_3D'])
+parser.add_argument("--model",required=True,type=str,help='',choices=['swin_small_3D','swin_base_3D','swin_large_3D'])
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
@@ -173,5 +173,5 @@ if __name__ == "__main__":
 
     # Run MAE Experiment
     torch.backends.cudnn.benchmark = True
-    setting, result = ViT_experiment(partition, num_classes, save_dir, deepcopy(args))
+    setting, result = Swin_experiment(partition, num_classes, save_dir, deepcopy(args))
     save_exp_result(save_dir, setting, result)

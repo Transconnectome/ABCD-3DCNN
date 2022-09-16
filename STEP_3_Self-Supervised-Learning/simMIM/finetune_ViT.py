@@ -6,7 +6,7 @@ import model.model_ViT as ViT
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, set_random_seed
 from dataloaders.dataloaders import check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
-from envs.finetuning_experiments import *
+from envs.finetuning_ViT import *
 from util.distributed_parallel import *
 import hashlib
 import datetime
