@@ -17,6 +17,7 @@ import torch.utils.checkpoint as checkpoint
 
 from model.layers.mlp import Mlp
 from timm.models.layers import DropPath, trunc_normal_
+from .layers.helpers import to_3tuple
 
 
 
@@ -398,14 +399,14 @@ class PatchEmbed3D(nn.Module):
         embed_dim (int): Number of linear projection output channels. Default: 96.
         norm_layer (nn.Module, optional): Normalization layer. Default: None
     """
-    def __init__(self, patch_size=(2,4,4), in_chans=3, embed_dim=96, norm_layer=None):
+    def __init__(self, patch_size=4, in_channels=3, embed_dim=96, norm_layer=None):
         super().__init__()
-        self.patch_size = patch_size
+        self.patch_size = to_3tuple(patch_size)
 
-        self.in_chans = in_chans
+        self.in_chans = in_channels
         self.embed_dim = embed_dim
 
-        self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
         if norm_layer is not None:
             self.norm = norm_layer(embed_dim)
         else:
@@ -424,9 +425,9 @@ class PatchEmbed3D(nn.Module):
 
         x = self.proj(x)  # B C D Wh Ww
         if self.norm is not None:
-            D, Wh, Ww = x.size(2), x.size(3), x.size(4)
+            Wd, Wh, Ww = x.size(2), x.size(3), x.size(4)
             x = x.flatten(2).transpose(1, 2)
             x = self.norm(x)
-            x = x.transpose(1, 2).view(-1, self.embed_dim, D, Wh, Ww)
+            x = x.transpose(1, 2).view(-1, self.embed_dim, Wd, Wh, Ww)
 
         return x
