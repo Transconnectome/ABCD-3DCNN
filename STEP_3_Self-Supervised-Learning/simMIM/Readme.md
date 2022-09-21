@@ -44,7 +44,7 @@ If you want to use relative positional bias **only for encoder**, add argument `
 In default, positional encoding is the zero-filled parameters update during training.  
 
 ### Swin Transformer specific parameters 
-If you want to change the size of window, setting ```--windw_size {int}```. 
+If you want to change the size of window, setting ```--window_size {int}```. 
 
   
 ## Finetuning
