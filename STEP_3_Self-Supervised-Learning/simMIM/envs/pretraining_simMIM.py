@@ -51,7 +51,7 @@ def simMIM_train(net, partition, optimizer, scaler, epoch, args):
         """
         #loss, pred, mask  = net(images)
         with torch.cuda.amp.autocast():
-            loss, _ = net(images, mask)
+            loss, _, _ = net(images, mask)
         losses.append(loss.item())
 
         assert args.accumulation_steps >= 1
@@ -101,9 +101,11 @@ def simMIM_validation(net, partition, epoch, args):
             images = images.cuda()
             mask = mask.cuda()
             with torch.cuda.amp.autocast():
-                loss, images_rec = net(images, mask)
-                if i == 0:  
-                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_reconstruct_%s.npy' % args.model, images_rec.detach().cpu().numpy())
+                loss, images_rec, mask_rec = net(images, mask)
+                if i == 0:
+                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_%s.npy' % args.model, images.detach().cpu().numpy())  
+                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_rec_%s.npy' % args.model, images_rec.detach().cpu().numpy())
+                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/mask_%s.npy' % args.model, mask_rec.detach().cpu().numpy())
             losses.append(loss.item())
                 
     return net, np.mean(losses)
@@ -113,15 +115,18 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting network 
     if args.model.find('swin') != -1:
-        net = simMIM.__dict__[args.model](drop_rate=args.projection_drop, num_classes=0)
+        net = simMIM.__dict__[args.model](window_size=args.window_size, drop_rate=args.projection_drop, num_classes=0)
         # change an attribute of mask generator
         partition['train'].transform.update_config(net.patch_size)
         partition['val'].transform.update_config(net.patch_size)
-    elif args.model.find('vit') != -1:    
-        net = simMIM.__dict__[args.model](img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
+    elif args.model.find('vit') != -1:
+        assert args.model_patch_size == args.mask_patch_size
+        net = simMIM.__dict__[args.model](img_size=args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
         # change an attribute of mask generator
         partition['train'].transform.update_config(net.patch_size)
         partition['val'].transform.update_config(net.patch_size)
+        print('The size of Patch is %i and the size of Mask Patch is %i' % (args.model_patch_size, args.mask_patch_size))
+
     if args.load_imagenet_pretrained:
         net = load_imagenet_pretrained_weight(net, args)
     checkpoint_dir = args.checkpoint_dir
@@ -164,7 +169,7 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
     net.cuda()
 
     # setting DataParallel
-    net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu])
+    net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu], find_unused_parameters=True)
     
     # attach optimizer to cuda device.
     for state in optimizer.state.values():

@@ -124,14 +124,31 @@ class SimMIM(nn.Module):
         self.in_channels = self.encoder.in_channels
         self.patch_size = self.encoder.patch_size
 
+    def patchify_3D(self, imgs):
+        """
+        imgs: (N, in_channel, H, W, D)
+        x: (N, L, patch_size**3 * in_channel)
+        """
+        p = self.encoder.patch_embed.patch_size[0]
+        assert imgs.shape[2] == imgs.shape[3] == imgs.shape[4] and imgs.shape[2] % p == 0
+
+        h = w = d = imgs.shape[2] // p
+        x = imgs.reshape(shape=(imgs.shape[0], self.in_channels, h, p, w, p, d, p))
+        x = torch.einsum('nchpwqdr->nhwdpqrc', x) # Changing the shape of Tensor. This line is same as transpose and permutation. 
+        x = x.reshape(shape=(imgs.shape[0], h * w * d, p**3 * self.in_channels))
+        return x
+
     def forward(self, x, mask):
+        ## original version
+        
         z = self.encoder(x, mask)
         x_rec = self.decoder(z)
         
-        mask = mask.repeat_interleave(self.patch_size, 1).repeat_interleave(self.patch_size, 2).repeat_interleave(self.patch_size, 3).unsqueeze(1).contiguous()
+        mask = mask.repeat_interleave(self.patch_size[0], 1).repeat_interleave(self.patch_size[1], 2).repeat_interleave(self.patch_size[2], 3).unsqueeze(1).contiguous()
         loss_recon = F.l1_loss(x, x_rec, reduction='none')
         loss = (loss_recon * mask).sum() / (mask.sum() + 1e-5) / self.in_channels
-        return loss, x_rec
+        
+        return loss, x_rec, mask
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -174,44 +191,44 @@ class PixelShuffle3D(nn.Module):
 
 def simMIM_swin_small_patch4_window8_3D(**kwargs):
     encoder = SwinTransformerForSimMIM(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24], window_size=(8,8,8),             
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],            
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    model = SimMIM(encoder=encoder, encoder_stride=32)     # encoder_stride == prediction resolution. In the original paper no less than 1 /16 of original image size perform well
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0]*encoder.window_size[0])     # encoder_stride == prediction resolution. In the original paper no less than 1 /16 of original image size perform well
     return model
 
 def simMIM_swin_base_patch4_window8_3D(**kwargs):
     encoder = SwinTransformerForSimMIM(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32], window_size=(8,8,8),                
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],               
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     model = SimMIM(encoder=encoder, encoder_stride=32)
     return model
 
 def simMIM_swin_large_patch4_window8_3D(**kwargs):
     encoder = SwinTransformerForSimMIM(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[2, 2, 18, 2], window_size=(8,8,8),                
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[2, 2, 18, 2],                 
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     model = SimMIM(encoder=encoder, encoder_stride=32)
     return model
 
 def simMIM_vit_base_patch16_dec512d8b_3D(**kwargs):
     encoder = VisionTransformerForSimMIM(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768
+        embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
-    model = SimMIM(encoder=encoder, encoder_stride=16)
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0])       # In case of vision transformer, assert  encoder_stride = encoder.mask_patch_size = encoder.model_patch_size
     return model
 
 def simMIM_vit_large_patch16_dec512d8b_3D(**kwargs):
     encoder = VisionTransformerForSimMIM(
-        patch_size=16, embed_dim=1024, depth=24, num_heads=16,              # original encoder embed_dim = 1024
+        embed_dim=1024, depth=24, num_heads=16,              # original encoder embed_dim = 1024
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
-    model = SimMIM(encoder=encoder, encoder_stride=16)
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0])
     return model
 
 def simMIM_vit_huge_patch14_dec512d8b_3D(**kwargs):
     encoder = VisionTransformerForSimMIM(
-        patch_size=14, embed_dim=1280, depth=32, num_heads=16,              # original encoder embed_dim = 1280
+        embed_dim=1280, depth=32, num_heads=16,              # original encoder embed_dim = 1280
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
-    model = SimMIM(encoder=encoder, encoder_stride=16)
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0])
     return model
 
 simMIM_swin_small_3D = simMIM_swin_small_patch4_window8_3D

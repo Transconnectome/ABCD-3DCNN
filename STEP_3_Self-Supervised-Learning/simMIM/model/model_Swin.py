@@ -25,6 +25,7 @@ from timm.models.layers import trunc_normal_
 from mmcv.runner import load_checkpoint
 
 from .swin_transformer import PatchEmbed3D, PatchMerging3D, BasicLayer
+from .layers.helpers import to_3tuple
 
 class SwinTransformer3D(nn.Module):
     """ Swin Transformer backbone.
@@ -58,7 +59,7 @@ class SwinTransformer3D(nn.Module):
                  embed_dim=96,
                  depths=[2, 2, 6, 2],
                  num_heads=[3, 6, 12, 24],
-                 window_size=(2,7,7),
+                 window_size=4,
                  mlp_ratio=4.,
                  qkv_bias=True,
                  qk_scale=None,
@@ -77,8 +78,8 @@ class SwinTransformer3D(nn.Module):
         self.embed_dim = embed_dim
         self.patch_norm = patch_norm
         self.frozen_stages = frozen_stages
-        self.window_size = window_size
-        self.patch_size = patch_size
+        self.window_size = window_size = to_3tuple(window_size)
+        self.patch_size = to_3tuple(patch_size)
         self.in_channels = in_channels
         self.num_classes = num_classes
 
@@ -246,19 +247,19 @@ class SwinTransformer3D(nn.Module):
 
 def swin_small_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24], window_size=(8,8,8),             
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
 def swin_base_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32], window_size=(8,8,8),                
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
 def swin_large_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[2, 2, 18, 2], window_size=(8,8,8),                
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[2, 2, 18, 2],                
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 

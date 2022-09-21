@@ -142,7 +142,7 @@ def Swin_validation(net, partition, epoch, num_classes, args):
 def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = Swin.__dict__[args.model](drop_rate=args.projection_drop, num_classes=num_classes)
+    net = Swin.__dict__[args.model](window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
     if args.load_imagenet_pretrained:
         net = load_imagenet_pretrained_weight(net, args)
     checkpoint_dir = args.checkpoint_dir

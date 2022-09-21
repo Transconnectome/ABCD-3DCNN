@@ -36,7 +36,7 @@ def loading_images(image_dir, args, study_sample='UKB'):
     elif study_sample == 'ABCD':
         image_files = glob.glob(os.path.join(image_dir,'*.npy'))
     image_files = sorted(image_files)
-    #image_files = image_files[:1000]
+    image_files = image_files[:1000]
     print("Loading image file names as list is completed")
     return image_files
 
@@ -134,8 +134,8 @@ def partition_dataset_pretrain(imageFiles, args):
 
     print("Training Sample: {}".format(len(images_train)))
 
-    train_set = ImageDataset(image_files=images_train,transform=MaskGenerator(train_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio)) 
-    val_set = ImageDataset(image_files=images_val,transform=MaskGenerator(val_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio))
+    train_set = ImageDataset(image_files=images_train,transform=MaskGenerator(train_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size)) 
+    val_set = ImageDataset(image_files=images_val,transform=MaskGenerator(val_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size))
     #test_set = ImageDataset(image_files=images_test,transform=val_transform)
 
     partition = {}
@@ -216,10 +216,15 @@ class MaskGenerator:
     def __init__(self, transform, input_size=192, mask_patch_size=16, model_patch_size=4, mask_ratio=0.6):
         self.transform = transform
         self.input_size = input_size
-        self.mask_patch_size = mask_patch_size
         self.model_patch_size = model_patch_size
         self.mask_ratio = mask_ratio
-        
+
+        if isinstance(mask_patch_size, tuple):
+            assert mask_patch_size[0] == mask_patch_size[1] == mask_patch_size[2]
+            self.mask_patch_size = mask_patch_size[0]
+        elif isinstance(mask_patch_size, int): 
+            self.mask_patch_size = mask_patch_size
+
         assert self.input_size % self.mask_patch_size == 0
         assert self.mask_patch_size % self.model_patch_size == 0
         
@@ -230,6 +235,9 @@ class MaskGenerator:
         self.mask_count = int(np.ceil(self.token_count * self.mask_ratio))
     
     def update_config(self, model_patch_size):
+        if isinstance(model_patch_size, tuple):
+            assert model_patch_size[0] == model_patch_size[1] == model_patch_size[2]
+            model_patch_size = model_patch_size[0]
         self.model_patch_size = model_patch_size
         self.scale = self.mask_patch_size // model_patch_size
         

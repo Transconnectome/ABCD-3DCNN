@@ -64,11 +64,15 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 ## simMIM specific params #
 #########################
 parser.add_argument("--model",required=True,type=str,help='',choices=['simMIM_swin_small_3D', 'simMIM_swin_base_3D', 'simMIM_swin_large_3D','simMIM_vit_base_patch16_3D', 'simMIM_vit_large_patch16_3D', 'simMIM_vit_huge_patch16_3D'])
-parser.add_argument("--patch_size",default=4,type=int,required=False,help='The size of patch used for patch emebdding.')
+parser.add_argument("--mask_patch_size",default=16,type=int,required=False,help='The size of mask patch used for patch emebdding.')
+parser.add_argument("--model_patch_size",default=16,type=int,required=False,help='The size of model patch used for patch emebdding.')
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
 parser.add_argument("--mask_ratio",required=False,default=0.6,type=float,help='the ratio of random masking')
+# Swin specific parameters
+parser.add_argument("--window_size",default=8,type=int,required=False,help='The size of window.')
+# ViT specific parameters 
 parser.add_argument("--use_rel_pos_bias",action='store_true',help='Use relative positional bias for positional encoding')
 parser.set_defaults(use_rel_pos_bias=False)
 parser.add_argument("--use_sincos_pos",action='store_true',help='Use relative positional bias for positional encoding')
