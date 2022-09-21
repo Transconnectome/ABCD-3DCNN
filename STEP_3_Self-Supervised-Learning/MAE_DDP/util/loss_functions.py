@@ -70,6 +70,7 @@ class calculating_eval_metrics(torch.nn.Module):
              
         elif self.num_classes == 1:
             assert len(self.true.shape) == len(self.true.shape) == 1 
+            #self.true, self.pred = self.true.unsqueeze(-1), self.pred.unsqueeze(-1)
             abs_loss_fn = torch.nn.L1Loss() 
             mse_loss_fn = torch.nn.MSELoss()
             abs_loss = abs_loss_fn(self.true, self.pred)
@@ -89,6 +90,6 @@ class calculating_eval_metrics(torch.nn.Module):
         mean_y = y.mean()
         stdev_y = y.var()**0.5
 
-        return (x - mean_x) / stdev_x, (y - mean_y) / stdev_y
+        return (x - mean_x) / (stdev_x + 1e-8), (y - mean_y) / (stdev_y + 1e-8)
 
 
