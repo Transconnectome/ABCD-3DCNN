@@ -3,6 +3,8 @@ from os import listdir
 from os.path import isfile, join
 import glob
 
+from matplotlib import transforms
+
 
 from util.utils import case_control_count
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
@@ -34,7 +36,7 @@ def loading_images(image_dir, args, study_sample='UKB'):
     elif study_sample == 'ABCD':
         image_files = glob.glob(os.path.join(image_dir,'*.npy'))
     image_files = sorted(image_files)
-    #image_files = image_files[:1000]
+    image_files = image_files[:1000]
     print("Loading image file names as list is completed")
     return image_files
 
@@ -100,17 +102,17 @@ def combining_image_target(subject_data, image_files, target_list, study_sample=
 
 
 
-def partition_dataset_pretrain(imageFiles,args):
+def partition_dataset_pretrain(imageFiles, args):
 
     train_transform = Compose([AddChannel(),
                                Resize(tuple(args.img_size)),
                                RandAxisFlip(prob=0.5),
-                               NormalizeIntensity(),
+                               ScaleIntensity(),
                                ToTensor()])
 
     val_transform = Compose([AddChannel(),
                              Resize(tuple(args.img_size)),
-                             NormalizeIntensity(),
+                             ScaleIntensity(),
                              ToTensor()])
 
 
@@ -132,8 +134,8 @@ def partition_dataset_pretrain(imageFiles,args):
 
     print("Training Sample: {}".format(len(images_train)))
 
-    train_set = ImageDataset(image_files=images_train,transform=train_transform) 
-    val_set = ImageDataset(image_files=images_val,transform=val_transform)
+    train_set = ImageDataset(image_files=images_train,transform=MaskGenerator(train_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size)) 
+    val_set = ImageDataset(image_files=images_val,transform=MaskGenerator(val_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size))
     #test_set = ImageDataset(image_files=images_test,transform=val_transform)
 
     partition = {}
@@ -163,12 +165,12 @@ def partition_dataset_finetuning(imageFiles_labels, args):
     train_transform = Compose([AddChannel(),
                                Resize(tuple(args.img_size)),
                                RandAxisFlip(prob=0.5),
-                               NormalizeIntensity(),
+                               ScaleIntensity(),
                                ToTensor()])
 
     val_transform = Compose([AddChannel(),
                              Resize(tuple(args.img_size)),
-                             NormalizeIntensity(),
+                             ScaleIntensity(),
                              ToTensor()])
 
 
@@ -208,3 +210,43 @@ def partition_dataset_finetuning(imageFiles_labels, args):
 
     return partition
 ## ====================================== ##
+
+
+class MaskGenerator:
+    def __init__(self, transform, input_size=192, mask_patch_size=16, model_patch_size=4, mask_ratio=0.6):
+        self.transform = transform
+        self.input_size = input_size
+        self.model_patch_size = model_patch_size
+        self.mask_ratio = mask_ratio
+
+        if isinstance(mask_patch_size, tuple):
+            assert mask_patch_size[0] == mask_patch_size[1] == mask_patch_size[2]
+            self.mask_patch_size = mask_patch_size[0]
+        elif isinstance(mask_patch_size, int): 
+            self.mask_patch_size = mask_patch_size
+
+        assert self.input_size % self.mask_patch_size == 0
+        assert self.mask_patch_size % self.model_patch_size == 0
+        
+        self.rand_size = self.input_size // self.mask_patch_size
+        self.scale = self.mask_patch_size // self.model_patch_size
+        
+        self.token_count = self.rand_size ** 3
+        self.mask_count = int(np.ceil(self.token_count * self.mask_ratio))
+    
+    def update_config(self, model_patch_size):
+        if isinstance(model_patch_size, tuple):
+            assert model_patch_size[0] == model_patch_size[1] == model_patch_size[2]
+            model_patch_size = model_patch_size[0]
+        self.model_patch_size = model_patch_size
+        self.scale = self.mask_patch_size // model_patch_size
+        
+    def __call__(self, img):
+        mask_idx = np.random.permutation(self.token_count)[:self.mask_count]
+        mask = np.zeros(self.token_count, dtype=int)
+        mask[mask_idx] = 1
+        
+        mask = mask.reshape((self.rand_size, self.rand_size, self.rand_size))
+        mask = mask.repeat(self.scale, axis=0).repeat(self.scale, axis=1).repeat(self.scale, axis=2)
+        
+        return (self.transform(img), mask)

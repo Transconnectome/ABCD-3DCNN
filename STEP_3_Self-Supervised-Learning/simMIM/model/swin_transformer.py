@@ -17,6 +17,7 @@ import torch.utils.checkpoint as checkpoint
 
 from model.layers.mlp import Mlp
 from timm.models.layers import DropPath, trunc_normal_
+from .layers.helpers import to_3tuple
 
 
 
@@ -252,7 +253,7 @@ class SwinTransformerBlock3D(nn.Module):
         return x
 
 
-class PatchMerging(nn.Module):
+class PatchMerging3D(nn.Module):
     """ Patch Merging Layer
     Args:
         dim (int): Number of input channels.
@@ -261,8 +262,8 @@ class PatchMerging(nn.Module):
     def __init__(self, dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.dim = dim
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
-        self.norm = norm_layer(4 * dim)
+        self.reduction = nn.Linear(8 * dim, 2 * dim, bias=False)
+        self.norm = norm_layer(8 * dim)
 
     def forward(self, x):
         """ Forward function.
@@ -272,16 +273,19 @@ class PatchMerging(nn.Module):
         B, D, H, W, C = x.shape
 
         # padding
-        pad_input = (H % 2 == 1) or (W % 2 == 1)
+        pad_input = (D % 2 == 1) or (H % 2 == 1) or (W % 2 == 1)
         if pad_input:
-            x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
+            x = F.pad(x, (0, D % 2, 0, W % 2, 0, H % 2))
 
-        x0 = x[:, :, 0::2, 0::2, :]  # B D H/2 W/2 C
-        x1 = x[:, :, 1::2, 0::2, :]  # B D H/2 W/2 C
-        x2 = x[:, :, 0::2, 1::2, :]  # B D H/2 W/2 C
-        x3 = x[:, :, 1::2, 1::2, :]  # B D H/2 W/2 C
-        x = torch.cat([x0, x1, x2, x3], -1)  # B D H/2 W/2 4*C
-
+        x0 = x[:, 0::2, 0::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x1 = x[:, 1::2, 0::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x2 = x[:, 0::2, 1::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x3 = x[:, 0::2, 0::2, 1::2, :]  # B D/2 H/2 W/2 C
+        x4 = x[:, 0::2, 1::2, 1::2, :]  # B D/2 H/2 W/2 C
+        x5 = x[:, 1::2, 0::2, 1::2, :]  # B D/2 H/2 W/2 C
+        x6 = x[:, 1::2, 1::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x7 = x[:, 1::2, 1::2, 1::2, :]  # B D/2 H/2 W/2 C   
+        x = torch.cat([x0, x1, x2, x3, x4, x5, x6, x7], -1)  # B D/2 H/2 W/2 8*C     
         x = self.norm(x)
         x = self.reduction(x)
 
@@ -395,14 +399,14 @@ class PatchEmbed3D(nn.Module):
         embed_dim (int): Number of linear projection output channels. Default: 96.
         norm_layer (nn.Module, optional): Normalization layer. Default: None
     """
-    def __init__(self, patch_size=(2,4,4), in_chans=3, embed_dim=96, norm_layer=None):
+    def __init__(self, patch_size=4, in_channels=3, embed_dim=96, norm_layer=None):
         super().__init__()
-        self.patch_size = patch_size
+        self.patch_size = to_3tuple(patch_size)
 
-        self.in_chans = in_chans
+        self.in_chans = in_channels
         self.embed_dim = embed_dim
 
-        self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj = nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
         if norm_layer is not None:
             self.norm = norm_layer(embed_dim)
         else:
@@ -421,9 +425,9 @@ class PatchEmbed3D(nn.Module):
 
         x = self.proj(x)  # B C D Wh Ww
         if self.norm is not None:
-            D, Wh, Ww = x.size(2), x.size(3), x.size(4)
+            Wd, Wh, Ww = x.size(2), x.size(3), x.size(4)
             x = x.flatten(2).transpose(1, 2)
             x = self.norm(x)
-            x = x.transpose(1, 2).view(-1, self.embed_dim, D, Wh, Ww)
+            x = x.transpose(1, 2).view(-1, self.embed_dim, Wd, Wh, Ww)
 
         return x

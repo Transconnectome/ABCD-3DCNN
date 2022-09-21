@@ -19,9 +19,10 @@ from model.layers.patch_embed import PatchEmbed_2D, PatchEmbed_3D
 from .vision_transformer import  Block
 
 from util.pos_embed import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed
+from .layers.helpers import to_3tuple
 
 
-class VisionTransformer(nn.Module):
+class VisionTransformer3D(nn.Module):
 
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
@@ -49,6 +50,8 @@ class VisionTransformer(nn.Module):
 
         # --------------------------------------------------------------------------
         # ViT encoder specifics
+        self.num_features = self.embed_dim = embed_dim
+        self.patch_size = patch_size = to_3tuple(patch_size)
         self.num_classes = num_classes
         self.in_channels = in_channels
         self.global_pool = global_pool
@@ -71,9 +74,11 @@ class VisionTransformer(nn.Module):
         else:
             self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  #  using absolute positional bias for positional encoding. fixed sin-cos embedding  
 
+        self.pos_drop = nn.Dropout(p=drop)
+
         # attention block 
         self.blocks = nn.ModuleList([
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer, window_size=self.patch_embed.patch_size if use_rel_pos_bias else None, spatial_dims=self.spatial_dims)
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer, window_size=self.patch_embed.grid_size if use_rel_pos_bias else None, spatial_dims=self.spatial_dims)
             for i in range(depth)])
 
         # the last layer normalization
@@ -162,8 +167,10 @@ class VisionTransformer(nn.Module):
             cls_token = self.cls_token
 
         # append cls token
-        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
-        x = torch.cat((cls_tokens, x), dim=1)
+        cls_token = cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_token, x), dim=1)
+
+        x = self.pos_drop(x)
 
         # apply Transformer blocks
         for blk in self.blocks:
@@ -196,40 +203,40 @@ class VisionTransformer(nn.Module):
 
 
 def vit_base_patch16_dec512d8b_2D(**kwargs):
-    model = VisionTransformer(
+    model = VisionTransformer3D(
         patch_size=16, embed_dim=768, depth=12, num_heads=12,              # original embed_dim = 768
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=2, **kwargs)
     return model
 
 
 def vit_large_patch16_dec512d8b_2D(**kwargs):
-    model = VisionTransformer(
+    model = VisionTransformer3D(
         patch_size=16, embed_dim=1024, depth=24, num_heads=16,              # original embed_dim = 1024
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=2, **kwargs)
     return model
 
 
 def vit_huge_patch14_dec512d8b_2D(**kwargs):
-    model = VisionTransformer(
-        patch_size=14, embed_dim=1280, depth=32, num_heads=16,              # original embed_dim = 1280
+    model = VisionTransformer3D(
+        embed_dim=1280, depth=32, num_heads=16,              # original embed_dim = 1280
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=2, **kwargs)
     return model
 
 def vit_base_patch16_dec512d8b_3D(**kwargs):
-    model = VisionTransformer(
+    model = VisionTransformer3D(
         embed_dim=1152, depth=12, num_heads=12,              # original encoder embed_dim = 768
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
     return model
 
 def vit_large_patch16_dec512d8b_3D(**kwargs):
-    model = VisionTransformer(
+    model = VisionTransformer3D(
         embed_dim=1024, depth=24, num_heads=16,              # original encoder embed_dim = 1024
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
     return model
 
 
 def vit_huge_patch14_dec512d8b_3D(**kwargs):
-    model = VisionTransformer(
+    model = VisionTransformer3D(
         embed_dim=1280, depth=32, num_heads=16,              # original encoder embed_dim = 1280
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
     return model

@@ -71,11 +71,11 @@ class Attention(nn.Module):
 
             elif self.spatial_dims == 3: 
                 self.window_size = window_size
-                self.relative_position_bias_table = nn.Parameter(
-                    torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1) * (2 * window_size[2] - 1), num_heads))  # 2*Wd-1 * 2*Wh-1 * 2*Ww-1, nH
-#                self.num_relative_distance = (2 * window_size[0] - 1) * (2 * window_size[1] - 1) * (2 * window_size[2] - 1) + 3
 #                self.relative_position_bias_table = nn.Parameter(
-#                    torch.zeros((self.num_relative_distance, num_heads)))  # 2*Wd-1 * 2*Wh-1 * 2*Ww-1, nH
+#                    torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1) * (2 * window_size[2] - 1), num_heads))  # 2*Wd-1 * 2*Wh-1 * 2*Ww-1, nH
+                self.num_relative_distance = (2 * window_size[0] - 1) * (2 * window_size[1] - 1) * (2 * window_size[2] - 1) + 3
+                self.relative_position_bias_table = nn.Parameter(
+                    torch.zeros((self.num_relative_distance, num_heads)))  # 2*Wd-1 * 2*Wh-1 * 2*Ww-1, nH
                 # cls to token & token 2 cls & cls to cls
 
                 # get pair-wise relative position index for each token inside the window
@@ -92,14 +92,14 @@ class Attention(nn.Module):
 
                 relative_coords[:, :, 0] *= (2 * self.window_size[1] - 1) * (2 * self.window_size[2] - 1)
                 relative_coords[:, :, 1] *= (2 * self.window_size[2] - 1)
-                relative_position_index = relative_coords.sum(-1)  # Wd*Wh*Ww, Wd*Wh*Ww
-                
-#                relative_position_index = \
-#                    torch.zeros(size=(window_size[0] * window_size[1] * window_size[2] + 1,) * 2, dtype=relative_coords.dtype)
-#                relative_position_index[1:, 1:] = relative_coords.sum(-1)  # Wd*Wh*Ww, Wd*Wh*Ww
-#                relative_position_index[0, 0:] = self.num_relative_distance - 3
-#                relative_position_index[0:, 0] = self.num_relative_distance - 2
-#                relative_position_index[0, 0] = self.num_relative_distance - 1
+#                relative_position_index = relative_coords.sum(-1)  # Wd*Wh*Ww, Wd*Wh*Ww
+#                print(window_size, relative_coords.shape)
+                relative_position_index = \
+                    torch.zeros(size=(window_size[0] * window_size[1] * window_size[2] + 1,) * 2, dtype=relative_coords.dtype)
+                relative_position_index[1:, 1:] = relative_coords.sum(-1)  # Wd*Wh*Ww, Wd*Wh*Ww
+                relative_position_index[0, 0:] = self.num_relative_distance - 3
+                relative_position_index[0:, 0] = self.num_relative_distance - 2
+                relative_position_index[0, 0] = self.num_relative_distance - 1
                 
                 self.register_buffer("relative_position_index", relative_position_index)
             torch.nn.init.normal_(self.relative_position_bias_table, std=.02)
@@ -123,10 +123,10 @@ class Attention(nn.Module):
 
 
         if self.relative_position_bias_table is not None:
-            relative_position_bias = self.relative_position_bias_table[self.relative_position_index[:N, :N].reshape(-1)].reshape(N,N, -1)  # Wh*Ww*Wd,Wh*Ww*Wd,nH
-#            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
-#                    self.window_size[0] * self.window_size[1] * self.window_size[2] + 1,
-#                    self.window_size[0] * self.window_size[1] * self.window_size[2] + 1, -1)
+#            relative_position_bias = self.relative_position_bias_table[self.relative_position_index[:N, :N].reshape(-1)].reshape(N,N, -1)  # Wh*Ww*Wd,Wh*Ww*Wd,nH
+            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
+                    self.window_size[0] * self.window_size[1] * self.window_size[2] + 1,
+                    self.window_size[0] * self.window_size[1] * self.window_size[2] + 1, -1)
             relative_position_bias = relative_position_bias.permute(2, 1, 0).contiguous()  # nH, Wh*Ww*Wd, Wh*Ww*Wd 
             attn = attn + relative_position_bias.unsqueeze(0)   # B_, nH, N, N
         

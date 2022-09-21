@@ -24,7 +24,8 @@ import torch.nn.functional as F
 from timm.models.layers import trunc_normal_
 from mmcv.runner import load_checkpoint
 
-from swin_transformer import PatchEmbed3D, PatchMerging, BasicLayer
+from .swin_transformer import PatchEmbed3D, PatchMerging3D, BasicLayer
+from .layers.helpers import to_3tuple
 
 class SwinTransformer3D(nn.Module):
     """ Swin Transformer backbone.
@@ -52,13 +53,13 @@ class SwinTransformer3D(nn.Module):
     def __init__(self,
                  pretrained=None,
                  pretrained2d=True,
-                 patch_size=(4,4,4),
+                 patch_size=4,
                  num_classes=1,
-                 in_chans=1,
+                 in_channels=1,
                  embed_dim=96,
                  depths=[2, 2, 6, 2],
                  num_heads=[3, 6, 12, 24],
-                 window_size=(2,7,7),
+                 window_size=4,
                  mlp_ratio=4.,
                  qkv_bias=True,
                  qk_scale=None,
@@ -77,12 +78,14 @@ class SwinTransformer3D(nn.Module):
         self.embed_dim = embed_dim
         self.patch_norm = patch_norm
         self.frozen_stages = frozen_stages
-        self.window_size = window_size
-        self.patch_size = patch_size
+        self.window_size = window_size = to_3tuple(window_size)
+        self.patch_size = to_3tuple(patch_size)
+        self.in_channels = in_channels
+        self.num_classes = num_classes
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
-            patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim,
+            patch_size=patch_size, in_channels=in_channels, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
 
         self.pos_drop = nn.Dropout(p=drop_rate)
@@ -105,14 +108,17 @@ class SwinTransformer3D(nn.Module):
                 attn_drop=attn_drop_rate,
                 drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
                 norm_layer=norm_layer,
-                downsample=PatchMerging if i_layer<self.num_layers-1 else None,
+                downsample=PatchMerging3D if i_layer<self.num_layers-1 else None,
                 use_checkpoint=use_checkpoint)
             self.layers.append(layer)
 
         self.num_features = int(embed_dim * 2**(self.num_layers-1))
 
-        # add a norm layer for each output
+        # the last norm layer
         self.norm = norm_layer(self.num_features)
+
+        # the last pooling layer
+        self.avgpool = nn.AdaptiveAvgPool1d(1)
 
         # predition head
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
@@ -229,30 +235,31 @@ class SwinTransformer3D(nn.Module):
 
         for layer in self.layers:
             x = layer(x.contiguous())
-
-        x = rearrange(x, 'n c d h w -> n d h w c')
-        x = self.norm(x)
-        x = rearrange(x, 'n d h w c -> n c d h w')
-        print(x.shape)
+        
+        x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C
+        x = self.norm(x)  # B L C
+        x = self.avgpool(x.transpose(1, 2))  # B C 1
+        x = torch.flatten(x, 1)
+        x = self.head(x)
 
         return x
 
 
 def swin_small_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=(4,4,4), depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24], window_size=(8,8,8),             
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
 def swin_base_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=(4,4,4), depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32], window_size=(8,8,8),                
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
 def swin_large_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=(4,4,4), depths=[2, 2, 18, 2], embed_dim=192, num_heads=[2, 2, 18, 2], window_size=(8,8,8),                
+        patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[2, 2, 18, 2],                
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
