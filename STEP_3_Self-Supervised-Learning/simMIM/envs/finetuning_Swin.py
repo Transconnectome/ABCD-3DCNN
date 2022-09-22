@@ -140,11 +140,21 @@ def Swin_validation(net, partition, epoch, num_classes, args):
 
 
 def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
-
-    # setting network 
-    net = Swin.__dict__[args.model](window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
     if args.load_imagenet_pretrained:
-        net = load_imagenet_pretrained_weight(net, args)
+        pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
+        pretrained2d = True
+    else: 
+        pretrained_weight = None 
+        pretrained2d = False 
+
+    if args.pretrained_model is not None: 
+        pretrained_weight = args.pretrained_model
+        pretrained2d = False 
+        simMIM_pretrained = True 
+
+        
+    # setting network 
+    net = Swin.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -173,12 +183,7 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
 
     # loading pre-trained model or last checkpoint 
     if args.resume == False: # loading pre-trained model
-        if args.pretrained_model != None:
-            net = checkpoint_load(net, args.pretrained_model, optimizer, scheduler, scaler, mode='finetuning')
-            last_epoch = 0 
-            print('Training start from pretrained model.')
-        else: 
-            last_epoch = 0 
+        last_epoch = 0 
     elif args.resume == True:  # loading last checkpoint 
         if args.checkpoint_dir != None:
             net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain')

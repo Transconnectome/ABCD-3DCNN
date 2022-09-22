@@ -96,6 +96,7 @@ parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.add_argument("--load_imagenet_pretrained", action='store_true', help = 'load imagenet pretrained model')
 parser.set_defaults(load_imagenet_pretrained=False)
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
+parser.add_argument("--pretrained_model", type=str, default=None,required=False)
 parser.add_argument("--resume", action='store_true', help = 'if you add this option in the command line like --resume, args.resume would change to be True')
 parser.set_defaults(resume=False)
     

@@ -36,7 +36,7 @@ def loading_images(image_dir, args, study_sample='UKB'):
     elif study_sample == 'ABCD':
         image_files = glob.glob(os.path.join(image_dir,'*.npy'))
     image_files = sorted(image_files)
-    #image_files = image_files[:1000]
+    image_files = image_files[:1000]
     print("Loading image file names as list is completed")
     return image_files
 

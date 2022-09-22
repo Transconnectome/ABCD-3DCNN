@@ -85,7 +85,7 @@ class VisionTransformerForSimMIM(VisionTransformer3D):
         x = x * (1 - w) + mask_token * w
 
         if self.pos_embed is not None:           # using absolute positional encoding for positional embedding. 
-            x = x + self.pos_embed
+            x = x + self.pos_embed[:, 1:, :]
             cls_token = self.cls_token + self.pos_embed[:, :1, :]
         else:                                    # else using relative positional bias for positional embedding (if using relative positional bias, self.pos_embed = None)
             cls_token = self.cls_token

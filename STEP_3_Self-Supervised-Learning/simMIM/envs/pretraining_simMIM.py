@@ -113,17 +113,26 @@ def simMIM_validation(net, partition, epoch, args):
 
 def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
     if args.load_imagenet_pretrained:
-        imagenet_pretrained_weight = load_imagenet_pretrained_weight(args)
+        pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
         pretrained2d = True
+    else: 
+        pretrained_weight = None 
+        pretrained2d = False 
+
+    if args.pretrained_model is not None: 
+        pretrained_weight = args.pretrained_model
+        pretrained2d = False 
+         
+
     # setting network 
     if args.model.find('swin') != -1:
-        net = simMIM.__dict__[args.model](pretrained=imagenet_pretrained_weight, pretrained2d=pretrained2d, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=0)
+        net = simMIM.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=0)
         # change an attribute of mask generator
         partition['train'].transform.update_config(net.patch_size)
         partition['val'].transform.update_config(net.patch_size)
     elif args.model.find('vit') != -1:
         assert args.model_patch_size == args.mask_patch_size
-        net = simMIM.__dict__[args.model](imagenet_pretrained_weight=imagenet_pretrained_weight,img_size=args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
+        net = simMIM.__dict__[args.model](pretrained=pretrained_weight,img_size=args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
         # change an attribute of mask generator
         partition['train'].transform.update_config(net.patch_size)
         partition['val'].transform.update_config(net.patch_size)
@@ -200,7 +209,7 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
         # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
         if args.gpu == 0:
             print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, optimizer.param_groups[0]['lr'],te-ts))
-        #    checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, mode='pretrain')
+            checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, mode='pretrain')
         
         torch.cuda.empty_cache()
             

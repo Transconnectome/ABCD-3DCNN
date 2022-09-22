@@ -66,7 +66,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, pe
     
 
     if mode == 'pretrain':
-        torch.save({'net':net.module.state_dict(), 
+        torch.save({'model':net.module.state_dict(), 
                     'optimizer': optimizer.state_dict(),
                     'lr': optimizer.param_groups[0]['lr'],
                     'scheduler': scheduler.state_dict(),
@@ -75,7 +75,7 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, pe
 
         print("Checkpoint is saved")
     elif mode == 'finetune':
-        torch.save({'net':net.module.state_dict(), 
+        torch.save({'model':net.module.state_dict(), 
                     'optimizer': optimizer.state_dict(),
                     'lr': optimizer.param_groups[0]['lr'],
                     'scheduler': scheduler.state_dict(),
@@ -153,8 +153,6 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pre
         scheduler.load_state_dict(model_state['scheduler'])
         print('The best checkpoint is loaded')
     """
-
-    
  
 
 def saving_outputs(net, pred, mask, target, save_dir):
@@ -163,43 +161,6 @@ def saving_outputs(net, pred, mask, target, save_dir):
     np.save(os.path.join(save_dir,'target.npy'),net.module.unpatchify_3D(target)[:10].detach().cpu().numpy())
     np.save(os.path.join(save_dir,'pred.npy'),net.module.unpatchify_3D(pred).detach()[:10].cpu().numpy())
     print('==== DONE SAVING EXAMPLE IMAGES ====')
-
-
-def load_attention_blocks(net, model_state):
-    for i, block in enumerate(net.blocks): 
-        # initial norm layer
-        setattr(net, 'blocks[%s].norm1.weight.data' % str(i), model_state['net']['blocks.%s.norm1.weight' % str(i)])
-        setattr(net, 'blocks[%s].norm1.bias.data' % str(i), model_state['net']['blocks.%s.norm1.bias' % str(i)])
-        # attention qkv parameters 
-        setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), model_state['net']['blocks.%s.attn.qkv.weight' % str(i)])
-        setattr(net, 'blocks[%s].attn.qkv.bias.data' % str(i), model_state['net']['blocks.%s.attn.qkv.bias' % str(i)])
-        # attention projection layer
-        setattr(net, 'blocks[%s].attn.proj.weight.data' % str(i), model_state['net']['blocks.%s.attn.proj.weight' % str(i)])
-        setattr(net, 'blocks[%s].attn.proj.bias.data' % str(i), model_state['net']['blocks.%s.attn.proj.bias' % str(i)])
-        # last norm layer
-        setattr(net, 'blocks[%s].norm2.weight.data' % str(i), model_state['net']['blocks.%s.norm2.weight' % str(i)])
-        setattr(net, 'blocks[%s].norm2.bias.data' % str(i), model_state['net']['blocks.%s.norm2.bias' % str(i)])
-        # fc layer 
-        setattr(net, 'blocks[%s].mlp.fc1.weight.data' % str(i), model_state['net']['blocks.%s.mlp.fc1.weight' % str(i)])
-        setattr(net, 'blocks[%s].mlp.fc1.bias.data' % str(i), model_state['net']['blocks.%s.mlp.fc1.bias' % str(i)])
-        setattr(net, 'blocks[%s].mlp.fc2.weight.data' % str(i), model_state['net']['blocks.%s.mlp.fc2.weight' % str(i)])
-        setattr(net, 'blocks[%s].mlp.fc2.bias.data' % str(i), model_state['net']['blocks.%s.mlp.fc2.bias' % str(i)])
-        return net
-
-
-def load_pretrained_model(net, model_state):
-    # load positional embedding
-    net.pos_embed.data = model_state['net']['pos_embed']
-    # load patch embedding
-    setattr(net, 'patch_embed.proj.weight.data', model_state['net']['patch_embed.proj.weight'])
-    setattr(net, 'patch_embed.proj.bias.data', model_state['net']['patch_embed.proj.bias'])
-    # load attention blocks 
-    net = load_attention_blocks(net, model_state)
-    # load last norm layer 
-    setattr(net, 'norm.weight.data', model_state['net']['norm.weight'])
-    setattr(net, 'norm.bias.data', model_state['net']['norm.bias'])
-    print('The pre-trained model is loaded')
-    return net    
 
 
 
@@ -223,19 +184,19 @@ def load_imagenet_pretrained_weight(args):
     Load weights from .npz checkpoints for official Google Brain Flax implementation
     """
     if args.model.find('vit_base_patch16_3D') != -1:
-        imagenet_pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/ViT/B_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.0-sd_0.0--imagenet2012-steps_20k-lr_0.01-res_384.npz'  
+        pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/ViT/B_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.0-sd_0.0--imagenet2012-steps_20k-lr_0.01-res_384.npz'  
 
     elif args.model.find('vit_large_patch16_3D') != -1:
-        imagenet_pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/ViT/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz'
+        pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/ViT/L_16-i21k-300ep-lr_0.001-aug_medium1-wd_0.1-do_0.1-sd_0.1--imagenet2012-steps_20k-lr_0.01-res_384.npz'
 
     elif args.model.find('vit_huge_patch14_3D') != -1:
-        imagenet_pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/ViT/ViT-H_14.npz'
+        pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/ViT/ViT-H_14.npz'
     
     elif args.model.find('swin_base') != -1: 
-        imagenet_pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/swin/swin_base_patch4_window12_384_22k.pth'
+        pretrained_weight = '/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/pretrained_model/swin/swin_base_patch4_window12_384_22k.pth'
 
 
-    return imagenet_pretrained_weight
+    return pretrained_weight
 
 def freezing_layers(module):
     for param in module.parameters():

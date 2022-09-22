@@ -140,12 +140,19 @@ def ViT_validation(net, partition, epoch, num_classes, args):
 
 
 def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
-    # setting network 
     if args.load_imagenet_pretrained:
-        imganet_pretrained_weight = load_imagenet_pretrained_weight(args)   # This line return directory of imagenet_pretrained_weight
+        pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
+        pretrained2d = True
     else: 
-        imganet_pretrained_weight = None 
-    net = ViT.__dict__[args.model](img_size = args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, imganet_pretrained_weight=imganet_pretrained_weight)
+        pretrained_weight = None 
+        pretrained2d = False 
+
+    if args.pretrained_model is not None: 
+        pretrained_weight = args.pretrained_model
+        pretrained2d = False 
+        simMIM_pretrained = True 
+    # setting network     
+    net = ViT.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, img_size = args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, imganet_pretrained_weight=imganet_pretrained_weight)
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -174,12 +181,7 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
 
     # loading pre-trained model or last checkpoint 
     if args.resume == False: # loading pre-trained model
-        if args.pretrained_model != None:
-            net = checkpoint_load(net, args.pretrained_model, optimizer, scheduler, scaler, mode='finetuning')
-            last_epoch = 0 
-            print('Training start from pretrained model.')
-        else: 
-            last_epoch = 0 
+        last_epoch = 0 
     elif args.resume == True:  # loading last checkpoint 
         if args.checkpoint_dir != None:
             net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain')
