@@ -33,7 +33,9 @@ You can specify the size of input image by setting ```--img_size 128 128 128```.
 In default, ```--img_size 96 96 96```.  
 
 You can specify the size of mask patch by setting ```---mask_patch_size 8```. 
-**When you want to change the size of mask patch during training ViT, be cautious that you should also specify the size of ```--model_patch_size 8```, which is the same as the size of mask patch (training Swin Transformer is not the case)**.
+**When you want to change the size of mask patch during training ViT, be cautious that you should also specify the size of ```--model_patch_size 8```, which is the same as the size of mask patch (training Swin Transformer is not the case)**.  
+  
+You can load ImageNet22k pretrained ViT and Swin by setting ```--load_imagenet_prertrained```.
    
 
 ### ViT specific parameters     
@@ -59,11 +61,11 @@ Finetuning Vision Transformer for downstream tasks.
 torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitBASE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
 ```
   
+  
+### ViT specific parameters
 **You can choose whether use cls token for classification (or regression) or use average pooled latent features for classification (or regression)**.  
 **In default, using average pooled latent features for classification (or regression)**. Or you can explicitly set ```--global_pool```.  
 If you set ```--cls_token```, then cls token would be used for classification (or regression).  
-  
-### ViT specific parameters
 If you want to use absolute sin-cos positional encoding, add argument ```--use_sincos_pos```.  
 If you want to use relative positional bias, add argument ```--use_rel_pos_bias```.  
 In default, positional encoding is the zero-filled parameters update during training.

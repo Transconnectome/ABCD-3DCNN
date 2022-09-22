@@ -12,22 +12,25 @@
 
 from functools import partial
 
+import numpy as np
+from sklearn.feature_selection import SelectFdr
+
 import torch
 import torch.nn as nn
 
 from model.layers.patch_embed import PatchEmbed_2D, PatchEmbed_3D
-from .vision_transformer import  Block
+from .vision_transformer import  Block, resize_pos_embed
 
 from util.pos_embed import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed
 from .layers.helpers import to_3tuple
-
+from util.utils import _n2p
 
 class VisionTransformer3D(nn.Module):
 
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
                  mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, 
-                 num_classes=1, global_pool='token', use_cls_tokens=True, fc_norm=None, use_rel_pos_bias=False, use_sincos_pos=False, spatial_dims=3):
+                 num_classes=1, global_pool='token', use_cls_tokens=True, fc_norm=None, use_rel_pos_bias=False, use_sincos_pos=False, spatial_dims=3, imagenet_pretrained_weight: str=None):
         """
         Args:
             img_size (int, tuple): input image size
@@ -88,9 +91,9 @@ class VisionTransformer3D(nn.Module):
         self.fc_norm = norm_layer(embed_dim) if self.global_pool else nn.Identity()
         self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
         # --------------------------------------------------------------------------
-        self.initialize_weights()
+        self.initialize_weights(imagenet_pretrained_weight)
 
-    def initialize_weights(self):
+    def initialize_weights(self, imagenet_pretrained_weight=None):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
         if self.use_sincos_pos:
@@ -115,6 +118,49 @@ class VisionTransformer3D(nn.Module):
             torch.nn.init.normal_(self.head.weight, std=.02)
             self.head.weight.data.mul_(0.001)
             self.head.bias.data.mul_(0.001)
+
+        if imagenet_pretrained_weight is not None:
+            # load numpy file of imagenet pretrained model
+            w = np.load(imagenet_pretrained_weight)
+            # load weight on positional encoding only if absolute positional encoding is True 
+            if self.use_sincos_pos:
+                if w['Transformer/posembed_input/pos_embedding'].shape != self.pos_embed.shape:
+                    pos_embed_w = _n2p(w['Transformer/posembed_input/pos_embedding'], t=False)
+                    pos_embed_w = resize_pos_embed(     # resize pos embedding when different size from pretrained weights
+                        pos_embed_w, 
+                        self.pos_embed,
+                        getattr(self,'num_prefix_tokens', 1),
+                        self.patch_embed.grid_size
+                    )
+                setattr(self, 'pos_embed.weight.data', pos_embed_w)
+
+            # load weight on attention blocks 
+            for i, block in enumerate(self.blocks):
+                # initial norm layer
+                setattr(self, 'blocks[%s].norm1.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/scale' % str(i)]))
+                setattr(self, 'blocks[%s].norm1.bias.data' % str(i),  _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/bias' % str(i)]))
+                # attention qkv parameters 
+                #setattr(net, 'blocks[%s].attn.qkv.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_0/scale' % str(i)]))
+                setattr(self, 'blocks[%s].attn.qkv.weight.data' % str(i), torch.cat([_n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/%s/kernel' % (str(i), n)], t=False).flatten(1).T for n in ('query', 'key', 'value')]))
+                setattr(self, 'blocks[%s].attn.qkv.bias.data' % str(i), torch.cat([_n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/%s/bias' % (str(i), n)], t=False).flatten(1).T for n in ('query', 'key', 'value')]))
+                # attention projection layer
+                setattr(self, 'blocks[%s].attn.proj.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/out/kernel' % str(i)]))
+                setattr(self, 'blocks[%s].attn.proj.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MultiHeadDotProductAttention_1/out/bias' % str(i)]))
+                # last norm layer
+                setattr(self, 'blocks[%s].norm2.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_2/scale' % str(i)]))
+                setattr(self, 'blocks[%s].norm2.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/LayerNorm_2/scale' % str(i)]))
+                # fc layer 
+                setattr(self, 'blocks[%s].mlp.fc1.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_0/kernel' % str(i)]))
+                setattr(self, 'blocks[%s].mlp.fc1.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_0/bias' % str(i)]))
+                setattr(self, 'blocks[%s].mlp.fc2.weight.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_1/kernel' % str(i)]))
+                setattr(self, 'blocks[%s].mlp.fc2.bias.data' % str(i), _n2p(w['Transformer/encoderblock_%s/MlpBlock_3/Dense_1/bias' % str(i)]))                
+            #load weight on the last norm layer
+            setattr(self, 'norm.weight.data', _n2p(w['Transformer/encoder_norm/scale']))
+            setattr(self, 'norm.bias.data', _n2p(w['Transformer/encoder_norm/bias']))
+
+            print(f"=> loaded successfully '{imagenet_pretrained_weight}'")
+
+
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):

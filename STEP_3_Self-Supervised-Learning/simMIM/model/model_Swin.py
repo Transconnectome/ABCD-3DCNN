@@ -124,6 +124,7 @@ class SwinTransformer3D(nn.Module):
         self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
 
         self._freeze_stages()
+        self.init_weights()
 
     def _freeze_stages(self):
         if self.frozen_stages >= 0:
@@ -139,8 +140,45 @@ class SwinTransformer3D(nn.Module):
                 for param in m.parameters():
                     param.requires_grad = False
 
+    def load_pretrained2d(self): 
+        """ Patch embedding and Patch merging layers couldn't be inflate 2D -> 3D 
+        ImageNet pretrained model has 3 channels for patch embedding, but this model only handle 1 channel patch emebdding. 
+        ImageNet pretrained model merging Height, and Width of images, but this model additionally merging depth. Thus hidden dimension of merging layer doesn't match. 
+        (In Video Transformer merging layer only merging Height and Width)
+        """
+        checkpoint = torch.load(self.pretrained, map_location='cpu')
+        state_dict = checkpoint['model']
+
+        # inflate positional embedding 2D -> 3D 
+        self.inflate_pos_emb(state_dict)
+
+        # load attetion layers 
+        for l, layer in enumerate(self.layers):
+            for b, block in enumerate(self.layers[l].blocks):
+                # initial norm layer
+                setattr(self, 'layers[%s].blocks[%s].norm1.weight.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.norm1.weight' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].norm1.bias.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.norm1.bias' % (str(l), str(b))])
+                # attention qkv parameters 
+                setattr(self, 'layers[%s].blocks[%s].attn.qkv.weight.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.attn.qkv.weight' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].attn.qkv.bias.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.attn.qkv.bias' %(str(l), str(b))])
+                # attention projection layer
+                setattr(self, 'layers[%s].blocks[%s].attn.proj.weight.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.attn.proj.weight' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].attn.proj.bias.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.attn.proj.bias' % (str(l), str(b))])
+                # last norm layer
+                setattr(self, 'layers[%s].blocks[%s].norm2.weight.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.norm2.weight' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].norm2.bias.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.norm2.bias' % (str(l), str(b))])
+                # fc layer 
+                setattr(self, 'layers[%s].blocks[%s].mlp.fc1.weight.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.mlp.fc1.weight' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].mlp.fc1.bias.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.mlp.fc1.bias' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].mlp.fc2.weight.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.mlp.fc2.weight' % (str(l), str(b))])
+                setattr(self, 'layers[%s].blocks[%s].mlp.fc2.bias.data' % (str(l), str(b)), state_dict['layers.%s.blocks.%s.mlp.fc2.bias' % (str(l), str(b))])
+
+        del checkpoint
+        del state_dict
+        torch.cuda.empty_cache()
+
     #def inflate_weights(self, logger):
-    def inflate_weights(self):
+    def inflate_pos_emb(self, state_dict):
         """Inflate the swin2d parameters to swin3d.
         The differences between swin3d and swin2d mainly lie in an extra
         axis. To utilize the pretrained parameters in 2d model,
@@ -150,48 +188,34 @@ class SwinTransformer3D(nn.Module):
             logger (logging.Logger): The logger used to print
                 debugging infomation.
         """
-        checkpoint = torch.load(self.pretrained, map_location='cpu')
-        state_dict = checkpoint['model']
 
-        # delete relative_position_index since we always re-init it
-        relative_position_index_keys = [k for k in state_dict.keys() if "relative_position_index" in k]
-        for k in relative_position_index_keys:
-            del state_dict[k]
-
-        # delete attn_mask since we always re-init it
-        attn_mask_keys = [k for k in state_dict.keys() if "attn_mask" in k]
-        for k in attn_mask_keys:
-            del state_dict[k]
-
-        state_dict['patch_embed.proj.weight'] = state_dict['patch_embed.proj.weight'].unsqueeze(2).repeat(1,1,self.patch_size[0],1,1) / self.patch_size[0]
 
         # bicubic interpolate relative_position_bias_table if not match
-        relative_position_bias_table_keys = [k for k in state_dict.keys() if "relative_position_bias_table" in k]
-        for k in relative_position_bias_table_keys:
-            relative_position_bias_table_pretrained = state_dict[k]
-            relative_position_bias_table_current = self.state_dict()[k]
-            L1, nH1 = relative_position_bias_table_pretrained.size()
-            L2, nH2 = relative_position_bias_table_current.size()
-            L2 = (2*self.window_size[1]-1) * (2*self.window_size[2]-1)
-            wd = self.window_size[0]
-            if nH1 != nH2:
-                print(f"Error in loading {k}, passing")
-                #logger.warning(f"Error in loading {k}, passing")
-            else:
-                if L1 != L2:
-                    S1 = int(L1 ** 0.5)
-                    relative_position_bias_table_pretrained_resized = torch.nn.functional.interpolate(
-                        relative_position_bias_table_pretrained.permute(1, 0).view(1, nH1, S1, S1), size=(2*self.window_size[1]-1, 2*self.window_size[2]-1),
-                        mode='bicubic')
-                    relative_position_bias_table_pretrained = relative_position_bias_table_pretrained_resized.view(nH2, L2).permute(1, 0)
-            state_dict[k] = relative_position_bias_table_pretrained.repeat(2*wd-1,1)
+        for l, layer in enumerate(self.layers):
+            for b, block in enumerate(self.layers[l].blocks):
+                relative_position_bias_table_pretrained =  state_dict['layers.%s.blocks.%s.attn.relative_position_bias_table' % (str(l), str(b))]
+                relative_position_bias_table_current = self.layers[l].blocks[b].attn.relative_position_bias_table.data 
+                L1, nH1 = relative_position_bias_table_pretrained.size()
+                L2, nH2 = relative_position_bias_table_current.size()
+                L2 = (2*self.window_size[1]-1) * (2*self.window_size[2]-1)
+                wd = self.window_size[0]
+                if nH1 != nH2:
+                    print(f'Error in loading layers.{l}.blocks.{b}.attn.relative_position_bias_table, passing')
+                else: 
+                    if L1 == L2:
+                        S1 = int(L1 ** 0.5)
+                        relative_position_bias_table_pretrained_resize = torch.nn.functional.interpolate(
+                            relative_position_bias_table_pretrained.permute(1,0).view(1,nH1, S1, S1), size=(2*self.winodw_size[1]-1, 2*self.window_size[2]-1),
+                            mode='bicubic')
+                        relative_position_bias_table_pretrained = relative_position_bias_table_pretrained_resize.view(nH2, L2).permute(1,0)
+                setattr(self, 'layers.%i.blocks.%i.attn.relative_position_bias_table.data' % (l, b), relative_position_bias_table_pretrained.repeat(2*wd-1, 1)) 
 
-        msg = self.load_state_dict(state_dict, strict=False)
+
+        #msg = self.load_state_dict(state_dict, strict=False)
         #logger.info(msg)
         #logger.info(f"=> loaded successfully '{self.pretrained}'")
         print(f"=> loaded successfully '{self.pretrained}'")
-        del checkpoint
-        torch.cuda.empty_cache()
+
 
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone.
@@ -218,7 +242,8 @@ class SwinTransformer3D(nn.Module):
             if self.pretrained2d:
                 # Inflate 2D model into 3D model.
                 #self.inflate_weights(logger)
-                self.inflate_weights()
+                #self.inflate_pos_emb()
+                self.load_pretrained2d()
             else:
                 # Directly load 3D model.
                 load_checkpoint(self, self.pretrained, strict=False)

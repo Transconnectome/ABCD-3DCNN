@@ -166,7 +166,7 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
     #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
     #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
-    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=5, gamma=0.5)
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=10, gamma=0.5)
 
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()

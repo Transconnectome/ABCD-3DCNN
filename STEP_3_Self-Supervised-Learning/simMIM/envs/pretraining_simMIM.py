@@ -112,23 +112,24 @@ def simMIM_validation(net, partition, epoch, args):
 
 
 def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
-
+    if args.load_imagenet_pretrained:
+        imagenet_pretrained_weight = load_imagenet_pretrained_weight(args)
+        pretrained2d = True
     # setting network 
     if args.model.find('swin') != -1:
-        net = simMIM.__dict__[args.model](window_size=args.window_size, drop_rate=args.projection_drop, num_classes=0)
+        net = simMIM.__dict__[args.model](pretrained=imagenet_pretrained_weight, pretrained2d=pretrained2d, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=0)
         # change an attribute of mask generator
         partition['train'].transform.update_config(net.patch_size)
         partition['val'].transform.update_config(net.patch_size)
     elif args.model.find('vit') != -1:
         assert args.model_patch_size == args.mask_patch_size
-        net = simMIM.__dict__[args.model](img_size=args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
+        net = simMIM.__dict__[args.model](imagenet_pretrained_weight=imagenet_pretrained_weight,img_size=args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
         # change an attribute of mask generator
         partition['train'].transform.update_config(net.patch_size)
         partition['val'].transform.update_config(net.patch_size)
         print('The size of Patch is %i and the size of Mask Patch is %i' % (args.model_patch_size, args.mask_patch_size))
 
-    if args.load_imagenet_pretrained:
-        net = load_imagenet_pretrained_weight(net, args)
+
     checkpoint_dir = args.checkpoint_dir
 
 
@@ -150,7 +151,7 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
     #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
     #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
-    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=2, eta_max=args.lr,  T_up=5, gamma=0.5)
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=10, gamma=0.5)
 
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()
