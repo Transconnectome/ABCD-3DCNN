@@ -143,9 +143,11 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
     if args.load_imagenet_pretrained:
         pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
         pretrained2d = True
+        simMIM_pretrained = False
     else: 
         pretrained_weight = None 
         pretrained2d = False 
+        simMIM_pretrained = False
 
     if args.pretrained_model is not None: 
         pretrained_weight = args.pretrained_model
