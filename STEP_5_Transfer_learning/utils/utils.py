@@ -47,6 +47,8 @@ def argument_setting():
     parser.add_argument("--scratch", type=str, required=False, default='',help='option for learning from scratch')
     parser.add_argument("--filter",required=False, nargs="+", default=[],
                         help='options for filter data by phenotype. usage: --filter abcd_site:10 sex:1')
+    parser.add_argument("--augmentation",required=False, nargs="+", default=[],
+                        help="Data augmentation - [shift, flip] are available")
     
     args = parser.parse_args()
     print("*** Categorical target labels are {} and Numerical target labels are {} *** \n".format(

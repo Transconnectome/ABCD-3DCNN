@@ -38,6 +38,28 @@ warnings.filterwarnings("ignore")
 
 ## ========= Helper Functions =============== ##
 
+def setup_results(args):
+    train_losses = {}
+    train_accs = {}
+    val_losses = {}
+    val_accs = {}
+    
+    targets = args.cat_target + args.num_target
+    for target_name in targets:
+        train_losses[target_name] = []
+        train_accs[target_name] = []
+        val_losses[target_name] = []
+        val_accs[target_name] = []
+
+    result = {}
+    result['train_losses'] = train_losses
+    result['train_accs'] = train_accs
+    result['val_losses'] = val_losses
+    result['val_accs'] = val_accs
+    
+    return result
+
+    
 def set_optimizer(args, net):
     if args.optim == 'SGD':
         optimizer = optim.SGD(params = filter(lambda p: p.requires_grad, net.parameters()),
@@ -56,29 +78,101 @@ def set_optimizer(args, net):
         
     return optimizer
     
-def set_lr_scheduler(args, optimizer):
-    if args.scheduler != '':
-        if args.scheduler == 'on':
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-9)
-        elif args.scheduler == 'cos':
-#             scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=1)
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=2, eta_min=0)
-        elif args.scheduler == 'step':
-            scheduler = optim.lr_scheduler.StepLR(optimizer, 80, gamma=0.1)
-    else:
+    
+def set_lr_scheduler(args, optimizer, len_dataloader):
+    if args.scheduler == '':
         scheduler = None
+    elif args.scheduler == 'on':
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-9)
+    elif args.scheduler.lower() == 'cos':
+#             scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=1)
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=2, eta_min=0)
+    elif 'step' in args.scheduler:
+        if len(args.scheduler.split('_')) != 2:
+            step_size = 80
+        else:
+            step_size = int(args.scheduler.split('_')[1])
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1)
+    elif args.scheduler.lower() == 'onecycle':
+        scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, total_steps=args.epoch)
+    else:
+        raise Exception("Invalid scheduler option")
         
     return scheduler
     
+    
+def run_experiment(args, net, partition, result, save_dir, mode):
+    if mode == 'FC':
+        epoch_exp = args.epoch_FC
+        num_unfrozen = 0
+    else:
+        epoch_exp = args.epoch
+        num_unfrozen = args.unfrozen_layer
+    
+    targets = args.cat_target + args.num_target
+    
+    setting_transfer(args, net.module, num_unfrozen = num_unfrozen)
+    optimizer = set_optimizer(args, net)
+    scheduler = set_lr_scheduler(args, optimizer, len(partition['train']))
+
+    best_val_loss = float('inf')
+    patience = 0
+
+    for epoch in tqdm(range(epoch_exp)):
+        ts = time.time()
+        net, train_loss, train_acc = train(net,partition,optimizer,args)
+        val_loss, val_acc = validate(net,partition,scheduler,args)
+        te = time.time()
+
+        ## sorting the results
+        train_loss_sum = 0
+        val_loss_sum = 0
+        for target_name in targets:
+            result['train_losses'][target_name].append(train_loss[target_name])
+            result['train_accs'][target_name].append(train_acc[target_name])
+            result['val_losses'][target_name].append(val_loss[target_name])
+            result['val_accs'][target_name].append(val_acc[target_name])
+            val_loss_sum += val_loss[target_name]
+            train_loss_sum += train_loss[target_name]
+            
+        val_loss_total = val_loss_sum/len(targets)
+        train_loss_total = train_loss_sum/len(targets)
+        
+        if val_loss_total < best_val_loss:
+            best_val_loss = val_loss_total
+            best_train_loss = train_loss_total
+            patience = 0
+        else:
+            patience += 1
+
+        ## visualize the result
+        CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
+        print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
+
+        ## saving the checkpoint and results
+        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, result['val_accs'], args)                     
+        if epoch%10 == 0:
+            save_exp_result(save_dir, vars(args).copy(), result)
+
+        ## Early-Stopping
+        if args.early_stopping != None and patience == args.early_stopping:
+            print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
+            break
+    
+    if mode == 'FC':
+        result['best_val_loss_FC'] = best_val_loss
+        result['best_train_loss_FC'] = best_train_loss
+    else:
+        result['best_val_loss'] = best_val_loss
+        result['best_train_loss'] = best_train_loss
+    return result, checkpoint_dir
 
 
 ## ========= Experiment =============== ##
 def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     
-    
     # selecting a model
     net = select_model(subject_data, args) #  
-    
     
     # loading pretrained model if transfer option is given
     if (args.transfer != "") and (args.load == ""):
@@ -106,123 +200,25 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             
     net.to(f'cuda:{net.device_ids[0]}')
     
-    
     # setting for results' DataFrame
-    train_losses = {}
-    train_accs = {}
-    val_losses = {}
-    val_accs = {}
-    
-    targets = args.cat_target + args.num_target
-    for target_name in targets:
-        train_losses[target_name] = []
-        train_accs[target_name] = []
-        val_losses[target_name] = []
-        val_accs[target_name] = []
-
-    result = {}
-    result['train_losses'] = train_losses
-    result['train_accs'] = train_accs
-    result['val_losses'] = val_losses
-    result['val_accs'] = val_accs
-    
+    result = setup_results(args)
     
     # training a model
     print("*** Start training a model *** \n")
     
-    if (args.unfrozen_layer > '0') and (args.load == "") and (args.transfer != '') and args.epoch_FC != 0:
+    if args.epoch_FC != 0:
+        assert args.epoch > 0, "Epoch_FC should be used with epoch option. ex) epoch_FC=100, epoch=200"
         print("*** Transfer Learning - Training FC layers *** \n")
         
-        setting_transfer(args, net.module, num_unfreezed = 0)
-        optimizer = set_optimizer(args, net)
-        scheduler = set_lr_scheduler(args, optimizer)
-        
-        best_val_loss = float('inf')
-        patience = 0
-
-        for epoch in tqdm(range(args.epoch_FC)):
-            ts = time.time()
-            net, train_loss, train_acc = train(net,partition,optimizer,args)
-            val_loss, val_acc = validate(net,partition,scheduler,args)
-            te = time.time()
-
-            ## sorting the results
-            for target_name in targets:
-                train_losses[target_name].append(train_loss[target_name])
-                train_accs[target_name].append(train_acc[target_name])
-                val_losses[target_name].append(val_loss[target_name])
-                val_accs[target_name].append(val_acc[target_name])
-
-            if val_loss[targets[0]] < best_val_loss:
-                best_val_loss = val_loss[targets[0]]
-                patience = 0
-            else:
-                patience += 1
-            
-            ## visualize the result
-            CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
-            print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
-            
-            ## saving the checkpoint and results
-            checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)                     
-            if epoch%10 == 0:
-                save_exp_result(save_dir, vars(args).copy(), result)
+        result, _ = run_experiment(args, net, partition, result, save_dir, 'FC')
                 
-            ## Early-Stopping
-            if args.early_stopping != None and patience == args.early_stopping:
-                    print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
-                    break
-                    
-        result['best_val_loss_FC'] = best_val_loss
-                
-        print("Adjust learning rate for Training unfrozen layers")
-        print(f"From {args.lr} to {args.lr*args.lr_adjust}")    
+        print(f"Adjust learning rate for Training unfrozen layers from {args.lr} to {args.lr*args.lr_adjust}")
         args.lr *= args.lr_adjust
         result['lr_adjusted'] = args.lr
-
             
     print("*** Training unfrozen layers *** \n")
     
-    best_val_loss = float('inf')
-    patience = 0
-    
-    setting_transfer(args, net.module, num_unfreezed = args.unfrozen_layer)
-    optimizer = set_optimizer(args, net)
-    scheduler = set_lr_scheduler(args, optimizer)
-    
-    for epoch in tqdm(range(args.epoch)):
-        ts = time.time()
-        net, train_loss, train_acc = train(net,partition,optimizer,args)
-        val_loss, val_acc = validate(net,partition,scheduler,args)
-        te = time.time()
-            
-        ## sorting the results
-        for target_name in targets:
-            train_losses[target_name].append(train_loss[target_name])
-            train_accs[target_name].append(train_acc[target_name])
-            val_losses[target_name].append(val_loss[target_name])
-            val_accs[target_name].append(val_acc[target_name])
-
-        if val_loss[targets[0]] < best_val_loss:
-            best_val_loss = val_loss[targets[0]]
-            patience = 0
-        else:
-            patience += 1
-        ## visualize the result
-        CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
-        print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
-
-        ## saving the checkpoint and results
-        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
-        if epoch%10 == 0:
-            save_exp_result(save_dir, vars(args).copy(), result)
-
-        ## Early-Stopping
-        if args.early_stopping != None and patience == args.early_stopping:
-            print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
-            break
-                    
-    result['best_val_loss'] = best_val_loss
+    result, checkpoint_dir = run_experiment(args, net, partition, result, save_dir, 'ALL')
                     
     # testing a model
     print("\n*** Start testing a model *** \n")
@@ -235,17 +231,11 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     else:
         net.to(f'cuda:{args.gpus[0]}')
     test_acc, confusion_matrices = test(net, partition, args)
-    print(f"Test result: {test_acc} for {args.exp_name}")
-    
-    # summarizing results
-    
     result['test_acc'] = test_acc
-    result['train_acc'] = train_acc
-    result['val_acc'] = val_acc
+    print(f"Test result: {test_acc} for {args.exp_name}") 
     
     if confusion_matrices != None:
         result['confusion_matrices'] = confusion_matrices
-
         
     return vars(args), result
 ## ==================================== ##
@@ -255,27 +245,23 @@ if __name__ == "__main__":
     cwd = os.getcwd()
 
     ## ========= Setting ========= ##
-    # seed number
-    seed = 1234
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
     args = argument_setting()
+    
+    # seed number
+    args.seed = 1234
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     
     if args.transfer in ['age','MAE']:
         assert 96 in args.resize, "age(MSE/MAE) transfer model's resize should be 96"
     elif args.transfer == 'sex':
         assert 80 in args.resize, "sex transfer model's resize should be 80"
         
-    save_dir = os.getcwd() + '/result' #  
-    partition, subject_data = make_dataset(args) #  
+    save_dir = os.getcwd() + '/result'
+    partition, subject_data = make_dataset(args)  
 
-    ## ========= Run Experiment and saving result ========= ##
-    # seed number
-    seed = 1234
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    
+    ## ========= Run Experiment and saving result ========= ##    
     time_hash = datetime.datetime.now().time()
     hash_key = hashlib.sha1(str(time_hash).encode()).hexdigest()[:6]
     args.exp_name = args.exp_name + f'_{hash_key}'

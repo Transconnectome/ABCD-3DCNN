@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
-from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor
+from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor, RandAffine
 from monai.data import ImageDataset
 
 
@@ -28,16 +28,14 @@ def case_control_count(labels, dataset_type, args):
 
 ## ========= Define directories of data ========= ##
 # revising
-ABCD_data = {
-            'fmriprep':'/scratch/connectome/3DCNN/data/1.ABCD/1.sMRI_fmriprep/preprocessed_masked',
+ABCD_data = {'fmriprep':'/scratch/connectome/3DCNN/data/1.ABCD/1.sMRI_fmriprep/preprocessed_masked',
             'freesurfer':'/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer',
             'FA_unwarpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.1.FA_unwarpped_nii',
             'FA_warpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.2.FA_warpped_nii',
             'MD_unwarpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.3.MD_unwarpped_nii',
             'MD_unwarpped_npy':'/scratch/connectome/3DCNN/data/1.ABCD/3.3.MD_unwarpped_npy',
             'MD_warpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.4.MD_warpped_nii',
-            'RD_warpped':'/scratch/connectome/3DCNN/data/1.ABCD/3.5.RD_warpped'
-}
+            'RD_warpped':'/scratch/connectome/3DCNN/data/1.ABCD/3.5.RD_warpped'}
 ABCD_phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
 
 UKB_data_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped/'
@@ -111,8 +109,7 @@ def combining_image_target(subject_data, image_files, target_list): # revising
 
 # defining train,val, test set splitting function
 def partition_dataset(imageFiles_labels, target_list, args):
-    random.shuffle(imageFiles_labels)
-
+    # make list of images & lables
     images = []
     labels = []
     targets = args.cat_target + args.num_target
@@ -126,28 +123,29 @@ def partition_dataset(imageFiles_labels, target_list, args):
 
         images.append(image)
         labels.append(label)
-
+    
+    # define transform function
     resize = tuple(args.resize)
-    train_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
-                               Resize(resize),
-                              ToTensor()])
+    
+    default_transforms = [ScaleIntensity(),
+                          AddChannel(),
+                          Resize(resize),
+                          ToTensor()]    
+    aug_transforms = []
+    if 'shift' in args.augmentation:
+        aug_transforms.append(RandAffine(prob=0.1,translate_range=(0,2),padding_mode='zeros'))
+    elif 'flip' in args.augmentation:
+        aug_transforms.append(RandFlip(prob=0.1, spatial_axis=0))
 
-    val_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
-                               Resize(resize),
-                              ToTensor()])
-
-    test_transform = Compose([ScaleIntensity(),
-                               AddChannel(),
-                               Resize(resize),
-                              ToTensor()])
+    train_transform = Compose(default_transforms+aug_transforms)
+    val_transform = Compose(default_transforms)
+    test_transform = Compose(default_transforms)
 
     # number of total / train,val, test
     num_total = len(images)
-    num_train = int(num_total*(1 - args.val_size - args.test_size))
     num_val = int(num_total*args.val_size)
     num_test = int(num_total*args.test_size)
+    num_train = int(num_total*(1 - args.val_size - args.test_size))
     print(f"Total subjects={num_total}, train={num_train}, val={num_val}, test={num_test}")
 
     # image and label information of train, val, test

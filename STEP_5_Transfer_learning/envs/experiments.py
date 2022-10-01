@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 import torch
 import torch.nn as nn
@@ -7,6 +8,10 @@ from sklearn.metrics import confusion_matrix
 
 from envs.loss_functions import calculating_loss_acc
 from tqdm import tqdm
+
+
+
+
 
 ### ========= Train,Validate, and Test ========= ###
 '''The process of calcuating loss and accuracy metrics is as follows.
@@ -20,13 +25,23 @@ from tqdm import tqdm
 
 # define training step
 def train(net,partition,optimizer,args):
+    def seed_worker(worker_id):
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+
+    g = torch.Generator()
+    g.manual_seed(args.seed)
+    
     '''GradScaler is for calculating gradient with float 16 type'''
     scaler = torch.cuda.amp.GradScaler()
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
                                              batch_size=args.train_batch_size,
                                              shuffle=True,
-                                             num_workers=4)
+                                             num_workers=4,
+                                             worker_init_fn=seed_worker,
+                                             generator=g)
 
     net.train()
 
@@ -81,10 +96,20 @@ def train(net,partition,optimizer,args):
 
 # define validation step
 def validate(net,partition,scheduler,args):
+    def seed_worker(worker_id):
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+
+    g = torch.Generator()
+    g.manual_seed(args.seed)
+    
     valloader = torch.utils.data.DataLoader(partition['val'],
                                            batch_size=args.val_batch_size,
                                            shuffle=True,
-                                           num_workers=4)
+                                           num_workers=4,
+                                           worker_init_fn=seed_worker,
+                                           generator=g)
 
     net.eval()
 
@@ -141,10 +166,20 @@ def validate(net,partition,scheduler,args):
 
 # define test step
 def test(net,partition,args):
+    def seed_worker(worker_id):
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+        random.seed(args.seed)
+
+    g = torch.Generator()
+    g.manual_seed(args.seed)
+    
     testloader = torch.utils.data.DataLoader(partition['test'],
                                             batch_size=args.test_batch_size,
                                             shuffle=False,
-                                            num_workers=4)
+                                            num_workers=4,
+                                            worker_init_fn=seed_worker,
+                                            generator=g)
 
     net.eval()
     if hasattr(net, 'module'):

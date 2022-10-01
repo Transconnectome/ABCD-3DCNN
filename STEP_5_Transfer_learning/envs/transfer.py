@@ -1,12 +1,12 @@
 import torch
 
 ## Main function that freezes layers & re-initialize FC layer
-def setting_transfer(args, net, num_unfreezed):
-    if num_unfreezed in ['all', 'no']:
+def setting_transfer(args, net, num_unfrozen):
+    if num_unfrozen in ['all', 'no']:
         return
     
-    elif num_unfreezed != '0':
-        num_unfreezed = int(num_unfreezed)
+    elif num_unfrozen != '0':
+        num_unfrozen = int(num_unfrozen)
         layers_total = []
 
         for name, module in net.features.named_modules():
@@ -15,7 +15,7 @@ def setting_transfer(args, net, num_unfreezed):
                 
         num_layers = len(layers_total)
 
-        freeze_until = num_layers - num_unfreezed
+        freeze_until = num_layers - num_unfrozen
         frozen_layers = layers_total[:freeze_until]
         unfrozen_layers = layers_total[freeze_until:]
         
@@ -24,7 +24,7 @@ def setting_transfer(args, net, num_unfreezed):
         if args.init_unfrozen != '':
             initialize_weights(net, unfrozen_layers)
         
-    elif num_unfreezed == '0':
+    elif num_unfrozen == '0':
         freeze_layers(net, 0)
         if args.load == '':
             initialize_weights(net, 0)

@@ -37,7 +37,7 @@ def calculating_loss_acc(targets, output, loss_dict, correct, total, acc_dict, n
             elif args.transfer == 'MAE' or args.scratch == 'MAE':
                 criterion = nn.L1Loss()
             else:
-                assert args.transfer == 'MAE', print("Invalid option")
+                assert args.transfer == 'MAE', print("Invalid age loss option")
             tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
             loss += tmp_loss * num_weight
             
