@@ -2,7 +2,6 @@
 ######### DDP reference: https://towardsdatascience.com/distribute-your-pytorch-model-in-less-than-20-lines-of-code-61a786e6e7b0
 
 ## ======= load module ======= ##
-import model.model_ViT as ViT
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, set_random_seed
 from dataloaders.dataloaders import check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
@@ -95,6 +94,8 @@ parser.set_defaults(gradient_accumulation=False)
 ##########################
 #### other parameters ####
 ##########################
+parser.add_argument("--torchscript",action='store_true', help = 'if you want to activate kernel fusion activate this option')
+parser.set_defaults(torchscript=False)
 parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
 parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.add_argument('--pretrained_model', type=str, default=None, required=False)
@@ -132,7 +133,7 @@ if __name__ == "__main__":
     ## ========= Settingfor data ========= ##
     current_dir = os.getcwd()
     image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
-    image_files = loading_images(image_dir, args, study_sample=args.study_sample)
+    image_files, _ = loading_images(image_dir, args, study_sample=args.study_sample)
     subject_data, target_list, num_classes = loading_phenotype(phenotype_dir, args, study_sample=args.study_sample)
     
     ## data preprocesing categorical variable and numerical variables
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     args.exp_name = args.exp_name + f'_{hash_key}'
 
 
-    # Run MAE Experiment
+    # Run Swin Experiment
     torch.backends.cudnn.benchmark = True
     setting, result = Swin_experiment(partition, num_classes, save_dir, deepcopy(args))
     save_exp_result(save_dir, setting, result)

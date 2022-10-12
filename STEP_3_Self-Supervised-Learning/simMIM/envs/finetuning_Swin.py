@@ -14,6 +14,8 @@ from sklearn.metrics import confusion_matrix
 
 ## ======= load module ======= ##
 import model.model_Swin as Swin
+from model.model_Swin import SwinTransformer3D
+from functools import partial
 
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight
 from util.optimizers import LAMB, LARS 
@@ -70,6 +72,7 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
             with torch.cuda.amp.autocast():
                 pred = net(images)
                 loss = loss_fn(pred, labels)
+        
         losses.append(loss.item())
         eval_metrics.store(pred, labels)
 
@@ -157,6 +160,9 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
         
     # setting network 
     net = Swin.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
+    if args.torchscript:
+        torch._C._jit_set_autocast_mode(True)
+        net = torch.jit.script(net)
     checkpoint_dir = args.checkpoint_dir
 
 

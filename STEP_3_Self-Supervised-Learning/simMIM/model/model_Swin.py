@@ -91,7 +91,7 @@ class SwinTransformer3D(nn.Module):
             patch_size=patch_size, in_channels=in_channels, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
 
-        self.pos_drop = nn.Dropout(p=drop_rate)
+        self.pos_drop : nn.Module = nn.Dropout(p=drop_rate)
 
         # stochastic depth
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
@@ -128,7 +128,8 @@ class SwinTransformer3D(nn.Module):
 
         self._freeze_stages()
         self.init_weights()
-
+    
+    @torch.jit.ignore
     def _freeze_stages(self):
         if self.frozen_stages >= 0:
             self.patch_embed.eval()
@@ -143,7 +144,7 @@ class SwinTransformer3D(nn.Module):
                 for param in m.parameters():
                     param.requires_grad = False
 
-
+    @torch.jit.ignore
     #def inflate_weights(self, logger):
     def inflate_pos_emb(self, state_dict):
         """Inflate the swin2d parameters to swin3d.
@@ -182,7 +183,7 @@ class SwinTransformer3D(nn.Module):
         #logger.info(f"=> loaded successfully '{self.pretrained}'")
         
 
-
+    @torch.jit.ignore
     def load_simMIM_pretrained(self):
         checkpoint = torch.load(self.pretrained, map_location='cpu')
         state_dict = checkpoint['model']
@@ -226,7 +227,7 @@ class SwinTransformer3D(nn.Module):
         torch.cuda.empty_cache()        
         print(f"=> loaded successfully '{self.pretrained}'")
 
-
+    @torch.jit.ignore
     def load_pretrained2d(self): 
         """ Patch embedding and Patch merging layers couldn't be inflate 2D -> 3D 
         ImageNet pretrained model has 3 channels for patch embedding, but this model only handle 1 channel patch emebdding. 
@@ -265,7 +266,7 @@ class SwinTransformer3D(nn.Module):
         torch.cuda.empty_cache()
         print(f"=> loaded successfully '{self.pretrained}'")
 
-
+    @torch.jit.ignore
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone.
         Args:
@@ -307,8 +308,8 @@ class SwinTransformer3D(nn.Module):
             self.apply(_init_weights)
         else:
             raise TypeError('pretrained must be a str or None')
-
-    def forward(self, x):
+    
+    def forward(self, x: torch.Tensor):
         """Forward function."""
         x = self.patch_embed(x)
 
@@ -317,8 +318,13 @@ class SwinTransformer3D(nn.Module):
         for layer in self.layers:
             x = layer(x.contiguous())
         
-        x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C
-        x = self.norm(x)  # B L C
+        #x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C    # original version
+        ## torchscript version
+        x = torch.einsum('bcdhw -> bdhwc', x) 
+        B, D, H, W, C = x.size() 
+        x = x.reshape(B, D * H * W, C)  # B L C 
+        ######################   
+        x = self.norm(x)  # B L C   
         x = self.avgpool(x.transpose(1, 2))  # B C 1
         x = torch.flatten(x, 1)
         x = self.head(x)
@@ -336,6 +342,11 @@ def swin_base_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
         patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+#def swin_base_patch4_window8_3D(pretrained, pretrained2d, simMIM_pretrained, window_size, drop_rate, num_classes):
+#    model = torch.jit.script(SwinTransformer3D(
+#        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
+#        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), 
+#        pretrained=pretrained, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, window_size=window_size, drop_rate=drop_rate, num_classes=num_classes))
     return model
 
 def swin_large_patch4_window8_3D(**kwargs):

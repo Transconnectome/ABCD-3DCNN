@@ -48,6 +48,8 @@ parser = argparse.ArgumentParser()
 #########################
 #### data parameters ####
 #########################
+parser.add_argument('--include_synthetic', action='store_true')
+parser.set_defaults(include_synthetic=False)
 parser.add_argument("--study_sample",default='UKB',type=str,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
@@ -91,6 +93,8 @@ parser.set_defaults(gradient_accumulation=False)
 ##########################
 #### other parameters ####
 ##########################
+parser.add_argument("--torchscript",action='store_true', help = 'if you want to activate kernel fusion activate this option')
+parser.set_defaults(torchscript=False)
 parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
 parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.add_argument("--load_imagenet_pretrained", action='store_true', help = 'load imagenet pretrained model')
@@ -121,10 +125,13 @@ if __name__ == "__main__":
     ## ========= Settingfor data ========= ##
     current_dir = os.getcwd()
     image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
-    image_files = loading_images(image_dir, args, study_sample=args.study_sample)
+    image_files, synthetic_image_files = loading_images(image_dir, args, study_sample=args.study_sample)
 
     # partitioning dataset and preprocessing 
-    partition = partition_dataset_pretrain(image_files, args)
+    if args.include_synthetic: 
+        partition = partition_dataset_pretrain(imageFiles=image_files, synthetic_imageFiles=synthetic_image_files, args=args)
+    else: 
+        partition = partition_dataset_pretrain(imageFiles=image_files, args=args)
     ## ====================================== ##
 
 

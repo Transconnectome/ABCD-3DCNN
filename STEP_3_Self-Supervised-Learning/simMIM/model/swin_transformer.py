@@ -6,7 +6,7 @@ from functools import partial, reduce, lru_cache
 from operator import mul
 from einops import rearrange
 from collections import OrderedDict
-from typing import Optional
+from typing import List, Optional, Tuple, Callable
 
 import numpy as np
 
@@ -19,9 +19,16 @@ from model.layers.mlp import Mlp
 from timm.models.layers import DropPath, trunc_normal_
 from .layers.helpers import to_3tuple
 
+def _mul(a: int, b: int) -> int:
+    return a * b
 
+def _reduce(iterable: Tuple[int, int, int]) -> int:
+    value = iterable[0]
+    for element in iterable[1:]:
+        value = _mul(value, element)
+    return value
 
-def window_partition(x, window_size):
+def window_partition(x: torch.Tensor, window_size: Tuple[int, int, int]):
     """
     Args:
         x: (B, D, H, W, C)
@@ -31,11 +38,12 @@ def window_partition(x, window_size):
     """
     B, D, H, W, C = x.shape
     x = x.view(B, D // window_size[0], window_size[0], H // window_size[1], window_size[1], W // window_size[2], window_size[2], C)
-    windows = x.permute(0, 1, 3, 5, 2, 4, 6, 7).contiguous().view(-1, reduce(mul, window_size), C)
+    #windows = x.permute(0, 1, 3, 5, 2, 4, 6, 7).contiguous().view(-1, reduce(mul, window_size), C)     # original version 
+    windows = x.permute(0, 1, 3, 5, 2, 4, 6, 7).contiguous().view(-1, _reduce(window_size), C)
     return windows
 
 
-def window_reverse(windows, window_size, B, D, H, W):
+def window_reverse(windows, window_size: Tuple[int, int, int], B: int, D: int, H:int, W:int):
     """
     Args:
         windows: (B*num_windows, window_size, window_size, C)
@@ -49,21 +57,58 @@ def window_reverse(windows, window_size, B, D, H, W):
     x = x.permute(0, 1, 4, 2, 5, 3, 6, 7).contiguous().view(B, D, H, W, -1)
     return x
 
-
-def get_window_size(x_size, window_size, shift_size=None):
-    use_window_size = list(window_size)
+def get_window_size(x_size: torch.Tensor, window_size: torch.Tensor, shift_size: Optional[torch.Tensor]=None):
+    ## additional line for torchscript 
+    if isinstance(x_size, torch.Tensor): 
+        list_x_size : List[int]= []
+        for i,_ in enumerate(x_size):
+            list_x_size.append(x_size[i].item())
+        x_size : Tuple[int, int, int] = (list_x_size[0], list_x_size[1], list_x_size[2])
+    
+    if isinstance(window_size, torch.Tensor):
+        use_window_size : List[int] = []
+        for i,_ in enumerate(window_size):
+            use_window_size.append(window_size[i].item())
+    else: 
+        use_window_size : List[int]  = list(window_size)
+    
     if shift_size is not None:
-        use_shift_size = list(shift_size)
-    for i in range(len(x_size)):
-        if x_size[i] <= window_size[i]:
-            use_window_size[i] = x_size[i]
+        if isinstance(shift_size, torch.Tensor):
+            use_shift_size : List[int] = []
+            for i,_ in enumerate(shift_size):
+                use_shift_size.append(shift_size[i].item())
+        else: 
+            use_shift_size : List[int] = list(shift_size)
+    else: 
+        use_shift_size : List[int] = []
+    
+    for i,_ in enumerate(x_size):
+        if x_size[i] <= window_size[i]:     
+            use_window_size[i] = int(x_size[i])
             if shift_size is not None:
                 use_shift_size[i] = 0
 
-    if shift_size is None:
-        return tuple(use_window_size)
-    else:
-        return tuple(use_window_size), tuple(use_shift_size)
+    #if shift_size is None:
+    #    return (use_window_size[0], use_window_size[1], use_window_size[2])
+    #else:
+    #    return (use_window_size[0], use_window_size[1], use_window_size[2]), (use_shift_size[0], use_shift_size[1], use_shift_size[2])
+    return (use_window_size[0], use_window_size[1], use_window_size[2]), (use_shift_size[0], use_shift_size[1], use_shift_size[2])
+
+    ######################################
+     # original version
+    #use_window_size = list(window_size)
+    #if shift_size is not None:
+    #    use_shift_size = list(shift_size)
+    #for i, in range(len(x_size)):
+    #    if x_size[i] <= window_size[i]:   
+    #        use_window_size[i] = int(x_size[i])
+    #        if shift_size is not None:
+    #            use_shift_size[i] = 0
+
+    #if shift_size is None:
+    #    return tuple(use_window_size)
+    #else:
+    #    return tuple(use_window_size), tuple(use_shift_size)
 
 class WindowAttention3D(nn.Module):
     """ Window based multi-head self attention (W-MSA) module with relative position bias.
@@ -116,7 +161,7 @@ class WindowAttention3D(nn.Module):
         trunc_normal_(self.relative_position_bias_table, std=.02)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x, mask=None):
+    def forward(self, x: torch.Tensor , mask :Optional[torch.Tensor]=None):
         """ Forward function.
         Args:
             x: input features with shape of (num_windows*B, N, C)
@@ -140,6 +185,7 @@ class WindowAttention3D(nn.Module):
             attn = attn.view(-1, self.num_heads, N, N)
             attn = self.softmax(attn)
         else:
+            assert mask is None
             attn = self.softmax(attn)
 
         attn = self.attn_drop(attn)
@@ -167,13 +213,13 @@ class SwinTransformerBlock3D(nn.Module):
         norm_layer (nn.Module, optional): Normalization layer.  Default: nn.LayerNorm
     """
 
-    def __init__(self, dim, num_heads, window_size=(2,7,7), shift_size=(0,0,0),
+    def __init__(self, dim, num_heads, window_size=(4,4,4), shift_size=(0,0,0),
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0., drop_path=0.,
                  act_layer=nn.GELU, norm_layer=nn.LayerNorm, use_checkpoint=False):
         super().__init__()
         self.dim = dim
         self.num_heads = num_heads
-        self.window_size = window_size
+        self.window_size : Tuple[int,int,int] = window_size
         self.shift_size = shift_size
         self.mlp_ratio = mlp_ratio
         self.use_checkpoint=use_checkpoint
@@ -194,18 +240,25 @@ class SwinTransformerBlock3D(nn.Module):
 
     def forward_part1(self, x, mask_matrix):
         B, D, H, W, C = x.shape
-        window_size, shift_size = get_window_size((D, H, W), self.window_size, self.shift_size)
+        #window_size, shift_size = get_window_size((D, H, W), self.window_size, self.shift_size)    # original version 
+        window_size, shift_size = get_window_size(torch.tensor((D,H,W)), torch.tensor(self.window_size), torch.tensor(self.shift_size))     # torchscript version
 
         x = self.norm1(x)
         # pad feature maps to multiples of window size
         pad_l = pad_t = pad_d0 = 0
-        pad_d1 = (window_size[0] - D % window_size[0]) % window_size[0]
-        pad_b = (window_size[1] - H % window_size[1]) % window_size[1]
-        pad_r = (window_size[2] - W % window_size[2]) % window_size[2]
+        pad_d1 = int((window_size[0] - D % window_size[0]) % window_size[0])
+        pad_b = int((window_size[1] - H % window_size[1]) % window_size[1])
+        pad_r = int((window_size[2] - W % window_size[2]) % window_size[2])
+        
         x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b, pad_d0, pad_d1))
         _, Dp, Hp, Wp, _ = x.shape
         # cyclic shift
-        if any(i > 0 for i in shift_size):
+        count = 0
+        for i in shift_size: 
+            if i > 0:
+                count += 1 
+        #if any(i > 0 for i in shift_size):
+        if count > 0:
             shifted_x = torch.roll(x, shifts=(-shift_size[0], -shift_size[1], -shift_size[2]), dims=(1, 2, 3))
             attn_mask = mask_matrix
         else:
@@ -219,7 +272,12 @@ class SwinTransformerBlock3D(nn.Module):
         attn_windows = attn_windows.view(-1, *(window_size+(C,)))
         shifted_x = window_reverse(attn_windows, window_size, B, Dp, Hp, Wp)  # B D' H' W' C
         # reverse cyclic shift
-        if any(i > 0 for i in shift_size):
+        reverse_count = 0
+        for i in shift_size: 
+            if i > 0:
+                reverse_count += 1
+        #if any(i > 0 for i in shift_size):
+        if reverse_count > 0:
             x = torch.roll(shifted_x, shifts=(shift_size[0], shift_size[1], shift_size[2]), dims=(1, 2, 3))
         else:
             x = shifted_x
@@ -237,18 +295,23 @@ class SwinTransformerBlock3D(nn.Module):
             x: Input feature, tensor size (B, D, H, W, C).
             mask_matrix: Attention mask for cyclic shift.
         """
+        """
+        For torchscript, checkpoint function couldn't be used.
+        """
 
         shortcut = x
-        if self.use_checkpoint:
-            x = checkpoint.checkpoint(self.forward_part1, x, mask_matrix)
-        else:
-            x = self.forward_part1(x, mask_matrix)
+#        if self.use_checkpoint:
+#            x = checkpoint.checkpoint(self.forward_part1, x, mask_matrix)
+#        else:
+#            x = self.forward_part1(x, mask_matrix)
+        x = self.forward_part1(x, mask_matrix)
         x = shortcut + self.drop_path(x)
 
-        if self.use_checkpoint:
-            x = x + checkpoint.checkpoint(self.forward_part2, x)
-        else:
-            x = x + self.forward_part2(x)
+#        if self.use_checkpoint:
+#            x = x + checkpoint.checkpoint(self.forward_part2, x)
+#        else:
+#            x = x + self.forward_part2(x)
+        x = x + self.forward_part2(x)
 
         return x
 
@@ -293,9 +356,11 @@ class PatchMerging3D(nn.Module):
 
 
 # cache each stage results
-@lru_cache()
-def compute_mask(D, H, W, window_size, shift_size, device):
-    img_mask = torch.zeros((1, D, H, W, 1), device=device)  # 1 Dp Hp Wp 1
+#@lru_cache()
+@torch.jit.ignore
+def compute_mask(D: int, H: int, W: int, window_size: Tuple[int, int, int], shift_size: Tuple[int, int, int], device: torch.device):
+    mask_size: Tuple[int, int, int, int, int] = (1, D, H, W, 1)
+    img_mask = torch.zeros(mask_size, device=device, dtype=torch.float32, requires_grad=False)  # 1 Dp Hp Wp 1
     cnt = 0
     for d in slice(-window_size[0]), slice(-window_size[0], -shift_size[0]), slice(-shift_size[0],None):
         for h in slice(-window_size[1]), slice(-window_size[1], -shift_size[1]), slice(-shift_size[1],None):
@@ -368,18 +433,24 @@ class BasicLayer(nn.Module):
         if self.downsample is not None:
             self.downsample = downsample(dim=dim, norm_layer=norm_layer)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """ Forward function.
         Args:
             x: Input feature, tensor size (B, C, D, H, W).
         """
         # calculate attention mask for SW-MSA
         B, C, D, H, W = x.shape
-        window_size, shift_size = get_window_size((D,H,W), self.window_size, self.shift_size)
-        x = rearrange(x, 'b c d h w -> b d h w c')
-        Dp = int(np.ceil(D / window_size[0])) * window_size[0]
-        Hp = int(np.ceil(H / window_size[1])) * window_size[1]
-        Wp = int(np.ceil(W / window_size[2])) * window_size[2]
+        #window_size, shift_size = get_window_size((D,H,W), self.window_size, self.shift_size)      # original version 
+        window_size, shift_size = get_window_size(torch.tensor((D,H,W)), torch.tensor(self.window_size), torch.tensor(self.shift_size))     # torchscript version
+
+        #x = rearrange(x, 'b c d h w -> b d h w c')     # original version
+        #Dp = int(np.ceil(D / window_size[0])) * window_size[0]     # original version
+        #Hp = int(np.ceil(H / window_size[1])) * window_size[1]     # original version
+        #Wp = int(np.ceil(W / window_size[2])) * window_size[2]     # original version
+        x = torch.einsum('bcdhw->bdhwc',x)      # torchscript version 
+        Dp: int = int(torch.ceil(torch.tensor(D / window_size[0]))) * window_size[0]     # torchscript version
+        Hp: int = int(torch.ceil(torch.tensor(H / window_size[1]))) * window_size[1]     # torchscript version
+        Wp: int = int(torch.ceil(torch.tensor(W / window_size[2]))) * window_size[2]     # torchscript version
         attn_mask = compute_mask(Dp, Hp, Wp, window_size, shift_size, x.device)
         for blk in self.blocks:
             x = blk(x, attn_mask)
@@ -387,7 +458,8 @@ class BasicLayer(nn.Module):
 
         if self.downsample is not None:
             x = self.downsample(x)
-        x = rearrange(x, 'b d h w c -> b c d h w')
+        #x = rearrange(x, 'b d h w c -> b c d h w')     # original version
+        x = torch.einsum('bdhwc->bcdhw', x)     # torchscript version
         return x
 
 
@@ -401,27 +473,28 @@ class PatchEmbed3D(nn.Module):
     """
     def __init__(self, patch_size=4, in_channels=3, embed_dim=96, norm_layer=None):
         super().__init__()
-        self.patch_size = to_3tuple(patch_size)
+        #self.patch_size = to_3tuple(patch_size)
+        self.patch_size : int = patch_size
 
         self.in_chans = in_channels
         self.embed_dim = embed_dim
 
-        self.proj = nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj : nn.Module = nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
         if norm_layer is not None:
-            self.norm = norm_layer(embed_dim)
+            self.norm : nn.Module = norm_layer(embed_dim)
         else:
             self.norm = None
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """Forward function."""
         # padding
         _, _, D, H, W = x.size()
-        if W % self.patch_size[2] != 0:
-            x = F.pad(x, (0, self.patch_size[2] - W % self.patch_size[2]))
-        if H % self.patch_size[1] != 0:
-            x = F.pad(x, (0, 0, 0, self.patch_size[1] - H % self.patch_size[1]))
-        if D % self.patch_size[0] != 0:
-            x = F.pad(x, (0, 0, 0, 0, 0, self.patch_size[0] - D % self.patch_size[0]))
+        if W % self.patch_size != 0:
+            x = F.pad(x, (0, self.patch_size - W % self.patch_size))
+        if H % self.patch_size != 0:
+            x = F.pad(x, (0, 0, 0, self.patch_size - H % self.patch_size))
+        if D % self.patch_size != 0:
+            x = F.pad(x, (0, 0, 0, 0, 0, self.patch_size - D % self.patch_size))
 
         x = self.proj(x)  # B C D Wh Ww
         if self.norm is not None:

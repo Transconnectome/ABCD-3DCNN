@@ -56,6 +56,7 @@ class calculating_eval_metrics(torch.nn.Module):
             self.total = torch.cat([self.total, torch.tensor([batch_size])])
             self.correct = torch.cat([self.correct, (predicted == true_y).sum().unsqueeze(0)])
         elif self.num_classes == 1:
+            true_y = true_y.unsqueeze(-1)
             assert true_y.shape[-1] == pred_y.shape[-1] == 1  
             self.true = torch.cat([self.true, true_y])
             self.pred = torch.cat([self.pred, pred_y])

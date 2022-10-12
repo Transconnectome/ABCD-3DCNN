@@ -138,7 +138,9 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
         partition['val'].transform.update_config(net.patch_size)
         print('The size of Patch is %i and the size of Mask Patch is %i' % (args.model_patch_size, args.mask_patch_size))
 
-
+    if args.torchscript:
+        torch._C._jit_set_autocast_mode(True)
+        net = torch.jit.script(net)
     checkpoint_dir = args.checkpoint_dir
 
 

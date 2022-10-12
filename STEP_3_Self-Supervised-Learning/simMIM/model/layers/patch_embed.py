@@ -6,6 +6,7 @@ Based on the impl in https://github.com/google-research/vision_transformer
 
 Hacked together by / Copyright 2020 Ross Wightman
 """
+import torch
 from torch import nn as nn
 
 from .helpers import to_2tuple, to_3tuple
@@ -45,15 +46,15 @@ class PatchEmbed_3D(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=1, embed_dim=768, norm_layer=None, flatten=True):
         super().__init__()
         img_size = to_3tuple(img_size)
-        self.img_size = img_size
+        self.img_size: tuple = img_size
         self.patch_size = patch_size
         self.grid_size = (img_size[0] // patch_size[0], img_size[1] // patch_size[1], img_size[2] // patch_size[2])
         self.num_patches = self.grid_size[0] * self.grid_size[1] * self.grid_size[2]
         self.flatten = flatten
 
-        self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
-
+        self.proj : nn.Module = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.norm : nn.Module = norm_layer(embed_dim) if norm_layer else nn.Identity()
+    
     def forward(self, x):
         B, C, H, W, D = x.shape
         _assert(H == self.img_size[0], f"Input image height ({H}) doesn't match model ({self.img_size[0]}).")

@@ -8,6 +8,7 @@
 
 from functools import partial
 from json import encoder
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -28,12 +29,17 @@ class SwinTransformerForSimMIM(SwinTransformer3D):
         self.mask_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
         trunc_normal_(self.mask_token, mean=0., std=.02)
 
-    def forward(self, x, mask):
+    def forward(self, x: torch.Tensor , mask: Optional[torch.Tensor]=None):
         x = self.patch_embed(x)
 
         assert mask is not None
         B, C, D, H, W = x.shape
-        x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C
+        #x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C    # original version
+        ## torchscript version
+        x = torch.einsum('bcdhw -> bdhwc', x) 
+        B, D, H, W, C = x.size() 
+        x = x.reshape(B, D * H * W, C)  # B L C 
+        ######################  
         _, L, _ = x.shape
 
         mask_token = self.mask_token.expand(B, L, -1)
@@ -47,7 +53,13 @@ class SwinTransformerForSimMIM(SwinTransformer3D):
         x = x.reshape(B, C, D, H, W)
         for layer in self.layers:
             x = layer(x)
-        x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C
+        #x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C    # original version
+        ## torchscript version
+        x = torch.einsum('bcdhw -> bdhwc', x) 
+        B, D, H, W, C = x.size() 
+        x = x.reshape(B, D * H * W, C)  # B L C 
+        ######################  
+        
         x = self.norm(x)
 
         x = x.transpose(1, 2)
@@ -70,7 +82,8 @@ class VisionTransformerForSimMIM(VisionTransformer3D):
 
         self.mask_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
         self._trunc_normal_(self.mask_token, std=.02)
-
+    
+    @torch.jit.ignore
     def _trunc_normal_(self, tensor, mean=0., std=1.):
         trunc_normal_(tensor, mean=mean, std=std, a=-std, b=std)
 
@@ -123,7 +136,8 @@ class SimMIM(nn.Module):
 
         self.in_channels = self.encoder.in_channels
         self.patch_size = self.encoder.patch_size
-
+    
+    @torch.jit.ignore
     def patchify_3D(self, imgs):
         """
         imgs: (N, in_channel, H, W, D)
@@ -138,7 +152,7 @@ class SimMIM(nn.Module):
         x = x.reshape(shape=(imgs.shape[0], h * w * d, p**3 * self.in_channels))
         return x
 
-    def forward(self, x, mask):
+    def forward(self, x: torch.Tensor, mask: torch.Tensor):
         ## original version
         
         z = self.encoder(x, mask)
@@ -174,9 +188,10 @@ class PixelShuffle3D(nn.Module):
         super().__init__()
         self.scale = scale 
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor):
         batch_size, channels, in_depth, in_height, in_width = input.size()
-        nOut = channels // self.scale ** 3 
+        #nOut = channels // self.scale ** 3    # original version
+        nOut = int(channels // self.scale ** 3)     # torchscript version
 
         out_depth = in_depth * self.scale 
         out_height = in_height * self.scale 

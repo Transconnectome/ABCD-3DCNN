@@ -144,7 +144,7 @@ if __name__ == "__main__":
     ## ========= Settingfor data ========= ##
     current_dir = os.getcwd()
     image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
-    image_files = loading_images(image_dir, args, study_sample=args.study_sample)
+    image_files, _ = loading_images(image_dir, args, study_sample=args.study_sample)
     subject_data, target_list, num_classes = loading_phenotype(phenotype_dir, args, study_sample=args.study_sample)
     
     ## data preprocesing categorical variable and numerical variables

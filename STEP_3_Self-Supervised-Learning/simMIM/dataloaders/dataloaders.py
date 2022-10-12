@@ -2,6 +2,7 @@ import os
 from os import listdir
 from os.path import isfile, join
 import glob
+from tkinter import NONE
 
 from matplotlib import transforms
 
@@ -23,22 +24,42 @@ def check_study_sample(study_sample):
     if study_sample == 'UKB':
         image_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
         phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
+        #image_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/1.sMRI_fs_cropped'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/2.demo_qc/UKB_phenotype.csv'
     elif study_sample == 'ABCD':
         image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
         phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+    elif study_sample == 'ABCD_ADHD':
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv'          
     return image_dir, phenotype_dir 
 
+def check_synthetic_sample(include_synthetic=True):
+    if include_synthetic: 
+        image_dir = '/home/ubuntu/3.LDM/1.sMRI'
+    else: 
+        image_dir = None 
+    return image_dir 
 
 
-def loading_images(image_dir, args, study_sample='UKB'):
+def loading_images(image_dir, args, study_sample='UKB', include_synthetic=False):
     if study_sample == 'UKB':
         image_files = glob.glob(os.path.join(image_dir,'*.nii.gz'))
     elif study_sample == 'ABCD':
         image_files = glob.glob(os.path.join(image_dir,'*.npy'))
     image_files = sorted(image_files)
+   
     #image_files = image_files[:1000]
     print("Loading image file names as list is completed")
-    return image_files
+
+    synthetic_image_dir = check_synthetic_sample(include_synthetic)
+    if synthetic_image_dir is not None: 
+        synthetic_image_files = glob.glob(os.path.join(synthetic_image_dir,'*.nii.gz'))
+        synthetic_image_files = sorted(synthetic_image_files)
+        print("Loading synthetic image file names as list is completed")
+    else: 
+        synthetic_image_files = None 
+    return image_files, synthetic_image_files
 
 def loading_phenotype(phenotype_dir, args, study_sample='UKB'):
     if study_sample == 'UKB':
@@ -77,7 +98,6 @@ def combining_image_target(subject_data, image_files, target_list, study_sample=
         suffix_len = -4
     imageFiles_labels = []
     
-    
     subj = []
     if type(subject_data[subject_id_col][0]) == np.str_ or type(subject_data[subject_id_col][0]) == str:
         for i in range(len(image_files)):
@@ -102,7 +122,7 @@ def combining_image_target(subject_data, image_files, target_list, study_sample=
 
 
 
-def partition_dataset_pretrain(imageFiles, args):
+def partition_dataset_pretrain(imageFiles=None, synthetic_imageFiles=None, args=None):
 
     train_transform = Compose([AddChannel(),
                                Resize(tuple(args.img_size)),
@@ -131,6 +151,10 @@ def partition_dataset_pretrain(imageFiles, args):
 
     # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
     #images_test = imageFiles[num_train+num_val:]
+
+    if synthetic_imageFiles is not None: 
+        image_train = image_train.append(synthetic_imageFiles)
+        print("{} Synthetic imaages are included in the training data".format(len(synthetic_imageFiles)))
 
     print("Training Sample: {}".format(len(images_train)))
 

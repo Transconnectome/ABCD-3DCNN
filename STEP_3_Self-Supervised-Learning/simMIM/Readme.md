@@ -35,7 +35,9 @@ In default, ```--img_size 96 96 96```.
 You can specify the size of mask patch by setting ```---mask_patch_size 8```. 
 **When you want to change the size of mask patch during training ViT, be cautious that you should also specify the size of ```--model_patch_size 8```, which is the same as the size of mask patch (training Swin Transformer is not the case)**.  
   
-You can load ImageNet22k pretrained ViT and Swin by setting ```--load_imagenet_prertrained```.
+You can load ImageNet22k pretrained ViT and Swin by setting ```--load_imagenet_prertrained```.  
+  
+You can use kernel fusion by activate ```--torchscript``` (Kernel fusion need pytoch version >= 1.2).
    
 
 ### ViT specific parameters     
@@ -61,6 +63,7 @@ Finetuning Vision Transformer for downstream tasks.
 torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitBASE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
 ```
   
+You can use kernel fusion by activate ```--torchscript``` (Kernel fusion need pytoch version >= 1.2).  
   
 ### ViT specific parameters
 **You can choose whether use cls token for classification (or regression) or use average pooled latent features for classification (or regression)**.  
