@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
-from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor, RandAffine
+from monai.transforms import AddChannel, Compose, RandRotate90, Resize, ScaleIntensity, Flip, ToTensor, RandAffine, RandFlip
 from monai.data import ImageDataset
 
 
@@ -143,14 +143,23 @@ def partition_dataset(imageFiles_labels, target_list, args):
 
     # number of total / train,val, test
     num_total = len(images)
-    num_val = int(num_total*args.val_size)
     num_test = int(num_total*args.test_size)
-    num_train = int(num_total*(1 - args.val_size - args.test_size))
-    print(f"Total subjects={num_total}, train={num_train}, val={num_val}, test={num_test}")
-
+    num_val = int(num_total*args.val_size) if args.cv == None else int((num_total-num_test)/5)
+    num_train = num_total - (num_val+num_test)
+    
     # image and label information of train, val, test
-    images_train, images_val, images_test = np.split(images, [num_train, num_train+num_val]) # revising
-    labels_train, labels_val, labels_test = np.split(labels, [num_train, num_train+num_val])
+    if args.cv == None:
+        images_train, images_val, images_test = np.split(images, [num_train, num_train+num_val]) # revising
+        labels_train, labels_val, labels_test = np.split(labels, [num_train, num_train+num_val])
+    else:
+        split_points = [num_val, 2*num_val, 3*num_val, 4*num_val, num_total-num_test]
+        images_total, labels_total = np.split(images, split_points), np.split(labels, split_points)
+        images_test, labels_test = images_total.pop(), labels_total.pop()
+        images_val, labels_val = images_total.pop(args.cv-1), labels_total.pop(args.cv-1)
+        images_train, labels_train = np.concatenate(images_total), np.concatenate(labels_total)
+        num_train, num_val = images_train.shape[0], images_val.shape[0]
+        
+    print(f"Total subjects={num_total}, train={num_train}, val={num_val}, test={num_test}")
 
     train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
     val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)

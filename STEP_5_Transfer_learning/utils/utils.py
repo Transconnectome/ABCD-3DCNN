@@ -11,12 +11,13 @@ import models.simple3d as simple3d #model script
 import models.vgg3d as vgg3d #model script
 import models.resnet3d as resnet3d #model script
 import models.densenet3d as densenet3d #model script
+import models.sfcn as sfcn
 
 def argument_setting():
     parser = argparse.ArgumentParser()
 
     #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
-    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
+    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264','sfcn'])
     parser.add_argument("--dataset",required=True, type=str, choices=['UKB','ABCD'],help='') # revising
     parser.add_argument("--data", type=str, help='select data type') # revising
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
@@ -49,6 +50,8 @@ def argument_setting():
                         help='options for filter data by phenotype. usage: --filter abcd_site:10 sex:1')
     parser.add_argument("--augmentation",required=False, nargs="+", default=[],
                         help="Data augmentation - [shift, flip] are available")
+    parser.add_argument("--cv",required=False, type=int, default=None,choices=[1,2,3,4,5],help="option for 5-fold CV. 1~5.")
+    
     
     args = parser.parse_args()
     print("*** Categorical target labels are {} and Numerical target labels are {} *** \n".format(
@@ -99,6 +102,10 @@ def select_model(subject_data, args): # revising
         net = densenet3d.densenet3D169(subject_data, args) 
     elif args.model == 'densenet3D201':
         net = densenet3d.densenet3D201(subject_data, args)
+    
+    # SFCN
+    elif args.model.lower() == 'sfcn':
+        net = sfcn.SFCN(subject_data, args)
         
     return net
 

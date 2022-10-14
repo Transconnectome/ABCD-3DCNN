@@ -127,15 +127,18 @@ def run_experiment(args, net, partition, result, save_dir, mode):
         ## sorting the results
         train_loss_sum = 0
         val_loss_sum = 0
+        val_acc_sum = 0
         for target_name in targets:
             result['train_losses'][target_name].append(train_loss[target_name])
             result['train_accs'][target_name].append(train_acc[target_name])
             result['val_losses'][target_name].append(val_loss[target_name])
             result['val_accs'][target_name].append(val_acc[target_name])
             val_loss_sum += val_loss[target_name]
+            val_acc_sum += val_acc[target_name]
             train_loss_sum += train_loss[target_name]
             
         val_loss_total = val_loss_sum/len(targets)
+        val_acc_total = val_acc_sum/len(targets)
         train_loss_total = train_loss_sum/len(targets)
         
         if val_loss_total < best_val_loss:
