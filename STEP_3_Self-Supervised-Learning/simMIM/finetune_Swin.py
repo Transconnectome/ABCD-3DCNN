@@ -51,6 +51,8 @@ parser.add_argument("--study_sample",default='UKB',type=str,required=False,help=
 parser.add_argument("--train_size",default=0.8,type=float,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
+#parser.add_argument("--random_shuffle_data",action='store_true',required=False,help='random shuffle data. If not train/validation/test sample would be fixed')
+#parser.set_defaults(random_shuffle_data=False)
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 parser.add_argument("--mixup",default=None,type=float,required=False,help='')
 

@@ -80,7 +80,7 @@ parser.add_argument("--torchscript",action='store_true', help = 'if you want to 
 parser.set_defaults(torchscript=False)
 parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.set_defaults(load_imagenet_pretrained=False)
-parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
+parser.add_argument("--checkpoint_dir", type=str, default=None,required=True)
 parser.add_argument("--use_gpu", action='store_true')
 parser.set_defaults(use_gpu=False)
 
