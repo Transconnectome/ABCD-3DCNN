@@ -163,14 +163,25 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
     #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=10, gamma=0.5)
-
+    
+    #for one cycle scheduler 
+    """
+    steps_per_epoch = len(torch.utils.data.DataLoader(partition['train'],
+                                             batch_size=args.batch_size,
+                                             sampler=DistributedSampler(partition['train'], shuffle=True), 
+                                             shuffle=False,
+                                             drop_last = False,
+                                             num_workers=16))
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epoch, steps_per_epoch=steps_per_epoch)
+    """
+  
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()
 
     # loading last checkpoint if resume training
     if args.resume == True:
         if args.checkpoint_dir != None:
-            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain')
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')

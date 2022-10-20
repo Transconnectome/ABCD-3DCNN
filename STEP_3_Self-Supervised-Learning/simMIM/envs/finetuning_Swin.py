@@ -33,9 +33,9 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
                                              batch_size=args.batch_size,
-                                             sampler=train_sampler, 
-                                             shuffle=False,
-                                             drop_last = False,
+                                             sampler=train_sampler,
+                                             shuffle=False, 
+                                             drop_last=True,
                                              num_workers=16)
 
     net.train()
@@ -98,7 +98,6 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()    
-            
 
     return net, np.mean(losses), eval_metrics.get_result() 
         
@@ -109,6 +108,7 @@ def Swin_validation(net, partition, epoch, num_classes, args):
                                             sampler=val_sampler, 
                                             batch_size=args.batch_size,
                                             shuffle=False,
+                                            drop_last=True,
                                             num_workers=16)
 
     net.eval()
@@ -185,7 +185,16 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
     #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=10, gamma=0.5)
-
+    """
+    #for one cycle scheduler 
+    steps_per_epoch = len(torch.utils.data.DataLoader(partition['train'],
+                                             batch_size=args.batch_size,
+                                             sampler=DistributedSampler(partition['train'], shuffle=True), 
+                                             shuffle=False,
+                                             drop_last = False,
+                                             num_workers=16))
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epoch, steps_per_epoch=steps_per_epoch)
+    """
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()
 
@@ -194,7 +203,7 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
         last_epoch = 0 
     elif args.resume == True:  # loading last checkpoint 
         if args.checkpoint_dir != None:
-            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain')
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
@@ -226,9 +235,7 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
         net, train_loss, train_performance = Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args)
         net, val_loss, val_performance = Swin_validation(net, partition, epoch, num_classes, args)
         
-        # store result per epoch 
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+
         
         #scheduler.step(loss)
         scheduler.step()
@@ -237,6 +244,9 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
         # visualize the result and saving the checkpoint
         # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
         if args.gpu == 0:
+            # store result per epoch 
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
             print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. \n Training Prediction Performance: {}. \n Validation Prediction Performance: {}. \n Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, train_performance, val_performance, optimizer.param_groups[0]['lr'],te-ts))
             if 'ACC' in val_performance.keys():
                 previous_performance['ACC'].append(val_performance['ACC'])

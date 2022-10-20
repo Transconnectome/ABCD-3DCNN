@@ -29,6 +29,8 @@ def check_study_sample(study_sample):
     elif study_sample == 'ABCD':
         image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
         phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+        #image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
     elif study_sample == 'ABCD_ADHD':
         image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
         phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv'          
@@ -122,7 +124,7 @@ def combining_image_target(subject_data, image_files, target_list, study_sample=
 
 
 
-def partition_dataset_pretrain(imageFiles=None, synthetic_imageFiles=None, args=None):
+def partition_dataset_pretrain(imageFiles_list: list=None, synthetic_imageFiles=None, args=None):
 
     train_transform = Compose([AddChannel(),
                                Resize(tuple(args.img_size)),
@@ -135,25 +137,30 @@ def partition_dataset_pretrain(imageFiles=None, synthetic_imageFiles=None, args=
                              ScaleIntensity(),
                              ToTensor()])
 
+    images_train, images_val = [], []
+    for imageFiles in imageFiles_list: 
+        # number of total / train,val, test
+        if args.train_size + args.val_size + args.test_size != 1: 
+            print('PLZ CHECK WHETHER YOU WANT TO USE ONLY THE PORTION OF DATA')
+        num_total = len(imageFiles)
+        num_train = int(num_total*args.train_size)
+        num_val = int(num_total*args.val_size)
+        num_test = int(num_total*args.test_size)
+        
 
-    # number of total / train,val, test
-    num_total = len(imageFiles)
-    num_train = int(num_total*(1 - args.val_size - args.test_size))
-    num_val = int(num_total*args.val_size)
-    num_test = int(num_total*args.test_size)
-    
+        # image for MAE training and linear classifier training (linear classifier is trained during linear evaluation protocol) 
+        images_train_tmp = imageFiles[:num_train]
 
-    # image for MAE training and linear classifier training (linear classifier is trained during linear evaluation protocol) 
-    images_train = imageFiles[:num_train]
+        # image for validation set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
+        images_val_tmp = imageFiles[num_train:num_train+num_val]
 
-    # image for validation set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
-    images_val = imageFiles[num_train:num_train+num_val]
+        # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
+        #images_test = imageFiles[num_train+num_val:]
 
-    # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
-    #images_test = imageFiles[num_train+num_val:]
+        images_train, images_val = images_train + images_train_tmp, images_val + images_val_tmp
 
     if synthetic_imageFiles is not None: 
-        image_train = image_train.append(synthetic_imageFiles)
+        image_train = image_train + synthetic_imageFiles
         print("{} Synthetic imaages are included in the training data".format(len(synthetic_imageFiles)))
 
     print("Training Sample: {}".format(len(images_train)))
@@ -200,7 +207,9 @@ def partition_dataset_finetuning(imageFiles_labels, args):
 
     # number of total / train,val, test
     num_total = len(images)
-    num_train = int(num_total*(1 - args.val_size - args.test_size))
+    if args.train_size + args.val_size + args.test_size != 1: 
+        print('PLZ CHECK WHETHER YOU WANT TO USE ONLY THE PORTION OF DATA')
+    num_train = int(num_total*args.train_size)
     num_val = int(num_total*args.val_size)
     num_test = int(num_total*args.test_size)
     

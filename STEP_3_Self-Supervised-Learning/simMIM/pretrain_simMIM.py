@@ -50,7 +50,8 @@ parser = argparse.ArgumentParser()
 #########################
 parser.add_argument('--include_synthetic', action='store_true')
 parser.set_defaults(include_synthetic=False)
-parser.add_argument("--study_sample",default='UKB',type=str,required=False,help='')
+parser.add_argument("--study_sample",default=['UKB'],type=str, nargs='*', required=False,help='')
+parser.add_argument("--train_size",default=0.8,type=float,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
@@ -67,7 +68,6 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 #########################
 parser.add_argument("--model",required=True,type=str,help='',choices=['simMIM_swin_small_3D', 'simMIM_swin_base_3D', 'simMIM_swin_large_3D','simMIM_vit_base_patch16_3D', 'simMIM_vit_large_patch16_3D', 'simMIM_vit_huge_patch16_3D'])
 parser.add_argument("--mask_patch_size",default=16,type=int,required=False,help='The size of mask patch used for patch emebdding.')
-parser.add_argument("--model_patch_size",default=16,type=int,required=False,help='The size of model patch used for patch emebdding.')
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
@@ -75,6 +75,7 @@ parser.add_argument("--mask_ratio",required=False,default=0.6,type=float,help='t
 # Swin specific parameters
 parser.add_argument("--window_size",default=8,type=int,required=False,help='The size of window.')
 # ViT specific parameters 
+parser.add_argument("--model_patch_size",default=16,type=int,required=False,help='The size of model patch used for patch emebdding.') # should be the same as --mask_patch_size
 parser.add_argument("--use_rel_pos_bias",action='store_true',help='Use relative positional bias for positional encoding')
 parser.set_defaults(use_rel_pos_bias=False)
 parser.add_argument("--use_sincos_pos",action='store_true',help='Use relative positional bias for positional encoding')
@@ -124,14 +125,22 @@ if __name__ == "__main__":
 
     ## ========= Settingfor data ========= ##
     current_dir = os.getcwd()
-    image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
-    image_files, synthetic_image_files = loading_images(image_dir, args, study_sample=args.study_sample)
+    #image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
+    #image_files, synthetic_image_files = loading_images(image_dir, args, study_sample=args.study_sample)
+    image_files = [] 
+    for i in range(len(args.study_sample)):
+        study_sample = args.study_sample[i]
+        image_dir, phenotype_dir = check_study_sample(study_sample=study_sample)
+        image_files_tmp, synthetic_image_files = loading_images(image_dir, args, study_sample=study_sample)
+        image_files.append(image_files_tmp)
 
     # partitioning dataset and preprocessing 
     if args.include_synthetic: 
-        partition = partition_dataset_pretrain(imageFiles=image_files, synthetic_imageFiles=synthetic_image_files, args=args)
+        partition = partition_dataset_pretrain(imageFiles_list=image_files, synthetic_imageFiles=synthetic_image_files, args=args)
     else: 
-        partition = partition_dataset_pretrain(imageFiles=image_files, args=args)
+        partition = partition_dataset_pretrain(imageFiles_list=image_files, args=args)
+        
+
     ## ====================================== ##
 
 

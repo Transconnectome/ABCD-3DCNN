@@ -110,10 +110,10 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, pe
 
 
 
-def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pretrain'):
+def checkpoint_load(net=None, checkpoint_dir=None, optimizer=None, scheduler=None, scaler=None, mode='pretrain'):
     if mode == 'pretrain':
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-        net.load_state_dict(model_state['net'])
+        net.load_state_dict(model_state['model'])
         optimizer.load_state_dict(model_state['optimizer'])
         scheduler.load_state_dict(model_state['scheduler'])
         scaler.load_state_dict(model_state['amp_state'])
@@ -124,6 +124,12 @@ def checkpoint_load(net, checkpoint_dir, optimizer, scheduler, scaler, mode='pre
     elif mode == 'finetuning': 
         model_state = torch.load(checkpoint_dir, map_location = 'cpu')
         net = load_pretrained_model(net, model_state)
+        return net 
+    
+    elif mode == 'inference':
+        model_state = torch.load(checkpoint_dir, map_location = 'cpu')
+        net.load_state_dict(model_state['model'])
+        print(f"=> loaded successfully for inference'{checkpoint_dir}'")
         return net 
 
     """
