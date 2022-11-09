@@ -254,8 +254,8 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
                     previous_performance['AUROC'].append(val_performance['AUROC'])
                     if val_performance['AUROC'] > max(previous_performance['AUROC'][:-1]):
                         checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-                    
-            elif 'abs_loss' in val_performance.keys():
+            
+            if 'abs_loss' in val_performance.keys():
                 previous_performance['abs_loss'].append(val_performance['abs_loss'])
                 if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
                     checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')

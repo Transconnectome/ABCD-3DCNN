@@ -107,18 +107,26 @@ class calculating_eval_metrics(torch.nn.Module):
                 for i in range(len(true_tmp)):
                     true, pred = torch.cat([true, true_tmp[i].detach().cpu()]), torch.cat([pred, pred_tmp[i].detach().cpu()])
                 abs_loss = torch.nn.functional.l1_loss(true, pred)
+                """
+                # lines for normalized MSE and R2
                 std_true, std_pred = self.standardization(true, pred) 
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
+                """
+                mse_loss = torch.nn.functional.mse_loss(true, pred)
                 y_var = torch.var(true)
-                r_square = 1 - (mse_loss / (y_var + 1e-6))
+                r_square = 1 - (mse_loss / (y_var + 1e-4))
                 result['abs_loss'] = abs_loss.item()
                 result['mse_loss'] = mse_loss.item() 
                 result['r_square'] = r_square.item()
                 
             else: 
                 abs_loss = torch.nn.functional.l1_loss(self.true, self.pred)
+                """
+                # lines for normalized MSE and R2
                 std_true, std_pred = self.standardization(self.true, self.pred)
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
+                """
+                mse_loss = torch.nn.functional.mse_loss(self.true, self.pred)
                 y_var = torch.var(self.true)
                 r_square = 1 - (mse_loss / y_var)
                 result['abs_loss'] = abs_loss.item()
@@ -127,12 +135,12 @@ class calculating_eval_metrics(torch.nn.Module):
 
         return result 
  
-    def standardization(self, x, y):
-        mean_x = x.mean()
-        stdev_x = x.var()**0.5
-        mean_y = y.mean()
-        stdev_y = y.var()**0.5
+    def standardization(self, a, b):
+        mean_a = a.mean()
+        stdev_a = a.var()**0.5
+        mean_b = b.mean()
+        stdev_b = b.var()**0.5
 
-        return (x - mean_x) / stdev_x, (y - mean_y) / stdev_y
+        return (a - mean_a) / stdev_a, (b - mean_b) / stdev_b
 
 

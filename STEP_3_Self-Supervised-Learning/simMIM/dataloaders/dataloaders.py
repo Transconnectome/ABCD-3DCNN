@@ -22,26 +22,26 @@ from monai.data import ImageDataset
 
 def check_study_sample(study_sample):
     if study_sample == 'UKB':
-        #image_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
-        #phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
-        image_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/1.sMRI_fs_cropped'
-        phenotype_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/2.demo_qc/UKB_phenotype.csv'
+        image_dir = '/scratch/connectome/3DCNN/data/2.UKB/1.sMRI_fs_cropped'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotype.csv'
+        #image_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/1.sMRI_fs_cropped'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/2.demo_qc/UKB_phenotype.csv'
     elif study_sample == 'ABCD':
-        #image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
-        #phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
-        image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'
-        phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+        #image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
     elif study_sample == 'ABCD_MNI':
-        #image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_fmriprep'
-        #phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
-        image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/1.sMRI_freesurfer'
-        phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_fmriprep'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+        #image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/1.sMRI_freesurfer'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
     elif study_sample == 'ABCD_ADHD':
-        #image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
-        #phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv'   
-        image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'       
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv'   
+        #image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'       
         #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS.csv'
-        phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS_and_CBCL.csv'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS_and_CBCL.csv'
     return image_dir, phenotype_dir 
 
 def check_synthetic_sample(include_synthetic=True):
