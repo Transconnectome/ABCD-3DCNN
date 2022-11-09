@@ -3,7 +3,7 @@
 
 ## ======= load module ======= ##
 from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, set_random_seed
-from dataloaders.dataloaders import check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
+from dataloaders.dataloaders import balancing_testset, check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.finetuning_Swin import *
 from util.distributed_parallel import *
@@ -51,6 +51,7 @@ parser.add_argument("--study_sample",default='UKB',type=str,required=False,help=
 parser.add_argument("--train_size",default=0.8,type=float,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
+parser.add_argument("--dataset_split", default='none', choices=['all', 'test','train_test', 'none'], help='the way splitting data set')
 #parser.add_argument("--random_shuffle_data",action='store_true',required=False,help='random shuffle data. If not train/validation/test sample would be fixed')
 #parser.set_defaults(random_shuffle_data=False)
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
@@ -62,6 +63,7 @@ parser.add_argument("--mixup",default=None,type=float,required=False,help='')
 #########################
 parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
 parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
+parser.add_argument("--metric", type=str, default='ACC',required=False, choices=['ACC', 'AUROC', 'abs_loss'])
 
 
 #########################
@@ -97,6 +99,7 @@ parser.set_defaults(gradient_accumulation=False)
 ##########################
 #### other parameters ####
 ##########################
+parser.add_argument("--seed",default=1234,type=int,required=False,help='')
 parser.add_argument("--torchscript",action='store_true', help = 'if you want to activate kernel fusion activate this option')
 parser.set_defaults(torchscript=False)
 parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
@@ -105,6 +108,8 @@ parser.add_argument('--pretrained_model', type=str, default=None, required=False
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
 parser.add_argument("--load_imagenet_pretrained", action='store_true', help = 'load imagenet pretrained model')
 parser.set_defaults(load_imagenet_pretrained=False)
+parser.add_argument("--freeze_backbone", action='store_true', help = 'freeze patch embedding and swin block layers. Only projection head is not frozen')
+parser.set_defaults(freeze_backbone=False)
 parser.add_argument("--resume", action='store_true', help = 'if you add this option in the command line like --resume, args.resume would change to be True')
 parser.set_defaults(resume=False)
     
@@ -132,12 +137,14 @@ elif not args.cat_target and args.num_target:
        raise ValueError('YOU SHOULD SELECT THE TARGET!')
 
 
+
+
 if __name__ == "__main__":
     ## ========= Settingfor data ========= ##
     current_dir = os.getcwd()
     image_dir, phenotype_dir = check_study_sample(study_sample=args.study_sample)
-    image_files, _ = loading_images(image_dir, args, study_sample=args.study_sample)
-    subject_data, target_list, num_classes = loading_phenotype(phenotype_dir, args, study_sample=args.study_sample)
+    image_files, _ = loading_images(image_dir=image_dir, args=args, study_sample=args.study_sample)
+    subject_data, target_list, num_classes = loading_phenotype(phenotype_dir=phenotype_dir, args=args, study_sample=args.study_sample)
     
     ## data preprocesing categorical variable and numerical variables
     imageFiles_labels = combining_image_target(subject_data, image_files, target_list, study_sample=args.study_sample)
@@ -149,7 +156,7 @@ if __name__ == "__main__":
 
     ## ========= Run Experiment and saving result ========= ##
     # seed number
-    seed = 1234
+    seed = args.seed
 
     # initialize Distributed Data Parallel and divide batch size by the number of (DDP) proccesses
     init_distributed(args)

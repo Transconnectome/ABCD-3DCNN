@@ -86,18 +86,21 @@ class calculating_eval_metrics(torch.nn.Module):
                 result['total'], result['correct'] = total.item(), correct.item() 
                 result['ACC'] = 100 * correct.item() / total.item() 
                 if self.num_classes == 2:
-                    result['AUROC'] = roc_auc_score(true.detach().cpu(), pred[:1].detach().cpu())
+                    true, pred = torch.cat(true), torch.cat(pred)
+                    true = true.long()
+                    result['AUROC'] = roc_auc_score(true.detach().cpu(), pred[:, 1].detach().cpu())
             else: 
                 result['total'] = self.total.sum().item()
                 result['correct'] = self.correct.sum().item()
                 result['ACC'] = 100 * self.correct.sum().item() /self.total.sum().item() 
-                if self.num_classes ==2: 
-                    result['AUROC'] = roc_auc_score(self.true, self.pred[:, 1])
+                if self.num_classes ==2:
+                    self.true = self.true.long()
+                    result['AUROC'] = roc_auc_score(self.true.detach().cpu(), self.pred[:, 1].detach().cpu())
              
         elif self.num_classes == 1:
             if self.is_DDP:
                 # gathering the results from each processes
-                true_tmp, pred_tmp = [torch.zeros(self.true.size(), dtype=torch.float64).cuda() for r in range(self.world_size)], [torch.zeros(self.pred.size(), dtype=torch.float64).cuda() for r in range(self.world_size)]
+                true_tmp, pred_tmp = [torch.zeros(self.true.size(), dtype=self.true.dtype).cuda() for r in range(self.world_size)], [torch.zeros(self.pred.size(), dtype=self.pred.dtype).cuda() for r in range(self.world_size)]
                 torch.distributed.all_gather(true_tmp, self.true.cuda())
                 torch.distributed.all_gather(pred_tmp, self.pred.cuda())
                 true, pred = torch.tensor([]), torch.tensor([])
@@ -107,16 +110,15 @@ class calculating_eval_metrics(torch.nn.Module):
                 std_true, std_pred = self.standardization(true, pred) 
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 y_var = torch.var(true)
-                r_square = 1 - (mse_loss / y_var)
+                r_square = 1 - (mse_loss / (y_var + 1e-6))
                 result['abs_loss'] = abs_loss.item()
                 result['mse_loss'] = mse_loss.item() 
                 result['r_square'] = r_square.item()
+                
             else: 
-                abs_loss_fn = torch.nn.L1Loss() 
-                mse_loss_fn = torch.nn.MSELoss()
-                abs_loss = abs_loss_fn(self.true, self.pred)
+                abs_loss = torch.nn.functional.l1_loss(self.true, self.pred)
                 std_true, std_pred = self.standardization(self.true, self.pred)
-                mse_loss = mse_loss_fn(std_true, std_pred)
+                mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 y_var = torch.var(self.true)
                 r_square = 1 - (mse_loss / y_var)
                 result['abs_loss'] = abs_loss.item()

@@ -131,7 +131,7 @@ if __name__ == "__main__":
     for i in range(len(args.study_sample)):
         study_sample = args.study_sample[i]
         image_dir, phenotype_dir = check_study_sample(study_sample=study_sample)
-        image_files_tmp, synthetic_image_files = loading_images(image_dir, args, study_sample=study_sample)
+        image_files_tmp, synthetic_image_files = loading_images(image_dir, args, study_sample=study_sample, include_synthetic=args.include_synthetic)
         image_files.append(image_files_tmp)
 
     # partitioning dataset and preprocessing 

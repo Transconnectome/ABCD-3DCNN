@@ -7,11 +7,13 @@ import json
 import torch
 import copy
 from copy import deepcopy
+import random
 
 
 
 
 def set_random_seed(seed):
+    random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -204,11 +206,6 @@ def load_imagenet_pretrained_weight(args):
 
     return pretrained_weight
 
-def freezing_layers(module):
-    for param in module.parameters():
-        param.requires_grad = False
-    return module
-
 
 # define result-saving function
 def save_exp_result(save_dir, setting, result, resume='False'):
@@ -227,8 +224,12 @@ def makedir(path):
         os.makedirs(path)
 
 
-
-
+def freeze_backbone(model):
+    for k, v in model.named_parameters():
+        if k.find('head') == -1: 
+            v.requires_grad = False
+    return model
+            
 
 
 

@@ -52,6 +52,7 @@ parser.add_argument("--study_sample",default='UKB',type=str,required=False,help=
 parser.add_argument("--train_size",default=0.8,type=float,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
+parser.add_argument("--dataset_split", default='none', choices=['all', 'test','train_test', 'none'], help='the way splitting data set')
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 parser.add_argument("--mixup",default=None,type=float,required=False,help='')
 
@@ -70,6 +71,7 @@ parser.add_argument('--cls_token', action='store_false', dest='global_pool',
 #########################
 parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
 parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
+parser.add_argument("--metric", type=str, default='ACC',required=False, choices=['ACC', 'AUROC', 'abs_loss'])
 
 
 #########################
@@ -108,12 +110,15 @@ parser.set_defaults(gradient_accumulation=False)
 ##########################
 #### other parameters ####
 ##########################
+parser.add_argument("--seed",default=1234,type=int,required=False,help='')
 parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
 parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.add_argument('--pretrained_model', type=str, default=None, required=False)
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
 parser.add_argument("--load_imagenet_pretrained", action='store_true', help = 'load imagenet pretrained model')
 parser.set_defaults(load_imagenet_pretrained=False)
+parser.add_argument("--freeze_backbone", action='store_true', help = 'freeze patch embedding and swin block layers. Only projection head is not frozen')
+parser.set_defaults(freeze_backbone=False)
 parser.add_argument("--resume", action='store_true', help = 'if you add this option in the command line like --resume, args.resume would change to be True')
 parser.set_defaults(resume=False)
     
@@ -158,7 +163,7 @@ if __name__ == "__main__":
 
     ## ========= Run Experiment and saving result ========= ##
     # seed number
-    seed = 1234
+    seed = args.seed
 
     # initialize Distributed Data Parallel and divide batch size by the number of (DDP) proccesses
     init_distributed(args)
