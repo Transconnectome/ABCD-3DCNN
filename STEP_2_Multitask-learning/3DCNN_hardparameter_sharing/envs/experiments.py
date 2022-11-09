@@ -51,19 +51,22 @@ def train(net,partition,optimizer,args):
             train_loss[num_target] = []
 
 
+    optimizer.zero_grad()
     for i, data in enumerate(trainloader,0):
-        optimizer.zero_grad()
         image, targets = data
         image = image.to(f'cuda:{net.device_ids[0]}')
-
+        # feed forward network with floating point 16
         with torch.cuda.amp.autocast():
             output = net(image)
-            loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
-            train_acc = calculating_acc(targets, output, correct, total, train_acc, net, args)
-        
-        scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
-        scaler.step(optimizer)
-        scaler.update()
+        loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
+        train_acc = calculating_acc(targets, output, correct, total, train_acc, net, args)
+        if args.accumulation_steps:
+            loss = loss / args.accumulation_steps
+            scaler.scale(loss).backward()
+            if  (i + 1) % args.accumulation_steps == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
 
 
     # calculating total loss and acc of separate mini-batch
@@ -118,8 +121,8 @@ def validate(net,partition,scheduler,args):
 
             with torch.cuda.amp.autocast():
                 output = net(image)
-                loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
-                val_acc = calculating_acc(targets, output, correct, total, val_acc, net, args)
+            loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
+            val_acc = calculating_acc(targets, output, correct, total, val_acc, net, args)
 
     if args.cat_target:
         for cat_target in args.cat_target:
