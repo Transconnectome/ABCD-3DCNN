@@ -8,6 +8,7 @@ class loss_forward(torch.nn.Module):
         self.num_classes = num_classes
         #self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss(label_smoothing=0.1)
         self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
+        #self.criterion = torch.nn.MSELoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
 
 
     def forward(self, pred_y, true_y):

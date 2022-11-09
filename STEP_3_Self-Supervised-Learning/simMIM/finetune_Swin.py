@@ -63,7 +63,7 @@ parser.add_argument("--mixup",default=None,type=float,required=False,help='')
 #########################
 parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
 parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
-parser.add_argument("--metric", type=str, default='ACC',required=False, choices=['ACC', 'AUROC', 'abs_loss'])
+parser.add_argument("--metric", type=str, default='ACC',required=False, choices=['ACC', 'AUROC', 'abs_loss', 'mse_loss'])
 
 
 #########################

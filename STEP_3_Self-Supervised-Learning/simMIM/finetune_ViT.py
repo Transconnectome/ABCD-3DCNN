@@ -71,7 +71,7 @@ parser.add_argument('--cls_token', action='store_false', dest='global_pool',
 #########################
 parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
 parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
-parser.add_argument("--metric", type=str, default='ACC',required=False, choices=['ACC', 'AUROC', 'abs_loss'])
+parser.add_argument("--metric", type=str, default='ACC',required=False, choices=['ACC', 'AUROC', 'abs_loss', 'mse_loss'])
 
 
 #########################

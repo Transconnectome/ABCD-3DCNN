@@ -51,12 +51,9 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
     
     optimizer.zero_grad()
     for i, data in enumerate(trainloader,0):
-        ################################################
-        ################################################
-        #################### TO DO #####################
-        # loss_fn = cross entropy or MSE 
-        # change pred, target, mask = net(images) => latent, cls_tokens = net(images)
-        images, labels = data 
+        images, labels = data
+        if args.num_target: 
+            labels = labels.float() 
         images = images.cuda()
         labels = labels.cuda() 
         """
@@ -121,7 +118,9 @@ def Swin_validation(net, partition, epoch, num_classes, args):
     with torch.no_grad():
         for i, data in enumerate(valloader,0):
             #images = images.to(f'cuda:{net.device_ids[0]}')
-            images, labels = data 
+            images, labels = data
+            if args.num_target: 
+                labels = labels.float() 
             labels = labels.cuda()
             images = images.cuda()
 
@@ -222,6 +221,7 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
     previous_performance = {}
     previous_performance['ACC'] = [0.0]
     previous_performance['abs_loss'] = [100000.0]
+    previous_performance['mse_loss'] = [100000.0]
     if num_classes == 2:
         previous_performance['AUROC'] = [0.0]
 
@@ -255,11 +255,16 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
                     if val_performance['AUROC'] > max(previous_performance['AUROC'][:-1]):
                         checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
             
-            if 'abs_loss' in val_performance.keys():
-                previous_performance['abs_loss'].append(val_performance['abs_loss'])
-                if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
-                    checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-        
+            if 'abs_loss' or 'mse_loss' in val_performance.keys():
+                if args.metric == 'abs_loss': 
+                    previous_performance['abs_loss'].append(val_performance['abs_loss'])
+                    if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
+                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                elif args.metric == 'mse_loss':
+                    previous_performance['mse_loss'].append(val_performance['mse_loss'])
+                    if val_performance['mse_loss'] < min(previous_performance['mse_loss'][:-1]):
+                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+
         torch.cuda.empty_cache()
             
 
