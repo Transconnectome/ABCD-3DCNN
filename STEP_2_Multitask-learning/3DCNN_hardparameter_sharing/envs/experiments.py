@@ -55,10 +55,11 @@ def train(net,partition,optimizer,args):
         optimizer.zero_grad()
         image, targets = data
         image = image.to(f'cuda:{net.device_ids[0]}')
-        output = net(image)
 
-        loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
-        train_acc = calculating_acc(targets, output, correct, total, train_acc, net, args)
+        with torch.cuda.amp.autocast():
+            output = net(image)
+            loss, train_loss = calculating_loss(targets, output, train_loss,net, args)
+            train_acc = calculating_acc(targets, output, correct, total, train_acc, net, args)
         
         scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
         scaler.step(optimizer)
@@ -114,10 +115,11 @@ def validate(net,partition,scheduler,args):
         for i, data in enumerate(valloader,0):
             image, targets = data
             image = image.to(f'cuda:{net.device_ids[0]}')
-            output = net(image)
 
-            loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
-            val_acc = calculating_acc(targets, output, correct, total, val_acc, net, args)
+            with torch.cuda.amp.autocast():
+                output = net(image)
+                loss, val_loss = calculating_loss(targets, output, val_loss,net, args)
+                val_acc = calculating_acc(targets, output, correct, total, val_acc, net, args)
 
     if args.cat_target:
         for cat_target in args.cat_target:

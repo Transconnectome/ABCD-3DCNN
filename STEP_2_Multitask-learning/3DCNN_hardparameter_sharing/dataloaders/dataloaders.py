@@ -38,7 +38,7 @@ def loading_phenotype(phenotype_dir, args):
 
     ### preprocessing categorical variables and numerical variables
     subject_data = preprocessing_cat(subject_data, args)
-    subject_data = preprocessing_num(subject_data, args)
+    #subject_data = preprocessing_num(subject_data, args)
     
     return subject_data, targets
 

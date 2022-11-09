@@ -26,7 +26,7 @@ def calculating_loss(targets, output, loss_dict,net, args):
             y_true = y_true.to(f'cuda:{net.device_ids[0]}')
             tmp_output = output[num_target]
 
-            criterion =nn.MSELoss()
+            criterion = nn.MSELoss()
             tmp_loss = criterion(tmp_output.float(),y_true.float().unsqueeze(1))
             loss += tmp_loss * num_weight
     
