@@ -1,27 +1,23 @@
 import os
+import re
 import glob
 import random
 
 import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
-from monai.transforms import (AddChannel, Compose, RandRotate90, Resize,
-                              ScaleIntensity, Flip, ToTensor, RandAffine, RandFlip)
-from monai.data import ImageDataset
+from monai.transforms import (AddChannel, Compose, CenterSpatialCrop, Flip, RandAffine,
+                              RandFlip, RandRotate90, Resize, ScaleIntensity, ToTensor)
+from monai.data import ImageDataset, NibabelReader
 
+from dataloaders.custom_dataset import MultiModalImageDataset
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 
 def case_control_count(labels, dataset_type, args):
     if args.cat_target:
         for cat_target in args.cat_target:
-            target_labels = []
-
-            for label in labels:
-                target_labels.append(label[cat_target])
-            
-            n_control = target_labels.count(0)
-            n_case = target_labels.count(1) + target_labels.count(2) # revising - count also 2 for UKB data
-            print(f'In {dataset_type} dataset, {cat_target} contains {n_case} CASE and {n_control} CONTROL')
+            curr_cnt = labels[cat_target].value_counts()
+            print(f'In {dataset_type},\t"{cat_target}" contains {curr_cnt[1]} CASE and {curr_cnt[0]} CONTROL')
             
 
 ## ========= Define directories of data ========= ##
@@ -51,26 +47,31 @@ UKB_phenotype_dir = '/scratch/connectome/3DCNN/data/2.UKB/2.demo_qc/UKB_phenotyp
 ## ========= Define helper functions ========= ##
 
 def loading_images(image_dir, args):
-    os.chdir(image_dir)
-    image_files = pd.Series(glob.glob('*.npy')) # revising
-    image_files = pd.concat([image_files, pd.Series(glob.glob('*.nii.gz'))])
-    image_files.sort_values(inplace=True)
-    subjects = image_files.map(lambda x: x.split('.')[0]) # revising
-    #image_files = image_files[:100]
+    image_files = pd.DataFrame()
+    for brain_modality in args.data_type:
+        curr_dir = image_dir[brain_modality]
+        curr_files = pd.DataFrame({brain_modality:glob.glob(curr_dir+'*[yz]')}) # to get .npy(sMRI) & .nii.gz(dMRI) files
+        curr_files[subjectkey] = curr_files[brain_modality].map(lambda x: x.split("/")[-1].split('.')[0])
+        if args.dataset == 'UKB':
+            curr_files[subjectkey] = curr_files[subjectkey].map(int)
+        curr_files.sort_values(by=subjectkey, inplace=True)
+        
+        if len(image_files) == 0:
+            image_files = curr_files
+        else:
+            image_files = pd.merge(image_files, curr_files, how='inner', on=subjectkey)
+            
+    if args.debug:
+        image_files = image_files[:100]
+        
     return image_files
 
 
 def get_available_subjects(subject_data, args):
-    case  = pd.read_csv(ABCD_phenotype_dir['ADHD_case']).subjectkey
-    control = pd.read_csv(ABCD_phenotype_dir['suicide_control']).subjectkey
+    case  = pd.read_csv(ABCD_phenotype_dir['ADHD_case'])[subjectkey]
+    control = pd.read_csv(ABCD_phenotype_dir['suicide_control'])[subjectkey]
     filtered_subjectkey = pd.concat([case,control]).reset_index(drop=True)
-    
-    for data_type in args.data_type:
-        data_files = glob.glob(ABCD_data_dir[data_type]+'*')
-        data_subjectkey = pd.Series(map(lambda x: x.split("/")[-1].split(".")[0],data_files),name='subjectkey')
-        filtered_subjectkey = pd.merge(filtered_subjectkey,data_subjectkey)
-
-    subject_data = subject_data[subject_data.subjectkey.isin(filtered_subjectkey.subjectkey)==True]
+    subject_data = subject_data[subject_data[subjectkey].isin(filtered_subjectkey)]
     
     return subject_data
 
@@ -87,7 +88,7 @@ def filter_phenotype(subject_data, filters):
 def loading_phenotype(phenotype_dir, target_list, args):
     col_list = target_list + [subjectkey]
 
-    ### get subject ID and target variables
+    ## get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
     subject_data = subject_data.loc[:,col_list]
     if 'Attention.Deficit.Hyperactivity.Disorder.x' in target_list:
@@ -107,68 +108,62 @@ def loading_phenotype(phenotype_dir, target_list, args):
     return subject_data
 
 
-# combine categorical + numeric
-def combining_image_target(subject_data, image_files, target_list):
-    if 'str' in str(type(subject_data[subjectkey][0])): 
-        image_subjectkeys = image_files.map(lambda x: str(x.split('.')[0]))
-    elif 'int' in str(type(subject_data[subjectkey][0])):
-        image_subjectkeys = image_files.map(lambda x: int(x.split('.')[0]))
+def make_balanced_testset(imageFiles_labels, num_test, args):
+    il = imageFiles_labels
+    n_case = num_test//2
+    n_control = num_test - n_case
 
-    image_list = pd.DataFrame({subjectkey:image_subjectkeys, 'image_files':image_files})
-    subject_data = pd.merge(subject_data, image_list, how='inner', on=subjectkey)  
-
-    col_list = target_list + ['image_files']
+    # << should be implemented later >> code for multiple categorical target
+    t_case, rest_case = np.split(il[il[args.cat_target[0]]==0], (n_case,)) 
+    t_control, rest_control = np.split(il[il[args.cat_target[0]]==1],(n_control,))
     
-    imageFiles_labels = []
-    for i in tqdm(range(len(subject_data))):
-        imageFile_label = {}
-        for j, col in enumerate(col_list):
-            imageFile_label[col] = subject_data[col][i]
-        imageFiles_labels.append(imageFile_label) 
-
+    test = pd.concat((t_case, t_control))
+    rest = pd.concat((rest_case, rest_control))
+    
+    test = test.sort_values(by=subjectkey)
+    rest = rest.sort_values(by=subjectkey)
+    
+    imageFiles_labels = pd.concat((rest,test)).reset_index(drop=True)
+    
     return imageFiles_labels
 
 
 # defining train,val, test set splitting function
 def partition_dataset(imageFiles_labels, target_list, args):
-    # make list of images & lables
-    images = []
-    labels = []
-
-    for imageFile_label in imageFiles_labels:
-        image = imageFile_label['image_files']
-        label = {}
-
-        for label_name in target_list[:len(target_list)]:
-            label[label_name]=imageFile_label[label_name]
-
-        images.append(image)
-        labels.append(label)
-    
-    # define transform function
+    ## Define transform function
     resize = tuple(args.resize)
     
-    default_transforms = [ScaleIntensity(),
-                          AddChannel(),
-                          Resize(resize),
-                          ToTensor()]    
+    default_transforms = [ScaleIntensity(), AddChannel(), Resize(resize), ToTensor()] 
+    dMRI_transform = [CenterSpatialCrop(192)] + default_transforms
     aug_transforms = []
+    
     if 'shift' in args.augmentation:
         aug_transforms.append(RandAffine(prob=0.1,translate_range=(0,2),padding_mode='zeros'))
     elif 'flip' in args.augmentation:
         aug_transforms.append(RandFlip(prob=0.1, spatial_axis=0))
+    
+    train_transforms, val_transforms, test_transforms = [], [], []
+    for brain_modality in args.data_type:
+        if re.search('FA|MD|RD',brain_modality) != None:
+            train_transforms.append(Compose(dMRI_transform+aug_transforms))
+            val_transforms.append(Compose(dMRI_transform))
+            test_transforms.append(Compose(dMRI_transform))
+        else:
+            train_transforms.append(Compose(default_transforms+aug_transforms))
+            val_transforms.append(Compose(default_transforms))
+            test_transforms.append(Compose(default_transforms))
 
-    train_transform = Compose(default_transforms+aug_transforms)
-    val_transform = Compose(default_transforms)
-    test_transform = Compose(default_transforms)
-
-    # number of total / train,val, test
-    num_total = len(images)
+    ## Dataset split
+    num_total = len(imageFiles_labels)
     num_test = int(num_total*args.test_size)
     num_val = int(num_total*args.val_size) if args.cv == None else int((num_total-num_test)/5)
     num_train = num_total - (num_val+num_test)
     
-    # image and label information of train, val, test
+    imageFiles_labels = make_balanced_testset(imageFiles_labels, num_test, args)
+    images = imageFiles_labels[args.data_type]
+    labels = imageFiles_labels[target_list]
+    
+    ## split dataset by 5-fold cv or given split size
     if args.cv == None:
         images_train, images_val, images_test = np.split(images, [num_train, num_train+num_val]) # revising
         labels_train, labels_val, labels_test = np.split(labels, [num_train, num_train+num_val])
@@ -177,14 +172,15 @@ def partition_dataset(imageFiles_labels, target_list, args):
         images_total, labels_total = np.split(images, split_points), np.split(labels, split_points)
         images_test, labels_test = images_total.pop(), labels_total.pop()
         images_val, labels_val = images_total.pop(args.cv-1), labels_total.pop(args.cv-1)
-        images_train, labels_train = np.concatenate(images_total), np.concatenate(labels_total)
+        images_train, labels_train = pd.concat(images_total), pd.concat(labels_total)
         num_train, num_val = images_train.shape[0], images_val.shape[0]
         
     print(f"Total subjects={num_total}, train={num_train}, val={num_val}, test={num_test}")
 
-    train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
-    val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
-    test_set = ImageDataset(image_files=images_test,labels=labels_test,transform=test_transform)
+    ## make splitted dataset
+    train_set = MultiModalImageDataset(image_files=images_train, labels=labels_train, transform=train_transforms)
+    val_set = MultiModalImageDataset(image_files=images_val, labels=labels_val, transform=val_transforms)
+    test_set = MultiModalImageDataset(image_files=images_test, labels=labels_test, transform=test_transforms)
 
     partition = {}
     partition['train'] = train_set
@@ -200,25 +196,21 @@ def partition_dataset(imageFiles_labels, target_list, args):
 
 
 ## ========= Main function that makes partition of dataset  ========= ##
-def make_dataset(args, curr_data_type='freesurfer'): # revising
-    image_dir = ABCD_data_dir[curr_data_type] if args.dataset == 'ABCD' else UKB_data_dir
-    phenotype_dir = ABCD_phenotype_dir['total'] if args.dataset == 'ABCD' else UKB_phenotype_dir
-    
+def make_dataset(args): # revising
     global subjectkey
     subjectkey = 'subjectkey' if args.dataset == 'ABCD' else 'eid'
-    
+    image_dir = ABCD_data_dir if args.dataset == 'ABCD' else UKB_data_dir
+    phenotype_dir = ABCD_phenotype_dir['total'] if args.dataset == 'ABCD' else UKB_phenotype_dir
     target_list = args.cat_target + args.num_target
-
+    
     image_files = loading_images(image_dir, args)
-    subject_data= loading_phenotype(phenotype_dir, target_list, args)
-    os.chdir(image_dir)
+    subject_data = loading_phenotype(phenotype_dir, target_list, args)
 
-    # data preprocesing categorical variable and numerical variables 
-    imageFiles_labels = combining_image_target(subject_data, image_files, target_list)
+    # combining image files & labels
+    imageFiles_labels = pd.merge(subject_data, image_files, how='inner', on=subjectkey)
 
-    # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables )
+    # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables)
     partition = partition_dataset(imageFiles_labels, target_list, args)
     print("*** Making a dataset is completed *** \n")
     
     return partition, subject_data
-

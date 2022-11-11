@@ -6,6 +6,7 @@ import datetime
 import random
 import hashlib
 from copy import deepcopy
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -26,17 +27,10 @@ warnings.filterwarnings("ignore")
 ## ========= Helper Functions =============== ##
 
 def setup_results(args):
-    train_losses = {}
-    train_accs = {}
-    val_losses = {}
-    val_accs = {}
-    
-    targets = args.cat_target + args.num_target
-    for target_name in targets:
-        train_losses[target_name] = []
-        train_accs[target_name] = []
-        val_losses[target_name] = []
-        val_accs[target_name] = []
+    train_losses = defaultdict(list)
+    train_accs = defaultdict(list)
+    val_losses = defaultdict(list)
+    val_accs = defaultdict(list)
 
     result = {}
     result['train_losses'] = train_losses
@@ -89,14 +83,13 @@ def run_experiment(args, net, partition, result, mode):
     epoch_exp = args.epoch if mode == 'ALL' else args.epoch_FC
     num_unfrozen = args.unfrozen_layer if mode == 'ALL' else '0'
     
-    targets = args.cat_target + args.num_target
-    
     if (args.transfer != '') and (args.unfrozen_layer.lower() != 'all'):
         setting_transfer(args, net.module, num_unfrozen = num_unfrozen)
     optimizer = set_optimizer(args, net)
     scheduler = set_lr_scheduler(args, optimizer, len(partition['train']))
 
     best_val_loss = float('inf')
+    best_train_loss = float('inf')
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
@@ -109,34 +102,34 @@ def run_experiment(args, net, partition, result, mode):
         train_loss_sum = 0
         val_loss_sum = 0
         val_acc_sum = 0
-        for target_name in targets:
-            result['train_losses'][target_name].append(train_loss[target_name])
-            result['train_accs'][target_name].append(train_acc[target_name])
-            result['val_losses'][target_name].append(val_loss[target_name])
-            result['val_accs'][target_name].append(val_acc[target_name])
-            val_loss_sum += val_loss[target_name]
-            val_acc_sum += val_acc[target_name]
-            train_loss_sum += train_loss[target_name]
-            
-        val_loss_total = val_loss_sum/len(targets)
-        val_acc_total = val_acc_sum/len(targets)
-        train_loss_total = train_loss_sum/len(targets)
         
-        if val_loss_total < best_val_loss:
-            best_val_loss = val_loss_total
-            best_train_loss = train_loss_total
+        for target_name in train_loss:
+            result['train_losses'][target_name].append(train_loss[target_name])
+            result['val_losses'][target_name].append(val_loss[target_name])
+            train_loss_sum += train_loss[target_name]
+            val_loss_sum += val_loss[target_name]
+            if 'contrastive_loss' not in target_name:
+                result['train_accs'][target_name].append(train_acc[target_name])
+                result['val_accs'][target_name].append(val_acc[target_name])
+                val_acc_sum += val_acc[target_name]
+            
+        if val_loss_sum < best_val_loss:
+            best_val_loss = val_loss_sum
+            best_train_loss = train_loss_sum
             patience = 0
         else:
             patience += 1
 
         ## visualize the result
-        CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
-        print(f'Epoch {epoch+1}. Current learning rate {optimizer.param_groups[0]["lr"]}. Took {te-ts:2.2f} sec')
+        CLIreporter(train_loss, train_acc, val_loss, val_acc)
+        curr_lr = optimizer.param_groups[0]['lr']
+        print(f"Epoch {epoch+1}. Current learning rate {curr_lr}. Took {te-ts:2.2f} sec")
 
         ## saving the checkpoint and results
-        checkpoint_dir = checkpoint_save(net, epoch, val_acc, result['val_accs'], args)                     
-        if epoch%10 == 0:
-            save_exp_result(vars(args).copy(), result)
+        if args.debug == '':
+            checkpoint_dir = checkpoint_save(net, epoch, val_acc, result['val_accs'], args)                     
+            if epoch%10 == 0:
+                save_exp_result(vars(args).copy(), result)
 
         ## Early-Stopping
         if args.early_stopping != None and patience == args.early_stopping:
@@ -203,21 +196,25 @@ def experiment(partition, subject_data, args):
     result, checkpoint_dir = run_experiment(args, net, partition, result, 'ALL')
                     
     # testing a model
-    print("\n*** Start testing a model *** \n")
-    net.to('cpu')
-    torch.cuda.empty_cache()
+    if args.debug == '':
+        print("\n*** Start testing a model *** \n")
+        net.to('cpu')
+        torch.cuda.empty_cache()
 
-    net = checkpoint_load(net, checkpoint_dir)
-    if args.sbatch == 'True':
-        net.cuda()
-    else:
-        net.to(f'cuda:{args.gpus[0]}')
-    test_acc, confusion_matrices = test(net, partition, args)
-    result['test_acc'] = test_acc
-    print(f"Test result: {test_acc} for {args.exp_name}") 
-    
-    if confusion_matrices != None:
-        result['confusion_matrices'] = confusion_matrices
+        net = checkpoint_load(net, checkpoint_dir)
+        if args.sbatch == 'True':
+            net.cuda()
+        else:
+            net.to(f'cuda:{args.gpus[0]}')
+        test_acc, confusion_matrices = test(net, partition, args)
+        result['test_acc'] = test_acc
+        print(f"===== Test result for {args.exp_name} =====") 
+        print(test_acc)
+
+        if confusion_matrices != None:
+            print("===== Confusion Matrices =====")
+            print(confusion_matrices,'\n')
+            result['confusion_matrices'] = confusion_matrices
         
     return vars(args), result
 ## ==================================== ##
@@ -234,7 +231,7 @@ if __name__ == "__main__":
     torch.manual_seed(args.seed)
         
     args.save_dir = os.getcwd() + '/result'
-    partition, subject_data = make_dataset(args,args.data_type[0])
+    partition, subject_data = make_dataset(args)
 
     ## ========= Run Experiment and saving result ========= ##    
     time_hash = datetime.datetime.now().time()
@@ -244,9 +241,11 @@ if __name__ == "__main__":
     # Run Experiment
     print(f"*** Experiment {args.exp_name} Start ***")
     setting, result = experiment(partition, subject_data, deepcopy(args))
-    print("setting was",args)
+    print("===== Experiment Setting Report =====")
+    print(args)
     
     # Save result
-    save_exp_result(setting, result)
+    if args.debug == '':
+        save_exp_result(setting, result)
     print("*** Experiment Done ***\n")
     ## ====================================== ##

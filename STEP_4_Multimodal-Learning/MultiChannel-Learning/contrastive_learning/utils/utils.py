@@ -1,6 +1,7 @@
 import os
 import json
 import argparse 
+from collections import defaultdict
 
 import pandas as pd
 import torch
@@ -52,7 +53,7 @@ def argument_setting():
     parser.add_argument("--sbatch", type=str, choices=['True', 'False'])
     parser.add_argument("--cat_target", nargs='+', default=[], type=str, help='')
     parser.add_argument("--num_target", nargs='+', default=[], type=str, help='')
-    parser.add_argument("--confusion_matrix",  nargs='*', type=str, help='')
+    parser.add_argument("--confusion_matrix",  nargs='*', default=[], type=str, help='')
     parser.add_argument("--filter", nargs="*", default=[], type=str,
                         help='options for filter data by phenotype. usage: --filter abcd_site:10 sex:1')
     parser.add_argument("--load", default='', type=str, help='Load model weight that mathces {your_exp_dir}/result/*{load}*')
@@ -61,6 +62,7 @@ def argument_setting():
                         help='Choose pretrained model according to your option')
     parser.add_argument("--unfrozen_layer", default='0', type=str, help='Select the number of layers that would be unfrozen')
     parser.add_argument("--init_unfrozen", default='', type=str, help='Initializes unfrozen layers')
+    parser.add_argument("--debug", default='', type=str, help='')
         
     args = parser.parse_args()
     if args.cat_target == args.num_target:
@@ -112,21 +114,20 @@ def select_model(subject_data, args):
     return net
 
 # Experiment 
-def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
+def CLIreporter(train_loss, train_acc, val_loss, val_acc):
     '''command line interface reporter per every epoch during experiments'''
-    var_column = []
-    visual_report = {}
-    visual_report['Loss (train/val)'] = []
-    visual_report['R2 or ACC (train/val)'] = []
-    for label_name in targets:
-        var_column.append(label_name)
-
+    visual_report = defaultdict(list)
+    for label_name in train_loss:
         loss_value = f'{train_loss[label_name]:2.4f} / {val_loss[label_name]:2.4f}'
-        acc_value = f'{train_acc[label_name]:2.4f} / {val_acc[label_name]:2.4f}'
+        if 'contrastive_loss' not in label_name:
+            acc_value = f'{train_acc[label_name]:2.4f} / {val_acc[label_name]:2.4f}' 
+        else:
+            acc_value = None
+            
         visual_report['Loss (train/val)'].append(loss_value)
         visual_report['R2 or ACC (train/val)'].append(acc_value)
-
-    print(pd.DataFrame(visual_report, index=var_column))
+    print("="*80)
+    print(pd.DataFrame(visual_report, index=train_loss.keys()))
 
 
 # define checkpoint-saving function

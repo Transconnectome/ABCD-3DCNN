@@ -1,4 +1,5 @@
 import random
+from collections import defaultdict
 
 from tqdm import tqdm
 import numpy as np
@@ -7,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import confusion_matrix
 
-from envs.loss_functions import calculating_loss_acc
+from envs.loss_functions import calculating_loss_acc, calc_acc, calc_R2
 
 ### ========= Train,Validate, and Test ========= ###
 '''The process of calcuating loss and accuracy metrics is as follows.
@@ -42,47 +43,25 @@ def train(net,partition,optimizer,args):
 
     net.train()
 
-    correct = {}
-    total = {}
-    train_loss = {}
-    train_acc = {}  # collecting r-square of contiunuous varibale directly
-
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            correct[cat_target] = 0
-            total[cat_target] = 0
-            train_acc[cat_target] = []
-            train_loss[cat_target] = []
-
-    if args.num_target:
-        for num_target in args.num_target:
-            train_acc[num_target] = []
-            train_loss[num_target] = []
+    train_loss = defaultdict(list)
+    train_acc =  defaultdict(list)
 
     for i, data in enumerate(trainloader,0):
         optimizer.zero_grad()
         image, targets = data
-        image = image.to(f'cuda:{net.device_ids[0]}')
+        image = list(map(lambda x: x.to(f'cuda:{net.device_ids[0]}'), image))
         output = net(image)
-
-        loss, train_loss, train_acc = calculating_loss_acc(targets, output, train_loss, correct, total, train_acc, net, args)
+        loss = calculating_loss_acc(targets, output, train_loss, train_acc, net, args)
         
-        scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
+        # multi-head model sum all the loss from predicting each target variable and back propagation
+        scaler.scale(loss).backward() 
         scaler.step(optimizer)
         scaler.update()
 
-
     # calculating total loss and acc of separate mini-batch
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            train_acc[cat_target] = np.mean(train_acc[cat_target])
-            train_loss[cat_target] = np.mean(train_loss[cat_target])
-
-    if args.num_target:
-        for num_target in args.num_target:
-            train_acc[num_target] = np.mean(train_acc[num_target])
-            train_loss[num_target] = np.mean(train_loss[num_target])
-
+    for target in train_loss:
+        train_loss[target] = np.mean(train_loss[target])
+        train_acc[target] = np.mean(train_acc[target])
 
     return net, train_loss, train_acc
 
@@ -107,40 +86,19 @@ def validate(net,partition,scheduler,args):
 
     net.eval()
 
-    correct = {}
-    total = {}
-    val_loss = {}
-    val_acc = {}  # collecting r-square of contiunuous varibale directly
-
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            correct[cat_target] = 0
-            total[cat_target] = 0
-            val_acc[cat_target] = []
-            val_loss[cat_target] = []
-
-    if args.num_target:
-        for num_target in args.num_target:
-            val_acc[num_target] = []
-            val_loss[num_target] = []
-
+    val_loss = defaultdict(list)
+    val_acc = defaultdict(list)
+    
     with torch.no_grad():
         for i, data in enumerate(valloader,0):
             image, targets = data
-            image = image.to(f'cuda:{net.device_ids[0]}')
+            image = list(map(lambda x: x.to(f'cuda:{net.device_ids[0]}'), image))
             output = net(image)
+            loss = calculating_loss_acc(targets, output, val_loss, val_acc, net, args)
 
-            loss, val_loss, val_acc = calculating_loss_acc(targets, output, val_loss, correct, total, val_acc, net, args)
-
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            val_acc[cat_target] = np.mean(val_acc[cat_target])
-            val_loss[cat_target] = np.mean(val_loss[cat_target])
-
-    if args.num_target:
-        for num_target in args.num_target:
-            val_acc[num_target] = np.mean(val_acc[num_target])
-            val_loss[num_target] = np.mean(val_loss[num_target])
+    for target in val_loss:
+        val_loss[target] = np.mean(val_loss[target])
+        val_acc[target] = np.mean(val_acc[target])
 
     # learning rate scheduler
     if scheduler:
@@ -151,6 +109,16 @@ def validate(net,partition,scheduler,args):
 
     return val_loss, val_acc
 
+
+def calc_confusion_matrix(confusion_matrices, curr_target, output, y_true):
+    _, predicted = torch.max(output.data,1)
+    tn, fp, fn, tp = confusion_matrix(y_true.numpy(), predicted.numpy()).ravel()
+    confusion_matrices[curr_target]['True Positive'] = int(tp)
+    confusion_matrices[curr_target]['True Negative'] = int(tn)
+    confusion_matrices[curr_target]['False Positive'] = int(fp)
+    confusion_matrices[curr_target]['False Negative'] = int(fn) 
+    
+    
 # define test step
 def test(net,partition,args):
     def seed_worker(worker_id):
@@ -175,71 +143,37 @@ def test(net,partition,args):
     else: 
         device = 'cuda:0' if args.sbatch =='True' else f'cuda:{args.gpus[0]}'
     
-    outputs = {}
-    y_true = {}
-    test_acc = {}
-    confusion_matrices = {}
+    outputs = defaultdict(list)
+    y_true = defaultdict(list)
+    test_acc = defaultdict(list)
+    confusion_matrices = defaultdict(defaultdict)
 
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            outputs[cat_target] = torch.tensor([])
-            y_true[cat_target] = torch.tensor([])
-            test_acc[cat_target] = []
-
-    if args.num_target:
-        for num_target in args.num_target:
-            outputs[num_target] = torch.tensor([])
-            y_true[num_target] = torch.tensor([])
-            test_acc[num_target] = []
-    
     with torch.no_grad():
         for i, data in enumerate(tqdm(testloader),0):
             image, targets = data
-            image = image.to(device)
-
+            image = list(map(lambda x: x.to(device), image))
             output = net(image)
-            if args.cat_target:
-                for cat_target in args.cat_target:
-                    outputs[cat_target] = torch.cat((outputs[cat_target], output[cat_target].cpu()))
-                    y_true[cat_target] = torch.cat((y_true[cat_target], targets[cat_target].cpu()))
-
-            if args.num_target:
-                for num_target in args.num_target:
-                    outputs[num_target] = torch.cat((outputs[num_target], output[num_target].cpu()))
-                    y_true[num_target] = torch.cat((y_true[num_target], targets[num_target].cpu()))
+            
+            for curr_target in output:
+                if curr_target != 'embeddings':
+                    outputs[curr_target].append(output[curr_target].cpu())
+                    y_true[curr_target].append(targets[curr_target].cpu())
     
     # caculating ACC and R2 at once  
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            _, predicted = torch.max(outputs[cat_target].data,1)
-            correct = (predicted == y_true[cat_target]).sum().item()
-            total = y_true[cat_target].size(0)
-            test_acc[cat_target].append(100 * (correct / total))
+    for curr_target in output:
+        if curr_target == 'embeddings':
+            continue
+            
+        outputs[curr_target] = torch.cat(outputs[curr_target])
+        y_true[curr_target] = torch.cat(y_true[curr_target])
+        acc_func = calc_acc if curr_target in args.cat_target else calc_R2
+        curr_acc = acc_func(outputs[curr_target], y_true[curr_target], args, None)
+        test_acc[curr_target].append(curr_acc)
+        
+        if curr_target in args.confusion_matrix:
+            calc_confusion_matrix(confusion_matrices, curr_target,
+                                  outputs[curr_target], y_true[curr_target])
 
-            if args.confusion_matrix:
-                for label_cm in args.confusion_matrix: 
-                    if len(np.unique(y_true[cat_target].numpy())) == 2:
-                        confusion_matrices[label_cm] = {}
-                        confusion_matrices[label_cm]['True Positive'] = 0
-                        confusion_matrices[label_cm]['True Negative'] = 0
-                        confusion_matrices[label_cm]['False Positive'] = 0
-                        confusion_matrices[label_cm]['False Negative'] = 0
-                        if label_cm == cat_target:
-                            tn, fp, fn, tp = confusion_matrix(y_true[cat_target].numpy(), predicted.numpy()).ravel()
-                            confusion_matrices[label_cm]['True Positive'] = int(tp)
-                            confusion_matrices[label_cm]['True Negative'] = int(tn)
-                            confusion_matrices[label_cm]['False Positive'] = int(fp)
-                            confusion_matrices[label_cm]['False Negative'] = int(fn)                       
-
-    if args.num_target:
-        for num_target in args.num_target:
-            predicted =  outputs[num_target].float()
-            criterion = nn.MSELoss()
-            loss = criterion(predicted, y_true[num_target].float().unsqueeze(1))
-            y_var = torch.var(y_true[num_target],unbiased=False)
-            r_square = 1 - (loss / y_var)
-            test_acc[num_target].append(r_square.item())
-            confusion_matrices = None
     return test_acc, confusion_matrices
 
 ## ============================================ ##
