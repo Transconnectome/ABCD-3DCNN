@@ -87,11 +87,11 @@ def checkpoint_save(net, save_dir, epoch, current_result, previous_result,  args
 
     if args.cat_target:
         for cat_target in args.cat_target:
-            if current_result[cat_target] >= max(previous_result[cat_target]):
+            if current_result[cat_target] >= max(previous_result[cat_target][:-1]):
                 best_checkpoint_votes += 1
     if args.num_target:
         for num_target in args.num_target:
-            if current_result[num_target] >= max(previous_result[num_target]):
+            if current_result[num_target] >= max(previous_result[num_target][:-1]):
                 best_checkpoint_votes += 1
         
     if best_checkpoint_votes == len(args.cat_target + args.num_target):
