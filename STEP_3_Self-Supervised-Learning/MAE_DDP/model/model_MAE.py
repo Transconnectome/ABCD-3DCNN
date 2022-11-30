@@ -17,7 +17,7 @@ import torch.nn as nn
 from model.layers.patch_embed import PatchEmbed_2D, PatchEmbed_3D
 from .vision_transformer import  Block
 
-from util.pos_embed import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed, RelativePositionBias2D, RelativePositionBias3D
+from util.pos_embed import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed
 
 
 class MaskedAutoencoderViT(nn.Module):
@@ -29,7 +29,7 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, norm_pix_loss=False, use_sincos_pos=False, spatial_dims=3, mask_ratio=0.75):
+                 mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, norm_pix_loss=False, spatial_dims=3, mask_ratio=0.75):
         super().__init__()
 
         # --------------------------------------------------------------------------
@@ -41,7 +41,6 @@ class MaskedAutoencoderViT(nn.Module):
             self.patch_embed = PatchEmbed_2D(img_size, patch_size, self.in_channels, embed_dim)
         elif self.spatial_dims == 3:
             self.patch_embed = PatchEmbed_3D(img_size, patch_size, self.in_channels, embed_dim)
-        self.use_sincos_pos = use_sincos_pos
         
         num_patches = self.patch_embed.num_patches
 
@@ -87,19 +86,19 @@ class MaskedAutoencoderViT(nn.Module):
     def initialize_weights(self):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
-        if self.use_sincos_pos:
-            if self.spatial_dims == 2:
-                pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
-            elif self.spatial_dims == 3:
-                pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1],int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
-            
-            self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         
-            if self.spatial_dims == 2:
-                decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
-            elif self.spatial_dims == 3:
-                decoder_pos_embed = get_3d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
-            self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
+        if self.spatial_dims == 2:
+            pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
+        elif self.spatial_dims == 3:
+            pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1],int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
+            
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+        
+        if self.spatial_dims == 2:
+            decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
+        elif self.spatial_dims == 3:
+            decoder_pos_embed = get_3d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
+        self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
 
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)

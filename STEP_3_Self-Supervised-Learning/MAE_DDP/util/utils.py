@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import hashlib
 import json
+import random
  
 import torch
 import copy
@@ -12,6 +13,7 @@ from copy import deepcopy
 
 
 def set_random_seed(seed):
+    random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)

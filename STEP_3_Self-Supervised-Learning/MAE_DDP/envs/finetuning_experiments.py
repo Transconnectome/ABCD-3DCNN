@@ -206,6 +206,10 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     previous_performance = {}
     previous_performance['ACC'] = [0.0]
     previous_performance['abs_loss'] = [100000.0]
+    previous_performance['mse_loss'] = [100000.0]
+    if num_classes == 2:
+
+        previous_performance['AUROC'] = [0.0]
 
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
@@ -224,15 +228,30 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
         # visualize the result and saving the checkpoint
         # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
         if args.gpu == 0:
+            # store result per epoch 
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
             print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. \n Training Prediction Performance: {}. \n Validation Prediction Performance: {}. \n Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, train_performance, val_performance, optimizer.param_groups[0]['lr'],te-ts))
-            if 'ACC' in val_performance.keys():
-                previous_performance['ACC'].append(val_performance['ACC'])
-                if val_performance['ACC'] > max(previous_performance['ACC'][:-1]):
-                    checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-            elif 'abs_loss' in val_performance.keys():
-                previous_performance['abs_loss'].append(val_performance['abs_loss'])
-                if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
-                    checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+            if 'ACC' or 'AUROC' in val_performance.keys():
+                if args.metric == 'ACC':
+                    previous_performance['ACC'].append(val_performance['ACC'])
+                    if val_performance['ACC'] > max(previous_performance['ACC'][:-1]):
+                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                elif args.metric == 'AUROC': 
+                    previous_performance['AUROC'].append(val_performance['AUROC'])
+                    if val_performance['AUROC'] > max(previous_performance['AUROC'][:-1]):
+                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+            
+            if 'abs_loss' or 'mse_loss' in val_performance.keys():
+                if args.metric == 'abs_loss': 
+                    previous_performance['abs_loss'].append(val_performance['abs_loss'])
+                    if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
+                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                elif args.metric == 'mse_loss':
+                    previous_performance['mse_loss'].append(val_performance['mse_loss'])
+                    if val_performance['mse_loss'] < min(previous_performance['mse_loss'][:-1]):
+                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+
         
         torch.cuda.empty_cache()
             

@@ -52,7 +52,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--study_sample",default='UKB',type=str,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
+parser.add_argument("--img_size",default=[128, 128, 128] ,type=int,nargs="*",required=False,help='')
 
 #########################
 ### batch size params ###
@@ -71,6 +71,8 @@ parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dr
 parser.add_argument("--mask_ratio",required=False,default=0.75,type=float,help='the ratio of random masking')
 parser.add_argument("--norm_pix_loss",action='store_true',help='Use (per-patch) normalized pixels as targets for computing loss')
 parser.set_defaults(norm_pix_loss=False)
+parser.add_argument("--use_rel_pos_bias",action='store_true',help='Use relative positional bias for positional encoding')
+parser.set_defaults(use_rel_pos_bias=False)
 parser.add_argument("--use_sincos_pos",action='store_true',help='Use relative positional bias for positional encoding')
 parser.set_defaults(use_sincos_pos=False)
 
@@ -79,7 +81,7 @@ parser.set_defaults(use_sincos_pos=False)
 ##########################
 parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','AdamW','SGD', 'LARS', 'LAMB'])
 parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
-parser.add_argument("--weight_decay",default=0.3,type=float,required=False,help='')
+parser.add_argument("--weight_decay",default=0.05,type=float,required=False,help='')
 parser.add_argument("--epoch",type=int,required=True,help='')
 parser.add_argument('--gradient_clipping', action='store_true')
 parser.set_defaults(gradient_accumulation=False)

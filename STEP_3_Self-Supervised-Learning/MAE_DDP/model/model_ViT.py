@@ -26,7 +26,7 @@ class VisionTransformer(nn.Module):
     def __init__(self, img_size=256, patch_size=16, in_channels=1,
                  embed_dim=1024, depth=24, num_heads=16,
                  mlp_ratio=4., attn_drop=.0, drop=.0, drop_path=.0, norm_layer=nn.LayerNorm, 
-                 num_classes=1, global_pool='token', use_cls_tokens=True, fc_norm=None, use_rel_pos_bias=False, use_sincos_pos=False, spatial_dims=3):
+                 num_classes=1, global_pool='token', use_cls_tokens=True, fc_norm=None, spatial_dims=3):
         """
         Args:
             img_size (int, tuple): input image size
@@ -53,7 +53,6 @@ class VisionTransformer(nn.Module):
         self.in_channels = in_channels
         self.global_pool = global_pool
         self.spatial_dims = spatial_dims
-        self.use_sincos_pos = use_sincos_pos
         self.num_prefix_tokens = 1 if use_cls_tokens else 0
         global_pool == 'avg' if fc_norm is None else fc_norm
 
@@ -65,15 +64,13 @@ class VisionTransformer(nn.Module):
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        
         # positional embedding
-        if use_rel_pos_bias:    # using relative positional bias for positional encoding
-            self.pos_embed = None  
-        else:
-            self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  #  using absolute positional bias for positional encoding. fixed sin-cos embedding  
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  #  using absolute positional bias for positional encoding. fixed sin-cos embedding  
 
         # attention block 
         self.blocks = nn.ModuleList([
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer, window_size=self.patch_embed.patch_size if use_rel_pos_bias else None, spatial_dims=self.spatial_dims)
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, drop=drop,  attn_drop=attn_drop, drop_path=drop_path, norm_layer=norm_layer, spatial_dims=self.spatial_dims)
             for i in range(depth)])
 
         # the last layer normalization
@@ -88,13 +85,13 @@ class VisionTransformer(nn.Module):
     def initialize_weights(self):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
-        if self.use_sincos_pos:
-            if self.spatial_dims == 2:
-                pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
-            elif self.spatial_dims == 3:
-                pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1],int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
+        
+        if self.spatial_dims == 2:
+            pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], int(self.patch_embed.num_patches**.5), cls_token=True)
+        elif self.spatial_dims == 3:
+            pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1],int(round(self.patch_embed.num_patches**(1/3))), cls_token=True)
             
-            self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         w = self.patch_embed.proj.weight.data
