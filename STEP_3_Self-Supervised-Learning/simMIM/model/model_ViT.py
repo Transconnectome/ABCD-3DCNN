@@ -47,7 +47,7 @@ class VisionTransformer3D(nn.Module):
                  use_cls_tokens=True, 
                  fc_norm=None, 
                  use_rel_pos_bias=False, 
-                 use_sincos_pos=False, 
+                 use_sincos_pos=True, 
                  spatial_dims=3, 
                  imagenet_pretrained_weight: str=None):
         """
