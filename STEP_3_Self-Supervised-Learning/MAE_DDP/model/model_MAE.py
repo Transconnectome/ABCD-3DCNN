@@ -330,14 +330,14 @@ def mae_vit_huge_patch14_dec512d8b_2D(**kwargs):
 
 def mae_vit_base_patch16_dec512d8b_3D(**kwargs):
     model = MaskedAutoencoderViT(
-        embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768
+        embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768 = 256 * 3
         decoder_embed_dim=576, decoder_depth=8, decoder_num_heads=16,
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
     return model
 
 def mae_vit_large_patch16_dec512d8b_3D(**kwargs):
     model = MaskedAutoencoderViT(
-        embed_dim=1024, depth=24, num_heads=16,              # original encoder embed_dim = 1024
+        embed_dim=1536, depth=24, num_heads=16,              # original encoder embed_dim = 1024 = 256 * 4; 256 * 6 = 1536 
         decoder_embed_dim=576, decoder_depth=8, decoder_num_heads=16,
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), spatial_dims=3, **kwargs)
     return model

@@ -106,13 +106,13 @@ class calculating_eval_metrics(torch.nn.Module):
                 true, pred = torch.tensor([]), torch.tensor([])
                 for i in range(len(true_tmp)):
                     true, pred = torch.cat([true, true_tmp[i].detach().cpu()]), torch.cat([pred, pred_tmp[i].detach().cpu()])
-                abs_loss = torch.nn.functional.l1_loss(true, pred)
+                abs_loss = torch.nn.functional.l1_loss(pred, true)
                 """
                 # lines for normalized MSE and R2
                 std_true, std_pred = self.standardization(true, pred) 
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 """
-                mse_loss = torch.nn.functional.mse_loss(true, pred)
+                mse_loss = torch.nn.functional.mse_loss(pred, true)
                 y_var = torch.var(true)
                 r_square = 1 - (mse_loss / (y_var + 1e-4))
                 result['abs_loss'] = abs_loss.item()
@@ -120,13 +120,13 @@ class calculating_eval_metrics(torch.nn.Module):
                 result['r_square'] = r_square.item()
                 
             else: 
-                abs_loss = torch.nn.functional.l1_loss(self.true, self.pred)
+                abs_loss = torch.nn.functional.l1_loss(self.pred, self.true)
                 """
                 # lines for normalized MSE and R2
                 std_true, std_pred = self.standardization(self.true, self.pred)
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 """
-                mse_loss = torch.nn.functional.mse_loss(self.true, self.pred)
+                mse_loss = torch.nn.functional.mse_loss(self.pred, self.true)
                 y_var = torch.var(self.true)
                 r_square = 1 - (mse_loss / y_var)
                 result['abs_loss'] = abs_loss.item()

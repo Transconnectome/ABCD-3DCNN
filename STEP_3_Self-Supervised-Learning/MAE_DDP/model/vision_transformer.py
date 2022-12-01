@@ -29,7 +29,6 @@ import torch.nn.functional as F
 
 from model.layers.mlp import Mlp
 from model.layers.drop_path import DropPath
-from util.pos_embed import RelativePositionBias2D, RelativePositionBias3D
 
 
 class Attention(nn.Module):

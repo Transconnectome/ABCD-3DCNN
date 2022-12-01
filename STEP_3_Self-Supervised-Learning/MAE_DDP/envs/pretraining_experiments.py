@@ -114,7 +114,7 @@ def MAE_validation(net, partition, epoch,args):
 def MAE_experiment(partition, save_dir, args): #in_channels,out_dim
 
     # setting network 
-    net = MAE.__dict__[args.model](patch_size=args.patch_size, img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, norm_pix_loss=args.norm_pix_loss, mask_ratio=args.mask_ratio, use_sincos_pos=args.use_sincos_pos)
+    net = MAE.__dict__[args.model](patch_size=args.patch_size, img_size = args.img_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, norm_pix_loss=args.norm_pix_loss, mask_ratio=args.mask_ratio)
     if args.load_imagenet_pretrained:
         net = load_imagenet_pretrained_weight(net, args)
     checkpoint_dir = args.checkpoint_dir
