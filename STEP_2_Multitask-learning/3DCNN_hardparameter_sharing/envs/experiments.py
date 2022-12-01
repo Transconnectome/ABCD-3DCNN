@@ -3,10 +3,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 
 from envs.loss_functions import calculating_loss, calculating_acc
+from utils.utils import combine_pred_subjid
 from tqdm import tqdm
+import os 
 
 ### ========= Train,Validate, and Test ========= ###
 '''The process of calcuating loss and accuracy metrics is as follows.
@@ -24,7 +26,7 @@ def train(net,partition,optimizer,args):
     scaler = torch.cuda.amp.GradScaler()
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
-                                             batch_size=args.train_batch_size,
+                                             batch_size=args.batch_size,
                                              shuffle=True,
                                              num_workers=24)
 
@@ -87,7 +89,7 @@ def train(net,partition,optimizer,args):
 # define validation step
 def validate(net,partition,scheduler,args):
     valloader = torch.utils.data.DataLoader(partition['val'],
-                                           batch_size=args.val_batch_size,
+                                           batch_size=args.batch_size,
                                            shuffle=True,
                                            num_workers=24)
 
@@ -145,9 +147,13 @@ def validate(net,partition,scheduler,args):
 
 # define test step
 def test(net,partition,args):
+    # flag for data shuffle 
+    data_shuffle = False 
+
+    assert data_shuffle == False 
     testloader = torch.utils.data.DataLoader(partition['test'],
-                                            batch_size=args.test_batch_size,
-                                            shuffle=False,
+                                            batch_size=args.batch_size,
+                                            shuffle=data_shuffle,
                                             num_workers=24)
 
     net.eval()
@@ -163,7 +169,7 @@ def test(net,partition,args):
     
     outputs = {}
     y_true = {}
-    test_acc = {}
+    test_result = {}
     confusion_matrices = {}
 
 
@@ -171,13 +177,13 @@ def test(net,partition,args):
         for cat_target in args.cat_target:
             outputs[cat_target] = torch.tensor([])
             y_true[cat_target] = torch.tensor([])
-            test_acc[cat_target] = []
+            test_result[cat_target] = {'test_loss':[], 'test_ACC':[], 'test_AUROC': []}
 
     if args.num_target:
         for num_target in args.num_target:
             outputs[num_target] = torch.tensor([])
             y_true[num_target] = torch.tensor([])
-            test_acc[num_target] = []
+            test_result[num_target] = {'test_abs_loss': [], 'test_mse_loss':[], 'test_r2':[]}
     
     with torch.no_grad():
        for i, data in enumerate(tqdm(testloader),0):
@@ -200,10 +206,16 @@ def test(net,partition,args):
     # caculating ACC and R2 at once  
     if args.cat_target:
         for cat_target in args.cat_target:
+            loss = torch.nn.functional.cross_entropy(outputs[cat_target].data, y_true[cat_target].long())
+            test_result[cat_target]['test_loss'].append(loss.item())
+
             _, predicted = torch.max(outputs[cat_target].data,1)
             correct = (predicted == y_true[cat_target]).sum().item()
             total = y_true[cat_target].size(0)
-            test_acc[cat_target].append(100 * (correct / total))
+            test_result[cat_target]['test_ACC'].append(100 * (correct / total))
+
+            auroc = roc_auc_score(y_true[cat_target].detach().cpu(), outputs[cat_target].data[:, 1].detach().cpu())
+            test_result[cat_target]['test_AUROC'].append(auroc.item())
 
             if args.confusion_matrix:
                 for label_cm in args.confusion_matrix: 
@@ -224,11 +236,13 @@ def test(net,partition,args):
     if args.num_target:
         for num_target in args.num_target:
             predicted =  outputs[num_target].float()
-            criterion = nn.MSELoss()
-            loss = criterion(predicted, y_true[num_target].float().unsqueeze(1))
+            abs_loss = torch.nn.functional.l1_loss(predicted, y_true[num_target].float().unsqueeze(1))
+            mse_loss = torch.nn.functional.mse_loss(predicted, y_true[num_target].float().unsqueeze(1))
             y_var = torch.var(y_true[num_target])
-            r_square = 1 - (loss / y_var)
-            test_acc[num_target].append(r_square.item())
+            r_square = 1 - (mse_loss / y_var)
+            test_result[num_target]['test_abs_loss'].append(abs_loss.item())
+            test_result[num_target]['test_mse_loss'].append(mse_loss.item())
+            test_result[num_target]['test_r2'].append(r_square.item())
             confusion_matrices = None
 
 
@@ -240,7 +254,21 @@ def test(net,partition,args):
     #    for num_target in args.num_target:
     #        test_acc[num_target] = np.mean(test_acc[num_target])
 
+    if args.get_predicted_score:
+        if args.cat_target:
+            for cat_target in args.cat_target: 
+                outputs[cat_target] = outputs[cat_target].squeeze(-1).tolist()
+                outputs[cat_target] = combine_pred_subjid(outputs[cat_target], partition['test'].image_files)
+                outputs["predicted_%s" % cat_target] = outputs.pop(cat_target)
+        if args.num_target:
+            for num_target in args.num_target: 
+                outputs[num_target] = outputs[num_target].squeeze(-1).tolist()
+                outputs[num_target] = combine_pred_subjid(outputs[num_target], partition['test'].image_files)
+                outputs["predicted_%s" % num_target] = outputs.pop(num_target)
+        test_result.update(outputs)
 
-    return test_acc, confusion_matrices
+
+    return test_result, confusion_matrices
+
 
 ## ============================================ ##

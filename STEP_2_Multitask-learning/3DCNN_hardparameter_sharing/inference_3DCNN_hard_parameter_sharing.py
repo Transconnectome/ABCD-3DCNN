@@ -43,7 +43,6 @@ from copy import deepcopy
 import warnings
 warnings.filterwarnings("ignore")
 
-
 def argument_setting():
     parser = argparse.ArgumentParser()
 
@@ -55,17 +54,12 @@ def argument_setting():
     parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
     parser.add_argument("--batch_size",default=16,type=int,required=False,help='')
     parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
-    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD','AdamW'])
-    parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
-    parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
-    parser.add_argument("--epoch",type=int,required=True,help='')
     parser.add_argument("--exp_name",type=str,required=True,help='')
     parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
     parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
     parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
     parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
     parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
-    parser.add_argument('--accumulation_steps', default=None, type=int, required=False)
     parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
     parser.add_argument('--get_predicted_score', action='store_true', help='save the result of inference in the result file')
     parser.set_defaults(get_predicted_score=False)
@@ -82,9 +76,8 @@ def argument_setting():
 
     return args
 
-
 ## ========= Experiment =============== ##
-def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
+def inference_engine(partition, subject_data, save_dir, args): #in_channels,out_dim
     targets = args.cat_target + args.num_target
 
     # Simple CNN
@@ -122,78 +115,12 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
         net = densenet3d.densenet3D201(subject_data, args)
 
 
-    if args.optim == 'SGD':
-        optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
-    elif args.optim == 'Adam':
-        optimizer = optim.Adam(net.parameters(),lr=args.lr,weight_decay=args.weight_decay)
-    elif args.optim == 'AdamW': 
-        optimizer = optim.AdamW(net.parameters(), lr=0, weight_decay=args.weight_decay,betas=(0.9, 0.95))
-    else:
-        raise ValueError('In-valid optimizer choice')
-
-    # learning rate schedluer
-    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=4) #if you want to use this scheduler, you should activate the line 134 of envs/experiments.py
-    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=50, T_mult=1, eta_max=args.lr, T_up=10, gamma=0.7)
-             
-
-    # setting DataParallel
-    if args.sbatch == "True":
-        devices = []
-        for d in range(torch.cuda.device_count()):
-            devices.append(d)
-        net = nn.DataParallel(net, device_ids = devices)
-    else:
-        if not args.gpus:
-            raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
-        else:
-            net = nn.DataParallel(net, device_ids=args.gpus)
-    
-    # attach network and optimizer to cuda device
-    net.to(f'cuda:{net.device_ids[0]}')
-
-    for state in optimizer.state.values():
-        for k, v in state.items():
-            if isinstance(v, torch.Tensor):
-                state[k] = v.to(f'cuda:{net.device_ids[0]}')
-    
-    # setting for results' data frame
-    train_losses = {}
-    train_accs = {}
-    val_losses = {}
-    val_accs = {}
-
-    for target_name in targets:
-        train_losses[target_name] = []
-        train_accs[target_name] = [0.0]
-        val_losses[target_name] = []
-        val_accs[target_name] = [-10000.0]
-        
-
-    for epoch in tqdm(range(args.epoch)):
-        ts = time.time()
-        net, train_loss, train_acc = train(net,partition,optimizer,args)
-        val_loss, val_acc = validate(net,partition,scheduler,args)
-        te = time.time()
-
-         # sorting the results
-        for target_name in targets:
-            train_losses[target_name].append(train_loss[target_name])
-            train_accs[target_name].append(train_acc[target_name])
-            val_losses[target_name].append(val_loss[target_name])
-            val_accs[target_name].append(val_acc[target_name])
-
-        # visualize the result
-        CLIreporter(targets, train_loss, train_acc, val_loss, val_acc)
-        print('Epoch {}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1,optimizer.param_groups[0]['lr'],te-ts))
-
-        # saving the checkpoint
-        checkpoint_dir = checkpoint_save(net, save_dir, epoch, val_acc, val_accs, args)
-
     # test
     net.to('cpu')
     torch.cuda.empty_cache()
 
-    net = checkpoint_load(net, checkpoint_dir)
+    assert args.checkpoint_dir
+    net = checkpoint_load(net, args.checkpoint_dir)
     if args.sbatch == 'True':
         net.cuda()
     else:
@@ -202,13 +129,6 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
     # summarize results
     result = {}
-    result['train_losses'] = train_losses
-    result['train_accs'] = train_accs
-    result['val_losses'] = val_losses
-    result['val_accs'] = val_accs
-
-    result['train_acc'] = train_acc
-    result['val_acc'] = val_acc
     result.update(test_result)
     
     
@@ -217,7 +137,6 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
 
     return vars(args), result
 ## ==================================== ##
-
 
 
 
@@ -252,7 +171,7 @@ if __name__ == "__main__":
 
 
     # Run Experiment
-    setting, result = experiment(partition, subject_data, save_dir, deepcopy(args))
+    setting, result = inference_engine(partition, subject_data, save_dir, deepcopy(args))
 
     # Save result
     save_exp_result(save_dir, setting, result)

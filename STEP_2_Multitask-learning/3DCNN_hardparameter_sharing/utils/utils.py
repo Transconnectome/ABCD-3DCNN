@@ -8,41 +8,6 @@ import argparse
 import torch
 from copy import deepcopy
 
-def argument_setting():
-    parser = argparse.ArgumentParser()
-
-    #parser.add_argument("--GPU_NUM",default=1,type=int,required=True,help='')
-    parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264'])
-    parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
-    parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-    parser.add_argument("--resize",default=[96, 96, 96],type=int,nargs="*",required=False,help='')
-    parser.add_argument("--train_batch_size",default=16,type=int,required=False,help='')
-    parser.add_argument("--val_batch_size",default=16,type=int,required=False,help='')
-    parser.add_argument("--test_batch_size",default=1,type=int,required=False,help='')
-    parser.add_argument("--in_channels",default=1,type=int,required=False,help='')
-    parser.add_argument("--optim",type=str,required=True,help='', choices=['Adam','SGD'])
-    parser.add_argument("--lr", default=0.01,type=float,required=False,help='')
-    parser.add_argument("--weight_decay",default=0.001,type=float,required=False,help='')
-    parser.add_argument("--epoch",type=int,required=True,help='')
-    parser.add_argument("--exp_name",type=str,required=True,help='')
-    parser.add_argument("--cat_target", type=str, nargs='*', required=False, help='')
-    parser.add_argument("--num_target", type=str,nargs='*', required=False, help='')
-    parser.add_argument("--confusion_matrix", type=str, nargs='*',required=False, help='')
-    parser.add_argument("--gpus", type=int,nargs='*', required=False, help='')
-    parser.add_argument("--sbatch", type=str, required=False, choices=['True', 'False'])
-    parser.add_argument('--accumulation_steps', default=None, type=int, required=False)
-
-    args = parser.parse_args()
-    print("Categorical target labels are {} and Numerical target labels are {}".format(args.cat_target, args.num_target))
-
-    if not args.cat_target:
-        args.cat_target = []
-    elif not args.num_target:
-        args.num_target = []
-    elif not args.cat_target and args.num_target:
-        raise ValueError('YOU SHOULD SELECT THE TARGET!')
-
-    return args
 
 
 def case_control_count(labels, dataset_type, args):
@@ -116,8 +81,7 @@ def checkpoint_load(net, checkpoint_dir):
 def save_exp_result(save_dir, setting, result):
     makedir(save_dir)
     exp_name = setting['exp_name']
-    del setting['epoch']
-    del setting['test_batch_size']
+
 
     filename = save_dir + '/{}.json'.format(exp_name)
     result.update(setting)
@@ -131,5 +95,21 @@ def makedir(path):
         os.makedirs(path)
 
 
+def combine_pred_subjid(outputs: dict, subject_ids: list) -> dict:
+    def getting_subjid(subject_ids):
+        for i, subj in enumerate(subject_ids):
+            _, subj = os.path.split(subj)
+            if subj.find('.nii.gz') != -1: 
+                subj = subj.replace('.nii.gz','')
+            elif subj.find('.npy') != -1: 
+                subj = subj.replace('.npy','')
+            subject_ids[i] = subj
+        return subject_ids
 
+    subject_ids = getting_subjid(subject_ids=subject_ids)    
+    for i, pred_score in enumerate(outputs): 
+        pred_subjid = (subject_ids[i], pred_score)
+        outputs[i] = tuple(pred_subjid)
+
+    return outputs
 
