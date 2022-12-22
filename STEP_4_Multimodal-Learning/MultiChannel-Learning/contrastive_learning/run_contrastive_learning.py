@@ -26,6 +26,13 @@ warnings.filterwarnings("ignore")
 
 ## ========= Helper Functions =============== ##
 
+def seed_all(SEED):
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.backends.cudnn.deterministic = True
+
 def setup_results(args):
     train_losses = defaultdict(list)
     train_accs = defaultdict(list)
@@ -64,7 +71,7 @@ def set_lr_scheduler(args, optimizer, len_dataloader):
     if args.scheduler == '':
         scheduler = None
     elif args.scheduler == 'on':
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-9)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-7)
     elif args.scheduler.lower() == 'cos':
 #             scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=1)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=2, eta_min=0)
@@ -90,6 +97,7 @@ def run_experiment(args, net, partition, result, mode):
 
     best_val_loss = float('inf')
     best_train_loss = float('inf')
+    best_val_acc = 0
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
@@ -112,29 +120,29 @@ def run_experiment(args, net, partition, result, mode):
                 result['train_accs'][target_name].append(train_acc[target_name])
                 result['val_accs'][target_name].append(val_acc[target_name])
                 val_acc_sum += val_acc[target_name]
-            
-        if val_loss_sum < best_val_loss:
+                
+        ## saving the checkpoint and results   
+        if val_acc_sum > best_val_acc:
+            best_val_acc = val_acc_sum
             best_val_loss = val_loss_sum
             best_train_loss = train_loss_sum
             patience = 0
+            checkpoint_dir = checkpoint_save(net, epoch, args)  
         else:
             patience += 1
-
-        ## visualize the result
+       
+        save_exp_result(vars(args).copy(), result) 
+            
+        ## visualize the result                   
         CLIreporter(train_loss, train_acc, val_loss, val_acc)
         curr_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch {epoch+1}. Current learning rate {curr_lr}. Took {te-ts:2.2f} sec")
 
-        ## saving the checkpoint and results
-        if args.debug == '':
-            checkpoint_dir = checkpoint_save(net, epoch, val_acc, result['val_accs'], args)                     
-            if epoch%10 == 0:
-                save_exp_result(vars(args).copy(), result)
-
         ## Early-Stopping
-        if args.early_stopping != None and patience == args.early_stopping:
-            print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
-            break
+        if args.early_stopping != None:
+            if patience >= args.early_stopping and epoch >= 50:
+                print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
+                break
     
     opt = '' if mode == 'ALL' else '_FC'
     result[f'best_val_loss{opt}'] = best_val_loss
@@ -226,9 +234,7 @@ if __name__ == "__main__":
     
     # seed number
     args.seed = 1234
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    seed_all(args.seed)
         
     args.save_dir = os.getcwd() + '/result'
     partition, subject_data = make_dataset(args)

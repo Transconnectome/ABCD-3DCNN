@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import confusion_matrix
 
-from envs.loss_functions import calculating_loss_acc, calc_acc, calc_R2
+from envs.loss_functions import calculating_loss_acc, calc_acc, calc_R2, calc_MAE_MSE_R2
 
 ### ========= Train,Validate, and Test ========= ###
 '''The process of calcuating loss and accuracy metrics is as follows.
@@ -45,18 +45,27 @@ def train(net,partition,optimizer,args):
 
     train_loss = defaultdict(list)
     train_acc =  defaultdict(list)
-
+    
+    optimizer.zero_grad()
     for i, data in enumerate(trainloader,0):
-        optimizer.zero_grad()
         image, targets = data
         image = list(map(lambda x: x.to(f'cuda:{net.device_ids[0]}'), image))
-        output = net(image)
-        loss = calculating_loss_acc(targets, output, train_loss, train_acc, net, args)
+        with torch.cuda.amp.autocast():
+            output = net(image)
+            loss = calculating_loss_acc(targets, output, train_loss, train_acc, net, args)
+            if args.accumulation_steps:
+                loss = loss / args.accumulation_steps
         
-        # multi-head model sum all the loss from predicting each target variable and back propagation
-        scaler.scale(loss).backward() 
-        scaler.step(optimizer)
-        scaler.update()
+        scaler.scale(loss).backward()
+        if args.accumulation_steps:
+            if ((i + 1) % args.accumulation_steps == 0) or (i == (len(trainloader)-1)):
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+        else:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
 
     # calculating total loss and acc of separate mini-batch
     for target in train_loss:
@@ -93,8 +102,9 @@ def validate(net,partition,scheduler,args):
         for i, data in enumerate(valloader,0):
             image, targets = data
             image = list(map(lambda x: x.to(f'cuda:{net.device_ids[0]}'), image))
-            output = net(image)
-            loss = calculating_loss_acc(targets, output, val_loss, val_acc, net, args)
+            with torch.cuda.amp.autocast():
+                output = net(image)
+                loss = calculating_loss_acc(targets, output, val_loss, val_acc, net, args)
 
     for target in val_loss:
         val_loss[target] = np.mean(val_loss[target])
@@ -166,7 +176,7 @@ def test(net,partition,args):
             
         outputs[curr_target] = torch.cat(outputs[curr_target])
         y_true[curr_target] = torch.cat(y_true[curr_target])
-        acc_func = calc_acc if curr_target in args.cat_target else calc_R2
+        acc_func = calc_acc if curr_target in args.cat_target else calc_MAE_MSE_R2
         curr_acc = acc_func(outputs[curr_target], y_true[curr_target], args, None)
         test_acc[curr_target].append(curr_acc)
         

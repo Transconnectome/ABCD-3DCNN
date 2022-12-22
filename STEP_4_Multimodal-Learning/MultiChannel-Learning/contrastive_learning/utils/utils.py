@@ -14,26 +14,31 @@ import models.sfcn as sfcn
 
 def argument_setting():
     parser = argparse.ArgumentParser()
-    
+
     # Options for model setting
     parser.add_argument("--model", type=str, required=True, help='Select model. e.g. densenet3D121, sfcn.',
                         choices=['simple3D', 'sfcn', 'vgg3D11', 'vgg3D13', 'vgg3D16', 'vgg3D19',
                                  'resnet3D50', 'resnet3D101', 'resnet3D152',
                                  'densenet3D121', 'densenet3D169', 'densenet201', 'densenet264'])
     parser.add_argument("--in_channels", default=1, type=int, help='')
-    
+
     # Options for dataset and data type, split ratio, CV, resize, augmentation
     parser.add_argument("--dataset", type=str, choices=['UKB','ABCD'], required=True, help='Selelct dataset')
     parser.add_argument("--data_type", nargs='+', type=str, help='Select data type(sMRI, dMRI)',
-                        choices=['fmriprep', 'freesurfer', 'FA_unwarpped_nii', 'FA_warpped_nii',
+                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'FA_unwarpped_nii', 'FA_warpped_nii',
                                  'MD_unwarpped_nii', 'MD_warpped_nii', 'RD_unwarpped_nii', 'RD_warpped_nii'])
+    parser.add_argument("--tissue", default=None, type=str, help='Select tissue mask(Cortical grey matter, \
+                        Sub-cortical grey matter, White matter, CSF, Pathological tissue)',
+                        choices=['cgm', 'scgm', 'wm', 'csf', 'pt'])
     parser.add_argument("--val_size", default=0.1, type=float, help='')
     parser.add_argument("--test_size", default=0.1, type=float, help='')
     parser.add_argument("--cv", default=None, type=int, choices=[1,2,3,4,5], help="option for 5-fold CV. 1~5.")
     parser.add_argument("--resize", nargs="*", default=(96, 96, 96), type=int, help='')
+    parser.add_argument("--transform", nargs="*", default=[], type=str, choices=['crop'],
+                        help="option for additional transform - [crop] are available")
     parser.add_argument("--augmentation", nargs="*", default=[], type=str, choices=['shift','flip'],
                         help="Data augmentation - [shift, flip] are available")
-    
+
     # Hyperparameters for model training
     parser.add_argument("--lr", default=0.01, type=float, help='')
     parser.add_argument("--lr_adjust", default=0.01, type=float, help='')
@@ -46,7 +51,7 @@ def argument_setting():
     parser.add_argument("--train_batch_size", default=16, type=int, help='')
     parser.add_argument("--val_batch_size", default=16, type=int, help='')
     parser.add_argument("--test_batch_size", default=1, type=int, help='')
-   
+
     # Options for experiment setting
     parser.add_argument("--exp_name", type=str, required=True, help='')
     parser.add_argument("--gpus", nargs='+', type=int, help='')
@@ -131,26 +136,14 @@ def CLIreporter(train_loss, train_acc, val_loss, val_acc):
 
 
 # define checkpoint-saving function
-def checkpoint_save(net, epoch, current_result, previous_result, args):
+def checkpoint_save(net, epoch, args):
     """checkpoint is saved only if validation performance for all target tasks are improved """
     if os.path.isdir(os.path.join(args.save_dir, 'model')) == False:
         makedir(os.path.join(args.save_dir, 'model'))
     
     checkpoint_dir = os.path.join(args.save_dir, f'model/{args.model}_{args.exp_name}.pth')
-    best_checkpoint_votes = 0
-
-    if args.cat_target:
-        for cat_target in args.cat_target:
-            if current_result[cat_target] >= max(previous_result[cat_target]):
-                best_checkpoint_votes += 1
-    if args.num_target:
-        for num_target in args.num_target:
-            if current_result[num_target] >= max(previous_result[num_target]):
-                best_checkpoint_votes += 1
-        
-    if best_checkpoint_votes == len(args.cat_target + args.num_target):
-        torch.save(net.module.state_dict(), checkpoint_dir)
-        print("Best iteration until now is %d" % (epoch + 1))
+    torch.save(net.module.state_dict(), checkpoint_dir)
+    print("Best iteration until now is %d" % (epoch + 1))
 
     return checkpoint_dir
 
@@ -190,7 +183,7 @@ def save_exp_result(setting, result):
     result.update(setting)
 
     with open(filename, 'w') as f:
-        json.dump(result, f)
+        json.dump(result, f, indent=4)
 
 
 def makedir(path):
