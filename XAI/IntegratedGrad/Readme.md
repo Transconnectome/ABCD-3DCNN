@@ -1,5 +1,7 @@
 # Update 
-If you use **captum.__version__ ==0.6.0, do not use ```custom_noise_tunnel.py```**.  
+```custom_noise_tunnel.py``` is a customized python script originated from captum's noise_tunnel.py.  
+This script will prevent adding noise to background of T1w images.  
+You should use **captum.__version__ ==0.6.0 for ```custom_noise_tunnel.py```**.  
 
 # flow of pipeline 
 At first, run **UKB_sex_IntegratedGrad.py** file to obtain individual heatmap. 
