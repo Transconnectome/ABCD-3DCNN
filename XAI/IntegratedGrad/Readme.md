@@ -1,3 +1,6 @@
+# Update 
+If you use **captum.__version__ ==0.6.0, do not use ```custom_noise_tunnel.py```**.  
+
 # flow of pipeline 
 At first, run **UKB_sex_IntegratedGrad.py** file to obtain individual heatmap. 
 Second, mean template of every individual heatmap **UKB_sex_IntegratedGrad.ipynb** and visualize it. 
