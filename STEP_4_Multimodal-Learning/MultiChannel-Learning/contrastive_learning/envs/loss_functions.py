@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 
-def constrastive_loss(output, metric='cos'):
+def contrastive_loss(output, metric='cos'):
     # << should be implemented later >> case where len(args.data_type) >= 3 
     embedding_1, embedding_2 = output['embeddings']
     embedding_2_rolled = embedding_2.roll(1,0)
     
     if metric == 'cos':
-        label_positive = torch.ones(embedding_1.shape[0]).to('cuda:0')
-        label_negative = -torch.ones(embedding_1.shape[0]).to('cuda:0')
+        label_positive = torch.ones(embedding_1.shape[0], device='cuda:0')
+        label_negative = -torch.ones(embedding_1.shape[0], device='cuda:0')
 
         criterion_ssim = nn.CosineEmbeddingLoss(margin=0.0, reduction='mean')
         loss_positive = criterion_ssim(embedding_1, embedding_2, label_positive)
@@ -43,27 +43,18 @@ def calc_R2(tmp_output, y_true, args, tmp_loss=None):
     return r_square.item()
 
 
-def standardization(self, x, y):
-    mean_x = x.mean()
-    stdev_x = x.var()**0.5
-    mean_y = y.mean()
-    stdev_y = y.var()**0.5
-
-    return (x - mean_x) / (stdev_x + 1e-8), (y - mean_y) / (stdev_y + 1e-8)
-
 def calc_MAE_MSE_R2(tmp_output, y_true, args, tmp_loss=None):
-    abs_loss_fn = torch.nn.L1Loss() 
-    mse_loss_fn = torch.nn.MSELoss()
-    abs_loss = abs_loss_fn(y_true, self.pred)
-    std_true, std_pred = self.standardization(y_true, self.pred)
-    mse_loss = mse_loss_fn(std_true, std_pred)
-    y_var = torch.var(y_true, unbiased=False)
+    pred, true = tmp_output.float(), y_true.float().unsqueeze(1)
+    abs_loss = torch.nn.functional.l1_loss(pred, true)
+    mse_loss = torch.nn.functional.mse_loss(pred, true)
+    y_var = torch.var(true, unbiased=False)
     r_square = 1 - (mse_loss / y_var)
-    result = dict()
-    result['abs_loss'] = abs_loss.item()
-    result['mse_loss'] = mse_loss.item() 
-    result['r_square'] = r_square.item()
-                    
+    result = {
+        'abs_loss': abs_loss.item(),
+        'mse_loss': mse_loss.item(),
+        'r_square': r_square.item()
+    }
+    
     return result
 
 
@@ -75,14 +66,14 @@ def calculating_loss_acc(targets, output, loss_dict, acc_dict, net, args):
     loss = 0.0
     
     # calculate constrastive_loss
-    if len(args.data_type) > 1:
-        loss_positive, loss_negative = constrastive_loss(output, args.metric)
+    if (len(args.data_type) > 1 and args.in_channels == 1):
+        loss_positive, loss_negative = contrastive_loss(output, args.metric)
         loss += (loss_positive + loss_negative)/2
         loss_dict['contrastive_loss_positive'].append(loss_positive.item())
         loss_dict['contrastive_loss_negative'].append(loss_negative.item())
         
     # calculate target_losses & accuracies
-    for curr_target in output:
+    for curr_target in targets:
         tmp_output = output[curr_target]
         label = targets[curr_target].to('cuda:0')
 #         label = label.repeat(2)

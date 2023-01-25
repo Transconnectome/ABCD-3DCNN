@@ -71,7 +71,7 @@ def set_lr_scheduler(args, optimizer, len_dataloader):
     if args.scheduler == '':
         scheduler = None
     elif args.scheduler == 'on':
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-7)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-6)
     elif args.scheduler.lower() == 'cos':
 #             scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=5, T_mult=2, eta_max=0.1, T_up=2, gamma=1)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=2, eta_min=0)
@@ -88,16 +88,17 @@ def set_lr_scheduler(args, optimizer, len_dataloader):
     
 def run_experiment(args, net, partition, result, mode):
     epoch_exp = args.epoch if mode == 'ALL' else args.epoch_FC
-    num_unfrozen = args.unfrozen_layer if mode == 'ALL' else '0'
     
     if (args.transfer != '') and (args.unfrozen_layer.lower() != 'all'):
+        num_unfrozen = args.unfrozen_layer if mode == 'ALL' else '0'
         setting_transfer(args, net.module, num_unfrozen = num_unfrozen)
+        
     optimizer = set_optimizer(args, net)
     scheduler = set_lr_scheduler(args, optimizer, len(partition['train']))
 
     best_val_loss = float('inf')
     best_train_loss = float('inf')
-    best_val_acc = 0
+    best_val_acc = -float('inf')
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
@@ -120,21 +121,20 @@ def run_experiment(args, net, partition, result, mode):
                 result['train_accs'][target_name].append(train_acc[target_name])
                 result['val_accs'][target_name].append(val_acc[target_name])
                 val_acc_sum += val_acc[target_name]
-                
-        ## saving the checkpoint and results   
+            
+        ## visualize the result, save the checkpoint and results
+        CLIreporter(train_loss, train_acc, val_loss, val_acc)
         if val_acc_sum > best_val_acc:
+            result['best_epoch'] = epoch
             best_val_acc = val_acc_sum
             best_val_loss = val_loss_sum
             best_train_loss = train_loss_sum
             patience = 0
-            checkpoint_dir = checkpoint_save(net, epoch, args)  
+            checkpoint_dir = checkpoint_save(net, epoch, args)
+            print(f"<< Best iteration until now is {(epoch + 1)} >>")
         else:
             patience += 1
-       
         save_exp_result(vars(args).copy(), result) 
-            
-        ## visualize the result                   
-        CLIreporter(train_loss, train_acc, val_loss, val_acc)
         curr_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch {epoch+1}. Current learning rate {curr_lr}. Took {te-ts:2.2f} sec")
 
@@ -143,7 +143,8 @@ def run_experiment(args, net, partition, result, mode):
             if patience >= args.early_stopping and epoch >= 50:
                 print(f"*** Validation Loss patience reached {args.early_stopping} epochs. Early Stopping Experiment ***")
                 break
-    
+    checkpoint_save(net, args.epoch, args)
+
     opt = '' if mode == 'ALL' else '_FC'
     result[f'best_val_loss{opt}'] = best_val_loss
     result[f'best_train_loss{opt}'] = best_train_loss
@@ -235,17 +236,15 @@ if __name__ == "__main__":
     # seed number
     args.seed = 1234
     seed_all(args.seed)
-        
     args.save_dir = os.getcwd() + '/result'
-    partition, subject_data = make_dataset(args)
-
-    ## ========= Run Experiment and saving result ========= ##    
     time_hash = datetime.datetime.now().time()
     hash_key = hashlib.sha1(str(time_hash).encode()).hexdigest()[:6]
     args.exp_name = args.exp_name + f'_{hash_key}'
 
+    ## ========= Run Experiment and saving result ========= ##    
     # Run Experiment
     print(f"*** Experiment {args.exp_name} Start ***")
+    partition, subject_data = make_dataset(args)
     setting, result = experiment(partition, subject_data, deepcopy(args))
     print("===== Experiment Setting Report =====")
     print(args)

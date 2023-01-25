@@ -25,11 +25,13 @@ def argument_setting():
     # Options for dataset and data type, split ratio, CV, resize, augmentation
     parser.add_argument("--dataset", type=str, choices=['UKB','ABCD'], required=True, help='Selelct dataset')
     parser.add_argument("--data_type", nargs='+', type=str, help='Select data type(sMRI, dMRI)',
-                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'FA_unwarpped_nii', 'FA_warpped_nii',
+                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'freesurfer_crop_resize128',
+                                 'FA_crop_resize128', 'FA_unwarpped_nii', 'FA_warpped_nii',
                                  'MD_unwarpped_nii', 'MD_warpped_nii', 'RD_unwarpped_nii', 'RD_warpped_nii'])
     parser.add_argument("--tissue", default=None, type=str, help='Select tissue mask(Cortical grey matter, \
                         Sub-cortical grey matter, White matter, CSF, Pathological tissue)',
                         choices=['cgm', 'scgm', 'wm', 'csf', 'pt'])
+    parser.add_argument("--metric", default='cos', type=str, help='')
     parser.add_argument("--val_size", default=0.1, type=float, help='')
     parser.add_argument("--test_size", default=0.1, type=float, help='')
     parser.add_argument("--cv", default=None, type=int, choices=[1,2,3,4,5], help="option for 5-fold CV. 1~5.")
@@ -45,9 +47,11 @@ def argument_setting():
     parser.add_argument("--epoch", type=int, required=True, help='')
     parser.add_argument("--epoch_FC", type=int, default=0, help='Option for training only FC layer')
     parser.add_argument("--optim", default='Adam', type=str, choices=['Adam','SGD','RAdam','AdamW'], help='')
-    parser.add_argument("--weight_decay", default=0.001, type=float, help='')
+    parser.add_argument("--weight_decay", default=0.01, type=float, help='')
     parser.add_argument("--scheduler", default='', type=str, help='') 
     parser.add_argument("--early_stopping", default=None, type=int, help='')
+    parser.add_argument("--num_workers", default=3, type=int, help='')
+    parser.add_argument('--accumulation_steps', default=None, type=int, required=False)
     parser.add_argument("--train_batch_size", default=16, type=int, help='')
     parser.add_argument("--val_batch_size", default=16, type=int, help='')
     parser.add_argument("--test_batch_size", default=1, type=int, help='')
@@ -58,6 +62,7 @@ def argument_setting():
     parser.add_argument("--sbatch", type=str, choices=['True', 'False'])
     parser.add_argument("--cat_target", nargs='+', default=[], type=str, help='')
     parser.add_argument("--num_target", nargs='+', default=[], type=str, help='')
+    parser.add_argument("--num_normalize", type=str, default=True, help='')
     parser.add_argument("--confusion_matrix",  nargs='*', default=[], type=str, help='')
     parser.add_argument("--filter", nargs="*", default=[], type=str,
                         help='options for filter data by phenotype. usage: --filter abcd_site:10 sex:1')
@@ -121,6 +126,7 @@ def select_model(subject_data, args):
 # Experiment 
 def CLIreporter(train_loss, train_acc, val_loss, val_acc):
     '''command line interface reporter per every epoch during experiments'''
+    print("="*80)
     visual_report = defaultdict(list)
     for label_name in train_loss:
         loss_value = f'{train_loss[label_name]:2.4f} / {val_loss[label_name]:2.4f}'
@@ -128,11 +134,11 @@ def CLIreporter(train_loss, train_acc, val_loss, val_acc):
             acc_value = f'{train_acc[label_name]:2.4f} / {val_acc[label_name]:2.4f}' 
         else:
             acc_value = None
-            
         visual_report['Loss (train/val)'].append(loss_value)
         visual_report['R2 or ACC (train/val)'].append(acc_value)
-    print("="*80)
     print(pd.DataFrame(visual_report, index=train_loss.keys()))
+    
+    return None
 
 
 # define checkpoint-saving function
@@ -142,8 +148,9 @@ def checkpoint_save(net, epoch, args):
         makedir(os.path.join(args.save_dir, 'model'))
     
     checkpoint_dir = os.path.join(args.save_dir, f'model/{args.model}_{args.exp_name}.pth')
+    if epoch == args.epoch:
+        checkpoint_dir = checkpoint_dir[:-4]+"_last.pth"
     torch.save(net.module.state_dict(), checkpoint_dir)
-    print("Best iteration until now is %d" % (epoch + 1))
 
     return checkpoint_dir
 
@@ -166,7 +173,7 @@ def checkpoint_load(net, checkpoint_dir):
         checkpoint_dir = MAE_model_dir
     
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-    net.load_state_dict(model_state, strict=False)
+    net.load_state_dict(model_state, strict=True)
     print('The best checkpoint is loaded')
 
     return net

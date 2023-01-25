@@ -1,26 +1,16 @@
+# utils
+import os
+import collections
+import time
+import copy
+import numpy as np
+
 # model
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-#from torchsummary import summary
-from torch import optim
 from torch import Tensor
-# dataset and transformation
-from torchvision import datasets
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader
-import os
 
-# display images
-from torchvision import utils
-import matplotlib.pyplot as plt
-
-# utils
-import collections
-import numpy as np
-#from torchsummary import summary
-import time
-import copy
 
 class SIMPLE_CNN3D(nn.Module):
     def __init__(self,subject_data, args):

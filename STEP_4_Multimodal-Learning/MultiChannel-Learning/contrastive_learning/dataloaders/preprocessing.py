@@ -1,6 +1,5 @@
 import numpy as np
 
-
 ## categorical
 def preprocessing_cat(subject_data, args):
     if args.cat_target:

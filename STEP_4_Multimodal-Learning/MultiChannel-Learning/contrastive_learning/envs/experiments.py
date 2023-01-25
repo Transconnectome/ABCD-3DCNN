@@ -26,46 +26,40 @@ def train(net,partition,optimizer,args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
         random.seed(args.seed)
-
     g = torch.Generator()
     g.manual_seed(args.seed)
     
     '''GradScaler is for calculating gradient with float 16 type'''
     scaler = torch.cuda.amp.GradScaler()
-
     trainloader = torch.utils.data.DataLoader(partition['train'],
                                               batch_size=args.train_batch_size,
                                               shuffle=False,
                                               pin_memory=True,
-                                              num_workers=4,
+                                              num_workers=args.num_workers,
                                               worker_init_fn=seed_worker,
                                               generator=g)
 
     net.train()
-
     train_loss = defaultdict(list)
     train_acc =  defaultdict(list)
     
-    optimizer.zero_grad()
     for i, data in enumerate(trainloader,0):
         image, targets = data
         image = list(map(lambda x: x.to(f'cuda:{net.device_ids[0]}'), image))
         with torch.cuda.amp.autocast():
             output = net(image)
             loss = calculating_loss_acc(targets, output, train_loss, train_acc, net, args)
-            if args.accumulation_steps:
-                loss = loss / args.accumulation_steps
+            loss = loss / args.accumulation_steps if args.accumulation_steps else loss
         
+        optimizer.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
         if args.accumulation_steps:
             if ((i + 1) % args.accumulation_steps == 0) or (i == (len(trainloader)-1)):
                 scaler.step(optimizer)
                 scaler.update()
-                optimizer.zero_grad()
         else:
             scaler.step(optimizer)
             scaler.update()
-            optimizer.zero_grad()
 
     # calculating total loss and acc of separate mini-batch
     for target in train_loss:
@@ -81,23 +75,19 @@ def validate(net,partition,scheduler,args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
         random.seed(args.seed)
-
     g = torch.Generator()
     g.manual_seed(args.seed)
-    
     valloader = torch.utils.data.DataLoader(partition['val'],
                                             batch_size=args.val_batch_size,
                                             shuffle=False,
                                             pin_memory=True,
-                                            num_workers=4,
+                                            num_workers=args.num_workers,
                                             worker_init_fn=seed_worker,
-                                            generator=g)
-
-    net.eval()
-
+                                            generator=g)   
     val_loss = defaultdict(list)
     val_acc = defaultdict(list)
-    
+
+    net.eval()
     with torch.no_grad():
         for i, data in enumerate(valloader,0):
             image, targets = data
@@ -135,14 +125,13 @@ def test(net,partition,args):
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
         random.seed(args.seed)
-
     g = torch.Generator()
     g.manual_seed(args.seed)
     
     testloader = torch.utils.data.DataLoader(partition['test'],
                                              batch_size=args.test_batch_size,
                                              shuffle=False,
-                                             num_workers=4,
+                                             num_workers=args.num_workers,
                                              pin_memory=True,
                                              worker_init_fn=seed_worker,
                                              generator=g)
@@ -170,7 +159,7 @@ def test(net,partition,args):
                     y_true[curr_target].append(targets[curr_target].cpu())
     
     # caculating ACC and R2 at once  
-    for curr_target in output:
+    for curr_target in args.cat_target + args.num_target:
         if curr_target == 'embeddings':
             continue
             

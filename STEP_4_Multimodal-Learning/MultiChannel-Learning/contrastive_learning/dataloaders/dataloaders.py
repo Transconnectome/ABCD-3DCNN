@@ -24,7 +24,9 @@ ABCD_data_dir = {
     'MD_warpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.4.MD_warpped_nii/',
     'RD_unwarpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.5.RD_unwarpped_nii/',
     'RD_warpped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.6.RD_warpped_nii/',
-    '5tt_warped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.7.5tt_warped_nii/'
+    '5tt_warped_nii':'/scratch/connectome/3DCNN/data/1.ABCD/3.7.5tt_warped_nii/',
+    'freesurfer_crop_resize128':'/home/connectome/jubin/3DCNN/ABCD/freesurfer_crop_resize128/',
+    'FA_crop_resize128':'/home/connectome/jubin/3DCNN/ABCD/FA_crop_resize128/'
 }
 
 ABCD_phenotype_dir = {
@@ -51,7 +53,7 @@ def loading_images(image_dir, args):
     for brain_modality in data_types:
         curr_dir = image_dir[brain_modality]
         curr_files = pd.DataFrame({brain_modality:glob.glob(curr_dir+'*[yz]')}) # to get .npy(sMRI) & .nii.gz(dMRI) files
-        curr_files[subjectkey] = curr_files[brain_modality].map(lambda x: x.split("/")[-1].split('.')[0])
+        curr_files[subjectkey] = curr_files[brain_modality].map(lambda x: x.split("/")[-1].split('.')[0].split('sub-')[-1])
         if args.dataset == 'UKB':
             curr_files[subjectkey] = curr_files[subjectkey].map(int)
         curr_files.sort_values(by=subjectkey, inplace=True)
@@ -97,13 +99,11 @@ def loading_phenotype(phenotype_dir, target_list, args):
     subject_data = subject_data.sort_values(by=subjectkey)
     subject_data = subject_data.dropna(axis = 0)
     subject_data = subject_data.reset_index(drop=True)
-    
-    if (args.transfer == 'MAE' and args.dataset == 'ABCD') or args.scratch == 'MAE':
-        return subject_data
 
     ### preprocessing categorical variables and numerical variables
     subject_data = preprocessing_cat(subject_data, args)
-    subject_data = preprocessing_num(subject_data, args)
+    if args.num_normalize == True:
+        subject_data = preprocessing_num(subject_data, args)
     
     return subject_data
 
@@ -111,7 +111,6 @@ def loading_phenotype(phenotype_dir, target_list, args):
 def make_balanced_testset(il, num_test, args):
     n_case = num_test//2
     n_control = num_test - n_case
-
     t_case, rest_case = np.split(il[il[args.cat_target[0]]==0], (n_case,))
     t_control, rest_control = np.split(il[il[args.cat_target[0]]==1],(n_control,))
     
@@ -128,16 +127,21 @@ def make_balanced_testset(il, num_test, args):
 
 # defining train,val, test set splitting function
 def partition_dataset(imageFiles_labels, target_list, args):
-    ## Random shuffle according to args.seed
-    imageFiles_labels = imageFiles_labels.sample(frac=1).reset_index(drop=True)
+    ## Random shuffle according to args.seed -> Disable.
+#     imageFiles_labels = imageFiles_labels.sample(frac=1).reset_index(drop=True)
     
     ## Dataset split    
     num_total = len(imageFiles_labels)
-    num_test = int(num_total*args.test_size)
+    num_train = int(num_total*(1 - args.val_size - args.test_size))
     num_val = int(num_total*args.val_size) if args.cv == None else int((num_total-num_test)/5)
-    num_train = num_total - (num_val+num_test)
+    num_test = int(num_total*args.test_size)
     
-    imageFiles_labels = make_balanced_testset(imageFiles_labels, num_test, args)
+#     num_test = int(num_total*args.test_size)
+#     num_val = int(num_total*args.val_size) if args.cv == None else int((num_total-num_test)/5)
+#     num_train = num_total - (num_val+num_test)
+    
+    if len(args.cat_target) > 0:
+        imageFiles_labels = make_balanced_testset(imageFiles_labels, num_test, args)
     images = imageFiles_labels[args.data_type]
     labels = imageFiles_labels[target_list].to_dict('records')
     
@@ -157,11 +161,12 @@ def partition_dataset(imageFiles_labels, target_list, args):
 
     ## Define transform function
     resize = tuple(args.resize)
-    
     default_transforms = [ScaleIntensity(), AddChannel(), Resize(resize), ToTensor()] 
+    
+    if 'resize128' in args.data_type:
+        default_transforms.pop(2)
     if 'crop' in args.transform:
-        default_transforms.insert(0, CenterSpatialCrop(192))
-        
+        default_transforms.insert(2, CenterSpatialCrop(192))
     if args.tissue:
         dMRI_transform = [MaskTissue(imageFiles_labels['5tt_warped_nii'], args.tissue)]
         dMRI_transform += default_transforms
@@ -189,9 +194,9 @@ def partition_dataset(imageFiles_labels, target_list, args):
     partition['val'] = val_set
     partition['test'] = test_set
 
-    case_control_count(labels_train, 'train', args)
-    case_control_count(labels_val, 'validation', args)
-    case_control_count(labels_test, 'test', args)
+#     case_control_count(labels_train, 'train', args)
+#     case_control_count(labels_val, 'validation', args)
+#     case_control_count(labels_test, 'test', args)
 
     return partition
 
@@ -208,7 +213,7 @@ def make_dataset(args):
 
     # combining image files & labels
     imageFiles_labels = pd.merge(subject_data, image_files, how='inner', on=subjectkey)
-    print(imageFiles_labels.columns)
+
     # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables)
     partition = partition_dataset(imageFiles_labels, target_list, args)
     print("*** Making a dataset is completed *** \n")

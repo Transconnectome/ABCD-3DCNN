@@ -103,6 +103,7 @@ class DenseNet(nn.Module):
         self.target = args.cat_target + args.num_target
         
         self.n_input_channels = n_input_channels
+        self.multi_channel = (len(self.brain_dtypes) > 1 and self.n_input_channels > 1)
         self.conv1_t_size = conv1_t_size
         self.conv1_t_stride = conv1_t_stride
         self.growth_rate = growth_rate
@@ -181,10 +182,10 @@ class DenseNet(nn.Module):
 
     def forward(self, images):            
         outs = []
-        results = {'embeddings':[]} if len(self.brain_dtypes) > 1 else {}
+        results = {} if self.multi_channel else {'embeddings':[]}
         for i, x in enumerate(images): # feed each brain modality into its own CNN
             features = self.feature_extractors[i](x)
-            if len(self.brain_dtypes) > 1:
+            if not self.multi_channel:
                 results['embeddings'].append(torch.flatten(features, 1))
             out = F.adaptive_avg_pool3d(features, output_size=(1, 1, 1))
             out = F.relu(out, inplace=True)
