@@ -14,7 +14,7 @@ def contrastive_loss(output, metric='cos'):
         loss_positive = criterion_ssim(embedding_1, embedding_2, label_positive)
         loss_negative = criterion_ssim(embedding_1, embedding_2_rolled, label_negative)
     
-    elif metric == 'L2':
+    elif metric.upper() == 'L2':
         criterion_ssim = nn.MSELoss()
         loss_positive = criterion_ssim(embedding_1, embedding_2)
         loss_negative = torch.zeros(loss_positive.shape) # setting this to 0 raises error when call loss_negative.item() later
