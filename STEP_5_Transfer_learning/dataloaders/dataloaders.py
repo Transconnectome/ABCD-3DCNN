@@ -50,7 +50,8 @@ def loading_images(image_dir, args):
     image_files = pd.concat([image_files, pd.Series(glob.glob('*.nii.gz'))])
     image_files.sort_values(inplace=True)
     subjects = image_files.map(lambda x: x.split('.')[0]) # revising
-    #image_files = image_files[:100]
+    if args.sample_size:
+        image_files = image_files[:args.sample_size]
     return image_files
 
 

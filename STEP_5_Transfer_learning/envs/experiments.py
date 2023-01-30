@@ -4,7 +4,7 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 
 from envs.loss_functions import calculating_loss_acc
 from tqdm import tqdm
@@ -40,6 +40,7 @@ def train(net,partition,optimizer,args):
                                              batch_size=args.train_batch_size,
                                              shuffle=True,
                                              num_workers=4,
+                                             pin_memory=True,
                                              worker_init_fn=seed_worker,
                                              generator=g)
 
@@ -70,9 +71,9 @@ def train(net,partition,optimizer,args):
         optimizer.zero_grad()
         image, targets = data
         image = image.to(f'cuda:{net.device_ids[0]}')
-        output = net(image)
-
-        loss, train_loss, train_acc = calculating_loss_acc(targets, output, train_loss, correct, total, train_acc, net, args)
+        with torch.cuda.amp.autocast():
+            output = net(image)
+            loss, train_loss, train_acc = calculating_loss_acc(targets, output, train_loss, correct, total, train_acc, net, args)
         
         scaler.scale(loss).backward()# multi-head model sum all the loss from predicting each target variable and back propagation
         scaler.step(optimizer)
@@ -108,6 +109,7 @@ def validate(net,partition,scheduler,args):
                                            batch_size=args.val_batch_size,
                                            shuffle=True,
                                            num_workers=4,
+                                           pin_memory=True,
                                            worker_init_fn=seed_worker,
                                            generator=g)
 
@@ -138,8 +140,8 @@ def validate(net,partition,scheduler,args):
         for i, data in enumerate(valloader,0):
             image, targets = data
             image = image.to(f'cuda:{net.device_ids[0]}')
+        with torch.cuda.amp.autocast():
             output = net(image)
-
             loss, val_loss, val_acc = calculating_loss_acc(targets, output, val_loss, correct, total, val_acc, net, args)
 
     if args.cat_target:
@@ -236,7 +238,10 @@ def test(net,partition,args):
             correct = (predicted == y_true[cat_target]).sum().item()
             total = y_true[cat_target].size(0)
             test_acc[cat_target].append(100 * (correct / total))
-
+            
+            auroc = roc_auc_score(y_true[cat_target].detach().cpu(), outputs[cat_target].data[:, 1].detach().cpu())
+            test_acc[cat_target].append({'test_AUROC':auroc.item()})
+            
             if args.confusion_matrix:
                 for label_cm in args.confusion_matrix: 
                     if len(np.unique(y_true[cat_target].numpy())) == 2:

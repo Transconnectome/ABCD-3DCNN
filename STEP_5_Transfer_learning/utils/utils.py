@@ -20,6 +20,7 @@ def argument_setting():
     parser.add_argument("--model",required=True,type=str,help='',choices=['simple3D','vgg3D11','vgg3D13','vgg3D16','vgg3D19','resnet3D50','resnet3D101','resnet3D152', 'densenet3D121', 'densenet3D169','densenet201','densenet264','sfcn'])
     parser.add_argument("--dataset",required=True, type=str, choices=['UKB','ABCD'],help='') # revising
     parser.add_argument("--data", type=str, help='select data type') # revising
+    parser.add_argument("--sample_size",default=None,type=int,required=False,help='')
     parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
     parser.add_argument("--resize",default=(96, 96, 96),type=int,nargs="*",required=False,help='')
@@ -170,7 +171,7 @@ def checkpoint_load(net, checkpoint_dir):
         checkpoint_dir = MAE_model_dir
     
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-    net.load_state_dict(model_state, strict=False)
+    net.load_state_dict(model_state, strict=True)
     print('The best checkpoint is loaded')
 
     return net

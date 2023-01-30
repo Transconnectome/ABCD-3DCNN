@@ -63,18 +63,22 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     return vars(args), result
 ## ==================================== ##
 
+def seed_all(SEED):
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.backends.cudnn.deterministic = True
+    
 
 if __name__ == "__main__":
     cwd = os.getcwd()
 
     ## ========= Setting ========= ##
-    # seed number
-    seed = 1234
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
     args = argument_setting()
+    # seed number
+    args.seed = 1234
+    seed_all(args.seed)
     
     if args.transfer in ['age','MAE']:
         assert 96 in args.resize, "age(MSE/MAE) transfer model's resize should be 96"
