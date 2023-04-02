@@ -27,21 +27,22 @@ def check_study_sample(study_sample):
         #image_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/1.sMRI_fs_cropped'
         #phenotype_dir = '/home/ubuntu/dhkdgmlghks/2.UKB/2.demo_qc/UKB_phenotype.csv'
     elif study_sample == 'ABCD':
-        #image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
-        #phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
-        image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'
-        phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
+        #image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
     elif study_sample == 'ABCD_MNI':
-        #image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_fmriprep'
-        #phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'  
-        image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/1.sMRI_freesurfer'
-        phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_phenotype_total.csv'
+        image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/1.1.sMRI_MNI_warped'
+        phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/BMI_prediction/ABCD_phenotype_total.csv'  
+        #image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/1.1.sMRI_warped'
+        #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/BMI_prediction/ABCD_phenotype_total.csv'
     elif study_sample == 'ABCD_ADHD':
         #image_dir = '/scratch/connectome/3DCNN/data/1.ABCD/2.sMRI_freesurfer'
         #phenotype_dir = '/scratch/connectome/3DCNN/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv'   
         image_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/2.sMRI_freesurfer'       
         #phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS.csv'
         phenotype_dir = '/home/ubuntu/dhkdgmlghks/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS_and_CBCL.csv'
+
     return image_dir, phenotype_dir 
 
 def check_synthetic_sample(include_synthetic=True):
@@ -57,10 +58,10 @@ def loading_images(image_dir, args, study_sample='UKB', include_synthetic=False)
     if study_sample.find('UKB') != -1:
         image_files = glob.glob(os.path.join(image_dir,'*.nii.gz'))
     elif study_sample.find('ABCD') != -1:
-        image_files = glob.glob(os.path.join(image_dir,'*.npy'))
+        image_files = glob.glob(os.path.join(image_dir,'*.nii.gz'))
     image_files = sorted(image_files)
    
-    #image_files = image_files[:1000]
+    #image_files = image_files[:100]
     print("Loading image file names as list is completed")
 
     synthetic_image_dir = check_synthetic_sample(include_synthetic)
@@ -106,7 +107,7 @@ def combining_image_target(subject_data, image_files, target_list, study_sample=
         suffix_len = -12
     elif study_sample.find('ABCD') != -1:
         subject_id_col = 'subjectkey'
-        suffix_len = -4
+        suffix_len = -7
     imageFiles_labels = []
     
     subj = []
@@ -192,12 +193,13 @@ def partition_dataset_finetuning(imageFiles_labels, args):
     """train_set for training simCLR
         finetuning_set for finetuning simCLR for prediction task 
         tests_set for evaluating simCLR for prediction task"""
-    #random.shuffle(imageFiles_labels)
+    if args.shuffle_data: 
+        random.shuffle(imageFiles_labels)
 
     # number of total / train,val, test
     num_total = len(imageFiles_labels)
-    if args.train_size + args.val_size + args.test_size != 1: 
-        print('PLZ CHECK WHETHER YOU WANT TO USE ONLY THE PORTION OF DATA')
+    #if args.train_size + args.val_size + args.test_size != 1: 
+    #    print('PLZ CHECK WHETHER YOU WANT TO USE ONLY THE PORTION OF DATA')
     num_train = int(num_total*args.train_size)
     num_val = int(num_total*args.val_size)
     num_test = int(num_total*args.test_size)
@@ -247,8 +249,8 @@ def partition_dataset_finetuning(imageFiles_labels, args):
         labels_val = labels[num_train:num_train+num_val]
 
         # image for test set during fine tuning (exactly saying linear classifier training during linear evaluation protocol)
-        images_test = images[num_train+num_val:]
-        labels_test = labels[num_train+num_val:]
+        images_test = images[num_train+num_val:num_train+num_val+num_test]
+        labels_test = labels[num_train+num_val:num_train+num_val+num_test]
 
     print("Training Sample: {}. Validation Sample: {}. Test Sample: {}".format(len(images_train), len(images_val), len(images_test)))
 

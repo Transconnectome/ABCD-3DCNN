@@ -7,6 +7,7 @@ from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint
 from dataloaders.dataloaders import check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.finetuning_ViT import *
+from envs.inference_engine import inference_engine
 from util.distributed_parallel import *
 import hashlib
 import datetime
@@ -55,7 +56,8 @@ parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--dataset_split", default='none', choices=['all', 'test','train_test', 'none'], help='the way splitting data set')
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 parser.add_argument("--mixup",default=None,type=float,required=False,help='')
-
+parser.add_argument("--shuffle_data", action='store_true', help = 'if you add this option in the command line like --shuffle_data, args.shuffle_data would change to be True')
+parser.set_defaults(shuffle_data=False)
 
 #############################
 #### finetune parameters ####
@@ -180,5 +182,9 @@ if __name__ == "__main__":
 
     # Run MAE Experiment
     torch.backends.cudnn.benchmark = True
-    setting, result = ViT_experiment(partition, num_classes, save_dir, deepcopy(args))
-    save_exp_result(save_dir, setting, result)
+    setting, result, checkpoint_dir = ViT_experiment(partition, num_classes, save_dir, deepcopy(args))
+
+    if args.gpu == 0:
+        _, inference_result = inference_engine(partition, num_classes, checkpoint_dir, deepcopy(args)) 
+        result.update(inference_result)
+        save_exp_result(save_dir, setting, result)

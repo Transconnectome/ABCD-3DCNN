@@ -1,5 +1,5 @@
 import torch 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, r2_score
 
 
 class loss_forward(torch.nn.Module): 
@@ -7,8 +7,8 @@ class loss_forward(torch.nn.Module):
         super().__init__()
         self.num_classes = num_classes
         #self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss(label_smoothing=0.1)
-        self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
-        #self.criterion = torch.nn.MSELoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
+        #self.criterion = torch.nn.SmoothL1Loss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
+        self.criterion = torch.nn.MSELoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
 
 
     def forward(self, pred_y, true_y):
@@ -114,8 +114,7 @@ class calculating_eval_metrics(torch.nn.Module):
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 """
                 mse_loss = torch.nn.functional.mse_loss(pred, true)
-                y_var = torch.var(true)
-                r_square = 1 - (mse_loss / (y_var + 1e-4))
+                r_square = r2_score(true, pred)
                 result['abs_loss'] = abs_loss.item()
                 result['mse_loss'] = mse_loss.item() 
                 result['r_square'] = r_square.item()
@@ -128,8 +127,7 @@ class calculating_eval_metrics(torch.nn.Module):
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 """
                 mse_loss = torch.nn.functional.mse_loss(self.pred, self.true)
-                y_var = torch.var(self.true)
-                r_square = 1 - (mse_loss / y_var)
+                r_square = r2_score(true, pred)
                 result['abs_loss'] = abs_loss.item()
                 result['mse_loss'] = mse_loss.item() 
                 result['r_square'] = r_square.item()

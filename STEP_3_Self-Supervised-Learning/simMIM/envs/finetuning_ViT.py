@@ -15,11 +15,12 @@ from sklearn.metrics import confusion_matrix
 ## ======= load module ======= ##
 import model.model_ViT as ViT
 
-from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight, freeze_backbone
+from util.utils import CLIreporter, save_exp_result, set_checkpoint_dir, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight, freeze_backbone
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
 from util.loss_functions  import loss_forward, mixup_loss, calculating_eval_metrics
 from util.augmentation import mixup_data
+from envs.inference_engine import inference
 
 
 import time
@@ -152,7 +153,7 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
         simMIM_pretrained = True 
     # setting network     
     net = ViT.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, img_size = args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos)
-    checkpoint_dir = args.checkpoint_dir
+    checkpoint_dir = set_checkpoint_dir(save_dir=save_dir, args=args)
 
 
     # setting optimizer 
@@ -260,7 +261,7 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     result['train_losses'] = train_losses
     result['validation_losses'] = val_losses
 
-    return vars(args), result
+    return vars(args), result, checkpoint_dir
         
 
 ## ==================================== ##

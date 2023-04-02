@@ -78,8 +78,7 @@ If you want to change the size of window, setting ```--windw_size {int}```.
   
   
 ## Inferece 
-If you want to use gpu for inference, activate ```--use_gpu```. Otherwise, running inference on cpu.  
 Please specify ```CUDA_VISIBLE_DEVICES``` for run inference on speicific gpu id.  
 You should specify ```--checkpoint_dir``` for load pretrained model for which you want to run inference. 
 
-```CUDA_VISIBLE_DEVICES=7 python3 inference_only.py --study_sample ABCD --img_size 128 128 128 --batch_size 4 --model swin_base_3D --exp_name testtestestsetst --checkpoint_dir /home/ubuntu/dhkdgmlghks/simMIM/result/model/swin_base_3D_swinBASE_UKBandABCD_pretrained_sex_weightdecay0.01_batch1024_d46210.pth --cat_target sex --use_gpu```
+```CUDA_VISIBLE_DEVICES=7 python3 inference_only.py --study_sample ABCD --img_size 128 128 128 --batch_size 4 --model swin_base_3D --exp_name testtestestsetst --checkpoint_dir /home/ubuntu/dhkdgmlghks/simMIM/result/model/swin_base_3D_swinBASE_UKBandABCD_pretrained_sex_weightdecay0.01_batch1024_d46210.pth --cat_target sex ```

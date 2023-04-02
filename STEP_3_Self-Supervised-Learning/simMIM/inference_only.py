@@ -81,10 +81,6 @@ parser.set_defaults(torchscript=False)
 parser.add_argument("--exp_name",type=str,required=True,help='')
 parser.set_defaults(load_imagenet_pretrained=False)
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=True)
-parser.add_argument("--use_gpu", action='store_true')
-parser.set_defaults(use_gpu=False)
-
-
 
 
 ####global args
@@ -136,5 +132,5 @@ if __name__ == "__main__":
 
     # Run MAE Experiment
     torch.backends.cudnn.benchmark = True
-    setting, result = inference_engine(partition, num_classes, save_dir, deepcopy(args))
+    setting, result = inference_engine(partition, num_classes, args.checkpoint_dir, deepcopy(args))
     save_exp_result(save_dir, setting, result)

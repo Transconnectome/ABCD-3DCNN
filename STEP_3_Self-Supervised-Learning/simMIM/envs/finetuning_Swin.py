@@ -14,10 +14,12 @@ from sklearn.metrics import confusion_matrix
 
 ## ======= load module ======= ##
 import model.model_Swin as Swin
+import model.model_SwinV2 as SwinV2
 from model.model_Swin import SwinTransformer3D
+from model.model_SwinV2 import SwinTransformer3D_v2
 from functools import partial
 
-from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight, freeze_backbone
+from util.utils import CLIreporter, save_exp_result, set_checkpoint_dir, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight, freeze_backbone
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
 from util.loss_functions  import loss_forward, mixup_loss, calculating_eval_metrics
@@ -37,9 +39,9 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
                                              shuffle=False, 
                                              drop_last=True,
                                              num_workers=16)
-
-    net.train()
     trainloader.sampler.set_epoch(epoch)
+    net.train()
+    
 
     losses = []
     if args.mixup:
@@ -69,7 +71,6 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
             with torch.cuda.amp.autocast():
                 pred = net(images)
                 loss = loss_fn(pred, labels)
-        
         losses.append(loss.item())
         eval_metrics.store(pred, labels)
 
@@ -79,7 +80,7 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
             # gradient clipping 
             if args.gradient_clipping == True:
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
+                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
@@ -91,12 +92,13 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
                 # gradient clipping 
                 if args.gradient_clipping == True:
                     scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
                 scaler.step(optimizer)
                 scaler.update()
-                optimizer.zero_grad()    
+                optimizer.zero_grad()
 
-    return net, np.mean(losses), eval_metrics.get_result() 
+
+    return net, np.mean(losses), eval_metrics.get_result()
         
 
 def Swin_validation(net, partition, epoch, num_classes, args):
@@ -133,6 +135,7 @@ def Swin_validation(net, partition, epoch, num_classes, args):
     return net, np.mean(losses), eval_metrics.get_result() 
 
 
+
 def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     if args.load_imagenet_pretrained:
         pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
@@ -150,11 +153,14 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
 
         
     # setting network 
-    net = Swin.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
+    if args.model.find('V2') != -1: 
+        net = SwinV2.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, drop_rate=args.projection_drop, num_classes=num_classes)
+    else: 
+        net = Swin.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, drop_rate=args.projection_drop, num_classes=num_classes)
     if args.torchscript:
         torch._C._jit_set_autocast_mode(True)
         net = torch.jit.script(net)
-    checkpoint_dir = args.checkpoint_dir
+    checkpoint_dir = set_checkpoint_dir(save_dir=save_dir, args=args)
 
 
     # setting optimizer 
@@ -194,19 +200,18 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
         last_epoch = 0 
     elif args.resume == True:  # loading last checkpoint 
         if args.checkpoint_dir != None:
-            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=args.checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
-
-    if args.freeze_backbone: 
-        net = freeze_backbone(net)
-    
+   
     # attach network to cuda device. This line should come before wrapping the model with DDP 
     net.cuda()
 
     # setting DataParallel
-    net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu])
+    if args.backbone_freeze:
+        net = freeze_backbone(net)
+    net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu], find_unused_parameters=True)
     
     # attach optimizer to cuda device.
     for state in optimizer.state.values():
@@ -226,7 +231,7 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
         previous_performance['AUROC'] = [0.0]
 
 
-    # training
+    #### training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
         net, train_loss, train_performance = Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args)
@@ -249,31 +254,30 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
                 if args.metric == 'ACC':
                     previous_performance['ACC'].append(val_performance['ACC'])
                     if val_performance['ACC'] > max(previous_performance['ACC'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
                 elif args.metric == 'AUROC': 
                     previous_performance['AUROC'].append(val_performance['AUROC'])
                     if val_performance['AUROC'] > max(previous_performance['AUROC'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
             
             if 'abs_loss' or 'mse_loss' in val_performance.keys():
                 if args.metric == 'abs_loss': 
                     previous_performance['abs_loss'].append(val_performance['abs_loss'])
                     if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
                 elif args.metric == 'mse_loss':
                     previous_performance['mse_loss'].append(val_performance['mse_loss'])
                     if val_performance['mse_loss'] < min(previous_performance['mse_loss'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
 
         torch.cuda.empty_cache()
-            
-
+    
     # summarize results
     result = {}
     result['train_losses'] = train_losses
     result['validation_losses'] = val_losses
 
-    return vars(args), result
+    return vars(args), result, checkpoint_dir
         
 
 ## ==================================== ##

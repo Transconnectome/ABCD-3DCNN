@@ -15,7 +15,7 @@ from sklearn.metrics import confusion_matrix
 ## ======= load module ======= ##
 import model.simMIM as simMIM
 
-from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight
+from util.utils import CLIreporter, save_exp_result, set_checkpoint_dir, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
 
@@ -103,9 +103,12 @@ def simMIM_validation(net, partition, epoch, args):
             with torch.cuda.amp.autocast():
                 loss, images_rec, mask_rec = net(images, mask)
                 if i == 0:
-                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_%s.npy' % args.model, images.detach().cpu().numpy())  
-                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_rec_%s.npy' % args.model, images_rec.detach().cpu().numpy())
-                    np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/mask_%s.npy' % args.model, mask_rec.detach().cpu().numpy())
+                    #np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_%s.npy' % args.model, images.detach().cpu().numpy())  
+                    #np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_rec_%s.npy' % args.model, images_rec.detach().cpu().numpy())
+                    #np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/mask_%s.npy' % args.model, mask_rec.detach().cpu().numpy())
+                    np.save('/home/ubuntu/dhkdgmlghks/simMIM/img_%s.npy' % args.model, images.detach().cpu().numpy())  
+                    np.save('/home/ubuntu/dhkdgmlghks/simMIM/img_rec_%s.npy' % args.model, images_rec.detach().cpu().numpy())
+                    np.save('/home/ubuntu/dhkdgmlghks/simMIM/mask_%s.npy' % args.model, mask_rec.detach().cpu().numpy())
             losses.append(loss.item())
                 
     return net, np.mean(losses)
@@ -141,7 +144,7 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
     if args.torchscript:
         torch._C._jit_set_autocast_mode(True)
         net = torch.jit.script(net)
-    checkpoint_dir = args.checkpoint_dir
+    checkpoint_dir = set_checkpoint_dir(save_dir=save_dir, args=args)
 
 
     # setting optimizer 
@@ -222,7 +225,7 @@ def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
         # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
         if args.gpu == 0:
             print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, optimizer.param_groups[0]['lr'],te-ts))
-            checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, mode='pretrain')
+            checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, mode='pretrain')
         
         torch.cuda.empty_cache()
             

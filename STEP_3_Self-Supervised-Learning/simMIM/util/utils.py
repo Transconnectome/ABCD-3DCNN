@@ -55,8 +55,7 @@ def CLIreporter(targets, train_loss, train_acc, val_loss, val_acc):
 
 
 # define checkpoint-saving function
-"""checkpoint is saved only when validation performance for all target tasks are improved """
-def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, performance_result=None, mode=None):
+def set_checkpoint_dir(save_dir, args): 
     # if not resume, making checkpoint file. And if resume, overwriting on existing files  
     if args.resume == False:
         if os.path.isdir(os.path.join(save_dir,'model')) == False:
@@ -65,7 +64,10 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, pe
     
     else:
         checkpoint_dir = copy.copy(args.checkpoint_dir)
-    
+    return checkpoint_dir
+
+"""checkpoint is saved only when validation performance for all target tasks are improved """
+def checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, performance_result=None, mode=None):
 
     if mode == 'pretrain':
         torch.save({'model':net.module.state_dict(), 
@@ -84,7 +86,9 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, pe
                     'amp_state': scaler.state_dict(),
                     'performance': performance_result,
                     'epoch':epoch}, checkpoint_dir) 
-        print("Checkpoint is saved")       
+        print("Checkpoint is saved")
+    elif mode == 'skip':
+        pass       
 
             
     """
@@ -108,7 +112,6 @@ def checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, pe
                         'epoch': epoch}, checkpoint_dir)
             print("Best iteration until now is %d" % (epoch + 1))
     """
-    return checkpoint_dir
 
 
 
@@ -226,10 +229,12 @@ def makedir(path):
 
 def freeze_backbone(model):
     for k, v in model.named_parameters():
-        if k.find('head') == -1: 
+        if k.find('head') != -1: 
+            v.requires_grad = True 
+        else: 
             v.requires_grad = False
     return model
-            
+
 
 
 

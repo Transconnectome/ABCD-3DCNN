@@ -6,6 +6,7 @@ from util.utils import CLIreporter, save_exp_result, checkpoint_save, checkpoint
 from dataloaders.dataloaders import balancing_testset, check_study_sample,loading_images, loading_phenotype, combining_image_target, partition_dataset_finetuning,  partition_dataset_pretrain
 from dataloaders.preprocessing import preprocessing_cat, preprocessing_num
 from envs.finetuning_Swin import *
+from envs.inference_engine import inference_engine
 from util.distributed_parallel import *
 import hashlib
 import datetime
@@ -56,7 +57,8 @@ parser.add_argument("--dataset_split", default='none', choices=['all', 'test','t
 #parser.set_defaults(random_shuffle_data=False)
 parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 parser.add_argument("--mixup",default=None,type=float,required=False,help='')
-
+parser.add_argument("--shuffle_data", action='store_true', help = 'if you add this option in the command line like --shuffle_data, args.shuffle_data would change to be True')
+parser.set_defaults(shuffle_data=False)
 
 #########################
 #### task parameters ####
@@ -77,7 +79,8 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 ## Swin specific params #
 #########################
 parser.add_argument("--window_size",default=8,type=int,required=False,help='The size of window.')
-parser.add_argument("--model",required=True,type=str,help='',choices=['swin_small_3D','swin_base_3D','swin_large_3D'])
+parser.add_argument("--model",required=True,type=str,help='',choices=['swinV2_tiny_3D','swinV2_small_3D','swinV2_base_3D','swinV2_large_3D',
+                                                                      'swin_tiny_3D','swin_small_3D','swin_base_3D','swin_large_3D'])
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
@@ -108,10 +111,10 @@ parser.add_argument('--pretrained_model', type=str, default=None, required=False
 parser.add_argument("--checkpoint_dir", type=str, default=None,required=False)
 parser.add_argument("--load_imagenet_pretrained", action='store_true', help = 'load imagenet pretrained model')
 parser.set_defaults(load_imagenet_pretrained=False)
-parser.add_argument("--freeze_backbone", action='store_true', help = 'freeze patch embedding and swin block layers. Only projection head is not frozen')
-parser.set_defaults(freeze_backbone=False)
+parser.add_argument("--backbone_freeze", action='store_true', help = 'freeze patch embedding and swin block layers. Only projection head is not frozen')
 parser.add_argument("--resume", action='store_true', help = 'if you add this option in the command line like --resume, args.resume would change to be True')
 parser.set_defaults(resume=False)
+parser.add_argument("--save_dir", type=str, default=None,required=False)
     
 #########################
 #### dist parameters ####
@@ -164,7 +167,10 @@ if __name__ == "__main__":
 
     ######init_distributed_mode(args)
     set_random_seed(seed)
-    save_dir = current_dir + '/result'
+    if args.save_dir: 
+        save_dir = args.save_dir 
+    else:
+        save_dir = current_dir + '/result'
     
     time_hash = datetime.datetime.now().time()
     hash_key = hashlib.sha1(str(time_hash).encode()).hexdigest()[:6]
@@ -173,5 +179,10 @@ if __name__ == "__main__":
 
     # Run Swin Experiment
     torch.backends.cudnn.benchmark = True
-    setting, result = Swin_experiment(partition, num_classes, save_dir, deepcopy(args))
-    save_exp_result(save_dir, setting, result)
+    setting, result, checkpoint_dir = Swin_experiment(partition, num_classes, save_dir, deepcopy(args))
+    
+    if args.gpu == 0:
+        _, inference_result = inference_engine(partition, num_classes, checkpoint_dir, deepcopy(args)) 
+        print(inference_result)
+        result.update(inference_result)
+        save_exp_result(save_dir, setting, result)

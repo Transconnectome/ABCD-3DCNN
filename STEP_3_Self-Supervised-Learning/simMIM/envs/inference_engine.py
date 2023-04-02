@@ -28,12 +28,13 @@ def inference(net, partition, num_classes, args):
         for i, data in enumerate(tqdm(testloader),0):
             #images = images.to(f'cuda:{net.device_ids[0]}')
             images, labels = data 
-            if args.use_gpu:
-                labels = labels.cuda()
-                images = images.cuda()
-            with torch.cuda.amp.autocast():
-                pred = net(images)
-                loss = loss_fn(pred, labels)
+            labels = labels.cuda()
+            images = images.cuda()
+            
+            
+            pred = net(images)
+            loss = loss_fn(pred, labels)
+            
             losses.append(loss.item())
             eval_metrics.store(pred, labels)
                            
@@ -41,11 +42,10 @@ def inference(net, partition, num_classes, args):
 
 
 
-def inference_engine(partition, num_classes, save_dir, args): #in_channels,out_dim
+def inference_engine(partition, num_classes, checkpoint_dir, args): #in_channels,out_dim
     pretrained_weight = None
     pretrained2d = False 
     simMIM_pretrained = False
-    checkpoint_dir = args.checkpoint_dir
     assert checkpoint_dir is not None 
         
     # setting network 
@@ -72,15 +72,13 @@ def inference_engine(partition, num_classes, save_dir, args): #in_channels,out_d
         torch._C._jit_set_autocast_mode(True)
         net = torch.jit.script(net)
 
-    # whether using gpu for inference or not
-    if args.use_gpu:
-        net.cuda()
+    # attach network module to gpu
+    net.cuda()
 
     # do inference
     result = {}
     net, test_loss, test_performance = inference(net, partition, num_classes, args)
-    if args.use_gpu:
-        torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
 
     result['test_loss'] = test_loss
     result.update(test_performance)

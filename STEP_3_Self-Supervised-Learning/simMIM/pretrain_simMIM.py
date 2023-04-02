@@ -164,4 +164,5 @@ if __name__ == "__main__":
     # Run MAE Experiment
     torch.backends.cudnn.benchmark = True
     setting, result = simMIM_experiment(partition, save_dir, deepcopy(args))
-    save_exp_result(save_dir, setting, result)
+    if args.gpu == 0:
+        save_exp_result(save_dir, setting, result)
