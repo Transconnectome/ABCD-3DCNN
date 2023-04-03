@@ -92,6 +92,7 @@ class SwinTransformer3D_v2(nn.Module):
         self.frozen_stages = frozen_stages
         self.in_channels = in_channels
         self.num_classes = num_classes
+        self.norm_layer = norm_layer
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
@@ -320,12 +321,12 @@ class SwinTransformer3D_v2(nn.Module):
             raise TypeError('pretrained must be a str or None')
     
     def forward_features(self, x: torch.Tensor): 
-        x = self.patch_embed(x)
+        x = self.patch_embed(x)     # B L C == B D*H*W C 
         
         x = self.pos_drop(x)
 
         for layer in self.layers: 
-            x = layer(x)
+            x = layer(x)    # B L C == B D*H*W C 
         
         x = self.norm(x)    # B L C == B D*H*W C 
         x = self.avgpool(x.transpose(1,2))  # B C 1

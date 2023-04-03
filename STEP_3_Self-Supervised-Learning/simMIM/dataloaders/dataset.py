@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np 
 from torch.utils.data import Dataset
+from dataloaders.preprocessing import MaskGenerator
 
 from monai.data import NibabelReader
 from monai.transforms import LoadImage, Randomizable, apply_transform
@@ -21,7 +22,7 @@ class Image_Dataset(Dataset, Randomizable):
         self._seed = self.R.randint(MAX_SEED, dtype="uint32")
     
     def __len__(self) -> int:
-        return len(self.labels)
+        return len(self.image_files)
     
     def __getitem__(self, index: int): 
         # load image and apply transform 
@@ -30,7 +31,18 @@ class Image_Dataset(Dataset, Randomizable):
         if self.transform is not None: 
             if isinstance(self.transform, Randomizable):
                 self.transform.set_random_state(seed=self._seed)
-            image = apply_transform(self.transform, image, map_items=False)
-            image = torch.tensor(image)
-        y = self.labels[index]
-        return (image, y)
+            if isinstance(self.transform, MaskGenerator): 
+                image, mask = apply_transform(self.transform, image, map_items=False)
+                image, mask = torch.tensor(image), torch.tensor(mask)
+            else: 
+                image = apply_transform(self.transform, image, map_items=False)
+                image = torch.tensor(image)
+                mask = None 
+        if self.labels is not None:
+            y = self.labels[index]
+            return (image, y)
+        else: 
+            if mask is not None:
+                return image, mask 
+            else: 
+                return mask

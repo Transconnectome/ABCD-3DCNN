@@ -512,6 +512,7 @@ class PatchEmbed3D(nn.Module):
         self.in_chans = in_channels
         self.embed_dim = embed_dim
 
+
         self.proj= nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
         if norm_layer is not None:
             self.norm = norm_layer(embed_dim)
@@ -522,7 +523,7 @@ class PatchEmbed3D(nn.Module):
         B, C, H, W, D = x.shape
         assert D == self.img_size[0] and H == self.img_size[1] and W == self.img_size[2], \
             f"Input image size ({D}*{H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]}*{self.img_size[2]})."
-        x = self.proj(x).flatten(2).transpose(1,2)  # B Pd*Ph*Pw C
+        x = self.proj(x).flatten(2).transpose(1,2) # B Pd*Ph*Pw C
         if self.norm is not None: 
             x = self.norm(x)
         return x
