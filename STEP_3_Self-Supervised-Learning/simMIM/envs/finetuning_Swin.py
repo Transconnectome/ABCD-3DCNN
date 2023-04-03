@@ -76,7 +76,8 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
 
         assert args.accumulation_steps >= 1
         if args.accumulation_steps == 1:
-            scaler.scale(loss).backward()
+            #scaler.scale(loss).sum().backward()    # pytorch 2.xx
+            scaler.scale(loss).backward()   # pytorch 1.xx 
             # gradient clipping 
             if args.gradient_clipping == True:
                 scaler.unscale_(optimizer)
@@ -87,7 +88,8 @@ def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
 
         elif args.accumulation_steps > 1:           # gradient accumulation
             loss = loss / args.accumulation_steps
-            scaler.scale(loss).backward()
+            #scaler.scale(loss).sum().backward()    # pytorch 2.xx
+            scaler.scale(loss).backward()   # pytorch 1.xx 
             if  (i + 1) % args.accumulation_steps == 0:
                 # gradient clipping 
                 if args.gradient_clipping == True:
@@ -212,6 +214,8 @@ def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_di
     if args.backbone_freeze:
         net = freeze_backbone(net)
     net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu], find_unused_parameters=True)
+    # pytorch 2.0
+    #net = torch.compile(net)
     
     # attach optimizer to cuda device.
     for state in optimizer.state.values():

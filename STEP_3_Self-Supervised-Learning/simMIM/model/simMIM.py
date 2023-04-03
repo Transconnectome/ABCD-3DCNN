@@ -17,9 +17,11 @@ from einops import rearrange
 from timm.models.layers import trunc_normal_
 
 from .model_Swin import SwinTransformer3D
+from .model_SwinV2 import SwinTransformer3D_v2
+from .swin_transformerV2 import PatchEmbed3D
 from .model_ViT import VisionTransformer3D
 
-
+## Swin Transformer version 1
 class SwinTransformerForSimMIM(SwinTransformer3D):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -74,6 +76,47 @@ class SwinTransformerForSimMIM(SwinTransformer3D):
         return super().no_weight_decay() | {'mask_token'}
 
 
+## Swin Transformer version 2
+class SwinTransformerV2ForSimMIM(SwinTransformer3D_v2):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        assert self.num_classes == 0
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, self.embed_dim))
+        trunc_normal_(self.mask_token, mean=0., std=.02)
+
+
+    def forward(self, x: torch.Tensor , mask: Optional[torch.Tensor]=None):
+        assert mask is not None
+        x = self.patch_embed(x)
+
+        B, L, C = x.shape
+
+        mask_token = self.mask_token.expand(B, L, -1)
+        w = mask.flatten(1).unsqueeze(-1).type_as(mask_token)
+        x = x * (1. - w) + mask_token * w
+
+        #if self.ape:
+        #    x = x + self.absolute_pos_embed
+        x = self.pos_drop(x)    # B L C 
+
+        for layer in self.layers:
+            x = layer(x)    # B L C 
+        ######################  
+        
+        x = self.norm(x)
+
+        x = x.transpose(1, 2)
+        B, C, L = x.shape
+        #H = W = int(L ** 0.5)
+        D = W = H = int(round(L**(1/3)))
+        x = x.reshape(B, C, D, H, W)
+        return x
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return super().no_weight_decay() | {'mask_token'}
+
 class VisionTransformerForSimMIM(VisionTransformer3D):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -119,6 +162,7 @@ class VisionTransformerForSimMIM(VisionTransformer3D):
         D = W = H = int(round(L**(1/3)))
         x = x.permute(0, 2, 1).reshape(B, C, D, H, W)
         return x
+    
 
 
 class SimMIM(nn.Module):
@@ -202,29 +246,69 @@ class PixelShuffle3D(nn.Module):
         output = input_view.permute(0, 1, 5, 2, 6, 3, 7, 4).contiguous() 
 
         return output.view(batch_size, nOut, out_depth, out_height, out_width) 
-    
+
+
+## Swin version 1 
+def simMIM_swin_tiny_patch4_window8_3D(**kwargs):
+    encoder = SwinTransformerForSimMIM(
+        patch_size=4, depths=[2, 2, 6, 2], embed_dim=96, num_heads=[3, 6, 12, 24],            
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.2, **kwargs)
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0]*encoder.window_size[0])     # encoder_stride == prediction resolution. In the original paper no less than 1 /16 of original image size perform well
+    return model
 
 def simMIM_swin_small_patch4_window8_3D(**kwargs):
     encoder = SwinTransformerForSimMIM(
         patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],            
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.3, **kwargs)
     model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0]*encoder.window_size[0])     # encoder_stride == prediction resolution. In the original paper no less than 1 /16 of original image size perform well
     return model
 
 def simMIM_swin_base_patch4_window8_3D(**kwargs):
     encoder = SwinTransformerForSimMIM(
         patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],               
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.5, **kwargs)
     model = SimMIM(encoder=encoder, encoder_stride=32)
     return model
 
 def simMIM_swin_large_patch4_window8_3D(**kwargs):
     encoder = SwinTransformerForSimMIM(
         patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[6, 12, 24, 48],                 
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.2, **kwargs)
     model = SimMIM(encoder=encoder, encoder_stride=32)
     return model
 
+
+## Swin version 2
+def simMIM_swinV2_tiny_patch4_window8_3D(**kwargs):
+    encoder = SwinTransformerV2ForSimMIM(
+        img_size=(128,128,128), patch_size=(4,4,4), window_size=(8,8,8), depths=[2, 2, 6, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.2, **kwargs)
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0]*encoder.window_size[0])     # encoder_stride == prediction resolution. In the original paper no less than 1 /16 of original image size perform well
+    return model
+
+def simMIM_swinV2_small_patch4_window8_3D(**kwargs):
+    encoder = SwinTransformerV2ForSimMIM(
+        img_size=(128,128,128), patch_size=(4,4,4), window_size=(8,8,8), depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.3, **kwargs)
+    model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0]*encoder.window_size[0])     # encoder_stride == prediction resolution. In the original paper no less than 1 /16 of original image size perform well
+    return model
+
+def simMIM_swinV2_base_patch4_window8_3D(**kwargs):
+    encoder = SwinTransformerV2ForSimMIM(
+        img_size=(128,128,128), patch_size=(4,4,4), window_size=(8,8,8), depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.5, **kwargs)
+    model = SimMIM(encoder=encoder, encoder_stride=32)
+    return model
+
+def simMIM_swinV2_large_patch4_window8_3D(**kwargs):
+    encoder = SwinTransformerV2ForSimMIM(
+        img_size=(128,128,128), patch_size=(4,4,4), window_size=(8,8,8), depths=[2, 2, 18, 2], embed_dim=192, num_heads=[6, 12, 24, 48],                
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.2, **kwargs)
+    model = SimMIM(encoder=encoder, encoder_stride=32)
+    return model
+
+
+# Vision Transformer
 def simMIM_vit_base_patch16_dec512d8b_3D(**kwargs):
     encoder = VisionTransformerForSimMIM(
         embed_dim=768, depth=12, num_heads=12,              # original encoder embed_dim = 768
@@ -246,9 +330,14 @@ def simMIM_vit_huge_patch14_dec512d8b_3D(**kwargs):
     model = SimMIM(encoder=encoder, encoder_stride=encoder.patch_size[0])
     return model
 
+simMIM_swin_tiny_3D = simMIM_swin_tiny_patch4_window8_3D
 simMIM_swin_small_3D = simMIM_swin_small_patch4_window8_3D
 simMIM_swin_base_3D = simMIM_swin_base_patch4_window8_3D
 simMIM_swin_large_3D = simMIM_swin_large_patch4_window8_3D
+simMIM_swinV2_tiny_3D = simMIM_swinV2_tiny_patch4_window8_3D
+simMIM_swinV2_small_3D = simMIM_swinV2_small_patch4_window8_3D
+simMIM_swinV2_base_3D = simMIM_swinV2_base_patch4_window8_3D
+simMIM_swinV2_large_3D = simMIM_swinV2_large_patch4_window8_3D
 simMIM_vit_base_patch16_3D = simMIM_vit_base_patch16_dec512d8b_3D
 simMIM_vit_large_patch16_3D = simMIM_vit_large_patch16_dec512d8b_3D
 simMIM_vit_huge_patch16_3D = simMIM_vit_huge_patch14_dec512d8b_3D
