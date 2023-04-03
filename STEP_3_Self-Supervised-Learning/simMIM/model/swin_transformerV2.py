@@ -505,16 +505,16 @@ class PatchEmbed3D(nn.Module):
     def __init__(self, img_size=(128, 128, 128),patch_size=(4,4,4), in_channels=1, embed_dim=96, norm_layer=None):
         super().__init__()
         self.img_size = img_size
-        self.patch_size : int = patch_size
+        self.patch_size = patch_size
         self.patches_resolution = (img_size[0] // patch_size[0], img_size[1] // patch_size[1], img_size[2] // patch_size[2])
         self.num_patches = self.patches_resolution[0] * self.patches_resolution[1] * self.patches_resolution[2]
 
         self.in_chans = in_channels
         self.embed_dim = embed_dim
 
-        self.proj : nn.Module = nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.proj= nn.Conv3d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
         if norm_layer is not None:
-            self.norm : nn.Module = norm_layer(embed_dim)
+            self.norm = norm_layer(embed_dim)
         else:
             self.norm = None
 
@@ -526,3 +526,4 @@ class PatchEmbed3D(nn.Module):
         if self.norm is not None: 
             x = self.norm(x)
         return x
+

@@ -17,8 +17,9 @@ import pandas as pd
 import numpy as np
 
 import monai
-from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop, ScaleIntensity, RandAxisFlip
-from monai.data import ImageDataset
+from monai.transforms import AddChannel, Compose, RandRotate90, Resize, NormalizeIntensity, Flip, ToTensor, RandSpatialCrop, ScaleIntensity, RandAxisFlip, RandCoarseDropout
+from dataloaders.dataset import Image_Dataset
+#from monai.data import ImageDataset
 
 def check_study_sample(study_sample):
     if study_sample == 'UKB':
@@ -136,17 +137,6 @@ def combining_image_target(subject_data, image_files, target_list, study_sample=
 
 def partition_dataset_pretrain(imageFiles_list: list=None, synthetic_imageFiles=None, args=None):
 
-    train_transform = Compose([AddChannel(),
-                               Resize(tuple(args.img_size)),
-                               RandAxisFlip(prob=0.5),
-                               ScaleIntensity(),
-                               ToTensor()])
-
-    val_transform = Compose([AddChannel(),
-                             Resize(tuple(args.img_size)),
-                             ScaleIntensity(),
-                             ToTensor()])
-
     images_train, images_val = [], []
     for imageFiles in imageFiles_list: 
         # number of total / train,val, test
@@ -175,8 +165,21 @@ def partition_dataset_pretrain(imageFiles_list: list=None, synthetic_imageFiles=
 
     print("Training Sample: {}".format(len(images_train)))
 
-    train_set = ImageDataset(image_files=images_train,transform=MaskGenerator(train_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size)) 
-    val_set = ImageDataset(image_files=images_val,transform=MaskGenerator(val_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size))
+
+    train_transform = Compose([ScaleIntensity(),
+                               AddChannel(),
+                               Resize(tuple(args.img_size)),
+                               RandRotate90(prob=0.5),
+                               RandAxisFlip(prob=0.5)
+                               ])
+
+    val_transform = Compose([ScaleIntensity(),
+                             AddChannel(),
+                             Resize(tuple(args.img_size))
+                             ])
+
+    train_set = Image_Dataset(image_files=images_train,transform=MaskGenerator(train_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size)) 
+    val_set = Image_Dataset(image_files=images_val,transform=MaskGenerator(val_transform, input_size=args.img_size[0], mask_ratio=args.mask_ratio, mask_patch_size=args.mask_patch_size))
     #test_set = ImageDataset(image_files=images_test,transform=val_transform)
 
     partition = {}
@@ -212,17 +215,6 @@ def partition_dataset_finetuning(imageFiles_labels, args):
         image, label = imageFile_label
         images.append(image)
         labels.append(label)
-
-    train_transform = Compose([AddChannel(),
-                               Resize(tuple(args.img_size)),
-                               RandAxisFlip(prob=0.5),
-                               ScaleIntensity(),
-                               ToTensor()])
-
-    val_transform = Compose([AddChannel(),
-                             Resize(tuple(args.img_size)),
-                             ScaleIntensity(),
-                             ToTensor()])
     
     if args.dataset_split == 'test':
         train_set_tmp, val_set_tmp, test_set_tmp = balancing_testset(imageFiles_labels, num_train, num_val ,num_test)
@@ -254,9 +246,26 @@ def partition_dataset_finetuning(imageFiles_labels, args):
 
     print("Training Sample: {}. Validation Sample: {}. Test Sample: {}".format(len(images_train), len(images_val), len(images_test)))
 
-    train_set = ImageDataset(image_files=images_train,labels=labels_train,transform=train_transform)
-    val_set = ImageDataset(image_files=images_val,labels=labels_val,transform=val_transform)
-    test_set = ImageDataset(image_files=images_test,labels=labels_test,transform=val_transform)
+    cutout_size = (32, 32, 32)
+    num_holes = 1 
+    train_transform = Compose([ScaleIntensity(),
+                               AddChannel(),
+                               Resize(tuple(args.img_size)),
+                               RandCoarseDropout(holes=num_holes,spatial_size=cutout_size, prob=0.5),
+                               RandRotate90(prob=0.5),
+                               RandAxisFlip(prob=0.5),
+                               ToTensor()
+                               ])
+
+    val_transform = Compose([ScaleIntensity(),
+                             AddChannel(),
+                             Resize(tuple(args.img_size)),
+                             ToTensor()
+                             ])
+    
+    train_set = Image_Dataset(image_files=images_train,labels=labels_train,transform=train_transform)
+    val_set = Image_Dataset(image_files=images_val,labels=labels_val,transform=val_transform)
+    test_set = Image_Dataset(image_files=images_test,labels=labels_test,transform=val_transform)
 
     partition = {}
     partition['train'] = train_set

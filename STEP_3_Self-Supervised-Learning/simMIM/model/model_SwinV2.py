@@ -126,7 +126,7 @@ class SwinTransformer3D_v2(nn.Module):
                 use_checkpoint=use_checkpoint,
                 pretrained_window_size=self.pretrained_window_sizes[i_layer])
             self.layers.append(layer)
-
+        
         # the last norm layer
         self.norm = norm_layer(self.num_features)
 
