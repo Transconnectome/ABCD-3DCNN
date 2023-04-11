@@ -15,7 +15,7 @@ from operator import mul
 from os import pread
 from einops import rearrange
 from collections import OrderedDict
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -25,14 +25,15 @@ import torch.nn.functional as F
 from timm.models.layers import trunc_normal_
 from mmcv.runner import load_checkpoint
 
-from .swin_transformer import PatchEmbed3D, PatchMerging3D, BasicLayer
+from .swin_transformerV2 import PatchEmbed3D, PatchMerging3D, BasicLayer
 from .layers.helpers import to_3tuple
 
-class SwinTransformer3D(nn.Module):
+class SwinTransformer3D_v2(nn.Module):
     """ Swin Transformer backbone.
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
     Args:
+        img_size (tuple[int]): Input image size. Default: (128,128,128).
         patch_size (int | tuple(int)): Patch size. Default: (4,4,4).
         in_chans (int): Number of input image channels. Default: 3.
         embed_dim (int): Number of linear projection output channels. Default: 96.
@@ -55,13 +56,14 @@ class SwinTransformer3D(nn.Module):
                  pretrained=None,
                  pretrained2d=True,
                  simMIM_pretrained=False, 
-                 patch_size=4,
+                 img_size=(128,128,128),
+                 patch_size=(4,4,4),
                  num_classes=1,
                  in_channels=1,
                  embed_dim=96,
                  depths=[2, 2, 6, 2],
                  num_heads=[3, 6, 12, 24],
-                 window_size=4,
+                 window_size=(4,4,4),
                  mlp_ratio=4.,
                  qkv_bias=True,
                  qk_scale=None,
@@ -71,26 +73,34 @@ class SwinTransformer3D(nn.Module):
                  norm_layer=nn.LayerNorm,
                  patch_norm=False,
                  frozen_stages=-1,
-                 use_checkpoint=False):
+                 use_checkpoint=False,
+                 pretrained_window_sizes=[0,0,0,0]):
         super().__init__()
 
         self.pretrained = pretrained
         self.pretrained2d = pretrained2d
         self.simMIM_pretrained = simMIM_pretrained
+
+        self.img_size: Tuple[int,int,int] = img_size
+        self.window_size: Tuple[int,int,int] = window_size 
+        self.patch_size: Tuple[int,int,int] = patch_size
+        
         self.num_layers = len(depths)
         self.embed_dim = embed_dim
         self.patch_norm = patch_norm
+        self.num_features = int(embed_dim * 2 ** (self.num_layers - 1))
+        self.mlp_ratio = mlp_ratio
         self.frozen_stages = frozen_stages
-        self.window_size = window_size = to_3tuple(window_size)
-        self.patch_size = to_3tuple(patch_size)
         self.in_channels = in_channels
         self.num_classes = num_classes
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
-            patch_size=patch_size, in_channels=in_channels, embed_dim=embed_dim,
+            img_size=img_size, patch_size=patch_size, in_channels=in_channels, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)
-
+        num_patches = self.patch_embed.num_patches
+        patches_resolution = self.patch_embed.patches_resolution
+        
         self.pos_drop : nn.Module = nn.Dropout(p=drop_rate)
 
         # stochastic depth
@@ -101,21 +111,22 @@ class SwinTransformer3D(nn.Module):
         for i_layer in range(self.num_layers):
             layer = BasicLayer(
                 dim=int(embed_dim * 2**i_layer),
+                input_resolution=(patches_resolution[0] // (2 ** i_layer),
+                                  patches_resolution[1] // (2 ** i_layer),
+                                  patches_resolution[2] // (2 ** i_layer)),
                 depth=depths[i_layer],
                 num_heads=num_heads[i_layer],
                 window_size=window_size,
-                mlp_ratio=mlp_ratio,
+                mlp_ratio=self.mlp_ratio,
                 qkv_bias=qkv_bias,
-                qk_scale=qk_scale,
                 drop=drop_rate,
                 attn_drop=attn_drop_rate,
                 drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
                 norm_layer=norm_layer,
                 downsample=PatchMerging3D if i_layer<self.num_layers-1 else None,
-                use_checkpoint=use_checkpoint)
+                use_checkpoint=use_checkpoint,
+                pretrained_winow_size=pretrained_window_sizes[i_layer])
             self.layers.append(layer)
-
-        self.num_features = int(embed_dim * 2**(self.num_layers-1))
 
         # the last norm layer
         self.norm = norm_layer(self.num_features)
@@ -309,57 +320,48 @@ class SwinTransformer3D(nn.Module):
         else:
             raise TypeError('pretrained must be a str or None')
     
-    def forward(self, x: torch.Tensor):
-        """Forward function."""
+    def forward_features(self, x: torch.Tensor): 
         x = self.patch_embed(x)
-
+        
         x = self.pos_drop(x)
 
-        for layer in self.layers:
-            x = layer(x.contiguous())
+        for layer in self.layers: 
+            x = self.layer(x)
         
-        #x = rearrange(x, 'b c d h w -> b (d h w) c') # B L C    # original version
-        ## torchscript version
-        x = torch.einsum('bcdhw -> bdhwc', x) 
-        B, D, H, W, C = x.size() 
-        x = x.reshape(B, D * H * W, C)  # B L C 
-        ######################   
-        x = self.norm(x)  # B L C   
-        x = self.avgpool(x.transpose(1, 2))  # B C 1
+        x = self.norm(x)    # B L C == B D*H*W C 
+        x = self.avgpool(x.transpose(1,2))  # B C 1
         x = torch.flatten(x, 1)
+        return x 
+
+    def forward(self, x: torch.Tensor): 
+        x = self.forward_features(x)
         x = self.head(x)
+        return x 
 
-        return x
 
-def swin_tiny_patch4_window8_3D(**kwargs):
+
+def swinV2_small_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 6, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.2, **kwargs)
-    return model
-
-def swin_small_patch4_window8_3D(**kwargs):
-    model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
+        img_size=(128,128,128), patch_size=(4,4,4), depths=[2, 2, 18, 2], embed_dim=96, num_heads=[3, 6, 12, 24],              
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.3, **kwargs)
     return model
 
-def swin_base_patch4_window8_3D(**kwargs):
+def swinV2_base_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
+        img_size=(128,128,128), patch_size=(4,4,4), depths=[2, 2, 18, 2], embed_dim=128, num_heads=[4, 8, 16, 32],                 
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.5, **kwargs)
     return model
 
-def swin_large_patch4_window8_3D(**kwargs):
+def swinV2_large_patch4_window8_3D(**kwargs):
     model = SwinTransformer3D(
-        patch_size=4, depths=[2, 2, 18, 2], embed_dim=192, num_heads=[6, 12, 24, 48],                
+        img_size=(128,128,128), patch_size=(4,4,4), depths=[2, 2, 18, 2], embed_dim=192, num_heads=[6, 12, 24, 48],                
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), drop_path_rate=0.2, **kwargs)
     return model
 
 
 ## set recommended archs
 # 3D swin
-swin_tiny_3D = swin_tiny_patch4_window8_3D
-swin_small_3D = swin_small_patch4_window8_3D
-swin_base_3D = swin_base_patch4_window8_3D
-swin_large_3D = swin_large_patch4_window8_3D
+swinV2_small_3D = swinV2_small_patch4_window8_3D
+swinV2_base_3D = swinV2_base_patch4_window8_3D
+swinV2_large_3D = swinV2_large_patch4_window8_3D
 

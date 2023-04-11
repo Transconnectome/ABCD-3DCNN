@@ -55,7 +55,7 @@ parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--dataset_split", default='none', choices=['all', 'test','train_test', 'none'], help='the way splitting data set')
 #parser.add_argument("--random_shuffle_data",action='store_true',required=False,help='random shuffle data. If not train/validation/test sample would be fixed')
 #parser.set_defaults(random_shuffle_data=False)
-parser.add_argument("--img_size",default=[128, 128, 128] ,type=int,nargs="*",required=False,help='')
+parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 parser.add_argument("--mixup",default=None,type=float,required=False,help='')
 parser.add_argument("--shuffle_data", action='store_true', help = 'if you add this option in the command line like --shuffle_data, args.shuffle_data would change to be True')
 parser.set_defaults(shuffle_data=False)
@@ -79,8 +79,8 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 ## Swin specific params #
 #########################
 parser.add_argument("--window_size",default=8,type=int,required=False,help='The size of window.')
-parser.add_argument("--model",required=True,type=str,help='',choices=['swinV2_tiny_3D','swinV2_small_3D','swinV2_base_3D','swinV2_large_3D',
-                                                                      'swin_tiny_3D','swin_small_3D','swin_base_3D','swin_large_3D'])
+parser.add_argument("--model",required=True,type=str,help='',choices=['swinV2_small_3D','swinV2_base_3D','swinV2_large_3D',
+                                                                      'swin_small_3D','swin_base_3D','swin_large_3D'])
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
 parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')

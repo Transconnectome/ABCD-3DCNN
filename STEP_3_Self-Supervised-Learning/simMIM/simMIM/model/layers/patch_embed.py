@@ -7,7 +7,7 @@ Based on the impl in https://github.com/google-research/vision_transformer
 Hacked together by / Copyright 2020 Ross Wightman
 """
 import torch
-import torch.nn as nn
+from torch import nn as nn
 
 from .helpers import to_2tuple, to_3tuple
 from .trace_utils import _assert
@@ -52,8 +52,8 @@ class PatchEmbed_3D(nn.Module):
         self.num_patches = self.grid_size[0] * self.grid_size[1] * self.grid_size[2]
         self.flatten = flatten
 
-        self.proj = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+        self.proj : nn.Module = nn.Conv3d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+        self.norm : nn.Module = norm_layer(embed_dim) if norm_layer else nn.Identity()
     
     def forward(self, x):
         B, C, H, W, D = x.shape

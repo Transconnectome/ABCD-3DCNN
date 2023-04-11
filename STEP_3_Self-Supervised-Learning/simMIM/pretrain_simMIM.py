@@ -54,7 +54,7 @@ parser.add_argument("--study_sample",default=['UKB'],type=str, nargs='*', requir
 parser.add_argument("--train_size",default=0.8,type=float,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
+parser.add_argument("--img_size",default=[128, 128, 128] ,type=int,nargs="*",required=False,help='')
 
 #########################
 ### batch size params ###
@@ -66,10 +66,12 @@ parser.add_argument("--accumulation_steps",default=1,type=int,required=False,hel
 #########################
 ## simMIM specific params #
 #########################
-parser.add_argument("--model",required=True,type=str,help='',choices=['simMIM_swin_small_3D', 'simMIM_swin_base_3D', 'simMIM_swin_large_3D','simMIM_vit_base_patch16_3D', 'simMIM_vit_large_patch16_3D', 'simMIM_vit_huge_patch16_3D'])
+parser.add_argument("--model",required=True,type=str,help='',choices=[
+                                                                      'simMIM_swin_tiny_3D', 'simMIM_swin_small_3D', 'simMIM_swin_base_3D', 'simMIM_swin_large_3D',
+                                                                      'simMIM_swinV2_tiny_3D', 'simMIM_swinV2_small_3D', 'simMIM_swinV2_base_3D', 'simMIM_swinV2_large_3D',
+                                                                      'simMIM_vit_base_patch16_3D', 'simMIM_vit_large_patch16_3D', 'simMIM_vit_huge_patch16_3D'])
 parser.add_argument("--mask_patch_size",default=16,type=int,required=False,help='The size of mask patch used for patch emebdding.')
 parser.add_argument("--attention_drop",default=0.5,type=float,required=False,help='dropout rate of encoder attention layer')
-parser.add_argument("--projection_drop",default=0.5,type=float,required=False,help='dropout rate of encoder projection layer')
 parser.add_argument("--path_drop",default=0.0,type=float,required=False,help='dropout rate of encoder attention block')
 parser.add_argument("--mask_ratio",required=False,default=0.6,type=float,help='the ratio of random masking')
 # Swin specific parameters
@@ -164,4 +166,5 @@ if __name__ == "__main__":
     # Run MAE Experiment
     torch.backends.cudnn.benchmark = True
     setting, result = simMIM_experiment(partition, save_dir, deepcopy(args))
-    save_exp_result(save_dir, setting, result)
+    if args.gpu == 0:
+        save_exp_result(save_dir, setting, result)

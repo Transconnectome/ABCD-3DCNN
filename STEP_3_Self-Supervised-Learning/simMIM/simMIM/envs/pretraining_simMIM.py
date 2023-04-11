@@ -13,21 +13,17 @@ from sklearn.metrics import confusion_matrix
 
 
 ## ======= load module ======= ##
-import model.model_ViT as ViT
+import model.simMIM as simMIM
 
-from util.utils import CLIreporter, save_exp_result, set_checkpoint_dir, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight, freeze_backbone
+from util.utils import CLIreporter, save_exp_result, set_checkpoint_dir, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
-from util.loss_functions  import loss_forward, mixup_loss, calculating_eval_metrics
-from util.augmentation import mixup_data
-from envs.inference_engine import inference
-
 
 import time
 from tqdm import tqdm
 import copy
 
-def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
+def simMIM_train(net, partition, optimizer, scaler, epoch, args):
     train_sampler = DistributedSampler(partition['train'], shuffle=True)    
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
@@ -41,40 +37,22 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
     trainloader.sampler.set_epoch(epoch)
 
     losses = []
-    if args.mixup:
-        loss_fn = mixup_loss(num_classes)
-    else:
-        loss_fn = loss_forward(num_classes)
-
-    eval_metrics = calculating_eval_metrics(num_classes=num_classes)
     
     optimizer.zero_grad()
     for i, data in enumerate(trainloader,0):
-        ################################################
-        ################################################
-        #################### TO DO #####################
-        # loss_fn = cross entropy or MSE 
-        # change pred, target, mask = net(images) => latent, cls_tokens = net(images)
-        images, labels = data 
-        if args.num_target: 
-            labels = labels.float() 
+        #images = images.to(f'cuda:{net.device_ids[0]}')
+        
+        images, mask = data[0], data[1]
         images = images.cuda()
-        labels = labels.cuda() 
+        mask = mask.cuda()
+        
         """
         if loss is calculated inside the model class, the output from the model forward method would be [loss] * number of devices. In other words, len(net(images)) == n_gpus
         """
         #loss, pred, mask  = net(images)
-        if args.mixup:
-            mixed_images, labels_a, labels_b, lam = mixup_data(images, labels)
-            with torch.cuda.amp.autocast():
-                pred = net(mixed_images)
-                loss = loss_fn(pred, labels_a, labels_b, lam)
-        else:
-            with torch.cuda.amp.autocast():
-                pred = net(images)
-                loss = loss_fn(pred, labels)
+        with torch.cuda.amp.autocast():
+            loss, _, _ = net(images, mask)
         losses.append(loss.item())
-        eval_metrics.store(pred, labels)
 
         assert args.accumulation_steps >= 1
         if args.accumulation_steps == 1:
@@ -100,10 +78,10 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
                 optimizer.zero_grad()    
             
 
-    return net, np.mean(losses), eval_metrics.get_result() 
+    return net, np.mean(losses) 
         
 
-def ViT_validation(net, partition, epoch, num_classes, args):
+def simMIM_validation(net, partition, epoch, args):
     val_sampler = DistributedSampler(partition['val'])  
     valloader = torch.utils.data.DataLoader(partition['val'],
                                             sampler=val_sampler, 
@@ -115,44 +93,57 @@ def ViT_validation(net, partition, epoch, num_classes, args):
     valloader.sampler.set_epoch(epoch)
     
     losses = []
-
-    loss_fn = loss_forward(num_classes)
-
-    eval_metrics = calculating_eval_metrics(num_classes=num_classes)    
+    
     with torch.no_grad():
         for i, data in enumerate(valloader,0):
             #images = images.to(f'cuda:{net.device_ids[0]}')
-            images, labels = data 
-            if args.num_target: 
-                labels = labels.float() 
-            labels = labels.cuda()
+            images, mask = data
             images = images.cuda()
-
+            mask = mask.cuda()
             with torch.cuda.amp.autocast():
-                pred = net(images)
-                loss = loss_fn(pred, labels)
+                loss, images_rec, mask_rec = net(images, mask)
+                if i == 0:
+                    #np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_%s.npy' % args.model, images.detach().cpu().numpy())  
+                    #np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/img_rec_%s.npy' % args.model, images_rec.detach().cpu().numpy())
+                    #np.save('/scratch/connectome/dhkdgmlghks/3DCNN_test/simMIM/mask_%s.npy' % args.model, mask_rec.detach().cpu().numpy())
+                    np.save('/home/ubuntu/dhkdgmlghks/simMIM/img_%s.npy' % args.model, images.detach().cpu().numpy())  
+                    np.save('/home/ubuntu/dhkdgmlghks/simMIM/img_rec_%s.npy' % args.model, images_rec.detach().cpu().numpy())
+                    np.save('/home/ubuntu/dhkdgmlghks/simMIM/mask_%s.npy' % args.model, mask_rec.detach().cpu().numpy())
             losses.append(loss.item())
-            eval_metrics.store(pred, labels)
-                           
-    return net, np.mean(losses), eval_metrics.get_result() 
+                
+    return net, np.mean(losses)
 
 
-def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
+def simMIM_experiment(partition, save_dir, args): #in_channels,out_dim
     if args.load_imagenet_pretrained:
         pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
         pretrained2d = True
-        simMIM_pretrained = False
     else: 
         pretrained_weight = None 
-        pretrained2d = False
-        simMIM_pretrained = False 
+        pretrained2d = False 
 
     if args.pretrained_model is not None: 
         pretrained_weight = args.pretrained_model
         pretrained2d = False 
-        simMIM_pretrained = True 
-    # setting network     
-    net = ViT.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, img_size = args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos)
+         
+
+    # setting network 
+    if args.model.find('swin') != -1:
+        net = simMIM.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=0)
+        # change an attribute of mask generator
+        partition['train'].transform.update_config(net.patch_size)
+        partition['val'].transform.update_config(net.patch_size)
+    elif args.model.find('vit') != -1:
+        assert args.model_patch_size == args.mask_patch_size
+        net = simMIM.__dict__[args.model](pretrained=pretrained_weight,img_size=args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos, num_classes=0)
+        # change an attribute of mask generator
+        partition['train'].transform.update_config(net.patch_size)
+        partition['val'].transform.update_config(net.patch_size)
+        print('The size of Patch is %i and the size of Mask Patch is %i' % (args.model_patch_size, args.mask_patch_size))
+
+    if args.torchscript:
+        torch._C._jit_set_autocast_mode(True)
+        net = torch.jit.script(net)
     checkpoint_dir = set_checkpoint_dir(save_dir=save_dir, args=args)
 
 
@@ -174,29 +165,37 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
     #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
-    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=5, gamma=0.5)
-
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=10, gamma=0.5)
+    
+    #for one cycle scheduler 
+    """
+    steps_per_epoch = len(torch.utils.data.DataLoader(partition['train'],
+                                             batch_size=args.batch_size,
+                                             sampler=DistributedSampler(partition['train'], shuffle=True), 
+                                             shuffle=False,
+                                             drop_last = False,
+                                             num_workers=16))
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epoch, steps_per_epoch=steps_per_epoch)
+    """
+  
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()
 
-    # loading pre-trained model or last checkpoint 
-    if args.resume == False: # loading pre-trained model
-        last_epoch = 0 
-    elif args.resume == True:  # loading last checkpoint 
+    # loading last checkpoint if resume training
+    if args.resume == True:
         if args.checkpoint_dir != None:
             net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
-
-    if args.freeze_backbone: 
-        net = freeze_backbone(net)
+    else:
+        last_epoch = 0 
     
     # attach network to cuda device. This line should come before wrapping the model with DDP 
     net.cuda()
 
     # setting DataParallel
-    net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu])
+    net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu], find_unused_parameters=True)
     
     # attach optimizer to cuda device.
     for state in optimizer.state.values():
@@ -207,24 +206,17 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     # setting for results' data frame
     train_losses = []
     val_losses = []
-
-    previous_performance = {}
-    previous_performance['ACC'] = [0.0]
-    previous_performance['abs_loss'] = [100000.0]
-    previous_performance['mse_loss'] = [100000.0]
-    if num_classes == 2:
-        previous_performance['AUROC'] = [0.0]
+    
 
     # training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
-        net, train_loss, train_performance = ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args)
-        net, val_loss, val_performance = ViT_validation(net, partition, epoch, num_classes, args)
+        net, train_loss = simMIM_train(net, partition, optimizer, scaler, epoch, args)
+        net, val_loss = simMIM_validation(net, partition, epoch, args)
         
         # store result per epoch 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
-        
         #scheduler.step(loss)
         scheduler.step()
         te = time.time()
@@ -232,27 +224,9 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
         # visualize the result and saving the checkpoint
         # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
         if args.gpu == 0:
-            print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. \n Training Prediction Performance: {}. \n Validation Prediction Performance: {}. \n Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, train_performance, val_performance, optimizer.param_groups[0]['lr'],te-ts))
-            if 'ACC' or 'AUROC' in val_performance.keys():
-                if args._metric == 'ACC':
-                    previous_performance['ACC'].append(val_performance['ACC'])
-                    if val_performance['ACC'] > max(previous_performance['ACC'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-                elif args.metric == 'AUROC': 
-                    previous_performance['AUROC'].append(val_performance['AUROC'])
-                    if val_performance['AUROC'] > max(previous_performance['AUROC'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-            
-            if 'abs_loss' or 'mse_loss' in val_performance.keys():
-                if args.metric == 'abs_loss': 
-                    previous_performance['abs_loss'].append(val_performance['abs_loss'])
-                    if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-                elif args.metric == 'mse_loss':
-                    previous_performance['mse_loss'].append(val_performance['mse_loss'])
-                    if val_performance['mse_loss'] < min(previous_performance['mse_loss'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-  
+            print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, optimizer.param_groups[0]['lr'],te-ts))
+            checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, mode='pretrain')
+        
         torch.cuda.empty_cache()
             
 
@@ -261,7 +235,7 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     result['train_losses'] = train_losses
     result['validation_losses'] = val_losses
 
-    return vars(args), result, checkpoint_dir
+    return vars(args), result
         
 
 ## ==================================== ##

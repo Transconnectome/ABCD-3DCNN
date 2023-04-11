@@ -41,7 +41,7 @@ parser.add_argument("--study_sample",default='UKB',type=str, required=False,help
 parser.add_argument("--train_size",default=0.8,type=float,required=False,help='')
 parser.add_argument("--val_size",default=0.1,type=float,required=False,help='')
 parser.add_argument("--test_size",default=0.1,type=float,required=False,help='')
-parser.add_argument("--img_size",default=[128, 128, 128] ,type=int,nargs="*",required=False,help='')
+parser.add_argument("--img_size",default=[96, 96, 96] ,type=int,nargs="*",required=False,help='')
 parser.add_argument("--dataset_split", default='none', choices=['all', 'test','train_test', 'none'], help='the way splitting data set')
 
 #########################

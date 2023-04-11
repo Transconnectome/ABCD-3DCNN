@@ -1,5 +1,5 @@
 import torch 
-from sklearn.metrics import roc_auc_score, r2_score
+from sklearn.metrics import roc_auc_score
 
 
 class loss_forward(torch.nn.Module): 
@@ -114,7 +114,8 @@ class calculating_eval_metrics(torch.nn.Module):
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 """
                 mse_loss = torch.nn.functional.mse_loss(pred, true)
-                r_square = r2_score(true, pred)
+                y_var = torch.var(true)
+                r_square = 1 - (mse_loss / (y_var + 1e-4))
                 result['abs_loss'] = abs_loss.item()
                 result['mse_loss'] = mse_loss.item() 
                 result['r_square'] = r_square.item()
@@ -127,7 +128,8 @@ class calculating_eval_metrics(torch.nn.Module):
                 mse_loss = torch.nn.functional.mse_loss(std_true, std_pred)
                 """
                 mse_loss = torch.nn.functional.mse_loss(self.pred, self.true)
-                r_square = r2_score(true, pred)
+                y_var = torch.var(self.true)
+                r_square = 1 - (mse_loss / y_var)
                 result['abs_loss'] = abs_loss.item()
                 result['mse_loss'] = mse_loss.item() 
                 result['r_square'] = r_square.item()

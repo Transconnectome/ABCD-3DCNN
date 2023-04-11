@@ -13,32 +13,35 @@ from sklearn.metrics import confusion_matrix
 
 
 ## ======= load module ======= ##
-import model.model_ViT as ViT
+import model.model_Swin as Swin
+import model.model_SwinV2 as SwinV2
+from model.model_Swin import SwinTransformer3D
+from model.model_SwinV2 import SwinTransformer3D_v2
+from functools import partial
 
 from util.utils import CLIreporter, save_exp_result, set_checkpoint_dir, checkpoint_save, checkpoint_load, saving_outputs, set_random_seed, load_imagenet_pretrained_weight, freeze_backbone
 from util.optimizers import LAMB, LARS 
 from util.lr_sched import CosineAnnealingWarmUpRestarts
 from util.loss_functions  import loss_forward, mixup_loss, calculating_eval_metrics
 from util.augmentation import mixup_data
-from envs.inference_engine import inference
 
 
 import time
 from tqdm import tqdm
 import copy
 
-def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
+def Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args):
     train_sampler = DistributedSampler(partition['train'], shuffle=True)    
 
     trainloader = torch.utils.data.DataLoader(partition['train'],
                                              batch_size=args.batch_size,
-                                             sampler=train_sampler, 
-                                             shuffle=False,
-                                             drop_last = False,
+                                             sampler=train_sampler,
+                                             shuffle=False, 
+                                             drop_last=True,
                                              num_workers=16)
-
-    net.train()
     trainloader.sampler.set_epoch(epoch)
+    net.train()
+    
 
     losses = []
     if args.mixup:
@@ -50,12 +53,7 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
     
     optimizer.zero_grad()
     for i, data in enumerate(trainloader,0):
-        ################################################
-        ################################################
-        #################### TO DO #####################
-        # loss_fn = cross entropy or MSE 
-        # change pred, target, mask = net(images) => latent, cls_tokens = net(images)
-        images, labels = data 
+        images, labels = data
         if args.num_target: 
             labels = labels.float() 
         images = images.cuda()
@@ -73,6 +71,7 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
             with torch.cuda.amp.autocast():
                 pred = net(images)
                 loss = loss_fn(pred, labels)
+        
         losses.append(loss.item())
         eval_metrics.store(pred, labels)
 
@@ -97,32 +96,32 @@ def ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args):
                     torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1, error_if_nonfinite=False)   # max_norm=1 from https://arxiv.org/pdf/2010.11929.pdf
                 scaler.step(optimizer)
                 scaler.update()
-                optimizer.zero_grad()    
-            
+                optimizer.zero_grad()
 
-    return net, np.mean(losses), eval_metrics.get_result() 
+
+    return net, np.mean(losses), eval_metrics.get_result()
         
 
-def ViT_validation(net, partition, epoch, num_classes, args):
+def Swin_validation(net, partition, epoch, num_classes, args):
     val_sampler = DistributedSampler(partition['val'])  
     valloader = torch.utils.data.DataLoader(partition['val'],
                                             sampler=val_sampler, 
                                             batch_size=args.batch_size,
                                             shuffle=False,
+                                            drop_last=True,
                                             num_workers=16)
 
     net.eval()
     valloader.sampler.set_epoch(epoch)
     
     losses = []
-
     loss_fn = loss_forward(num_classes)
 
     eval_metrics = calculating_eval_metrics(num_classes=num_classes)    
     with torch.no_grad():
         for i, data in enumerate(valloader,0):
             #images = images.to(f'cuda:{net.device_ids[0]}')
-            images, labels = data 
+            images, labels = data
             if args.num_target: 
                 labels = labels.float() 
             labels = labels.cuda()
@@ -137,22 +136,31 @@ def ViT_validation(net, partition, epoch, num_classes, args):
     return net, np.mean(losses), eval_metrics.get_result() 
 
 
-def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
+
+def Swin_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     if args.load_imagenet_pretrained:
         pretrained_weight = load_imagenet_pretrained_weight(args)       # This line return directory of imagenet_pretrained_weight
         pretrained2d = True
         simMIM_pretrained = False
     else: 
         pretrained_weight = None 
-        pretrained2d = False
-        simMIM_pretrained = False 
+        pretrained2d = False 
+        simMIM_pretrained = False
 
     if args.pretrained_model is not None: 
         pretrained_weight = args.pretrained_model
         pretrained2d = False 
         simMIM_pretrained = True 
-    # setting network     
-    net = ViT.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, img_size = args.img_size, patch_size=args.model_patch_size, attn_drop=args.attention_drop, drop=args.projection_drop, drop_path=args.path_drop, global_pool=args.global_pool, num_classes=num_classes, use_rel_pos_bias=args.use_rel_pos_bias, use_sincos_pos=args.use_sincos_pos)
+
+        
+    # setting network 
+    if args.model.find('V2') != -1: 
+        net = Swin.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
+    else: 
+        net = SwinV2.__dict__[args.model](pretrained=pretrained_weight, pretrained2d=pretrained2d, simMIM_pretrained=simMIM_pretrained, window_size=args.window_size, drop_rate=args.projection_drop, num_classes=num_classes)
+    if args.torchscript:
+        torch._C._jit_set_autocast_mode(True)
+        net = torch.jit.script(net)
     checkpoint_dir = set_checkpoint_dir(save_dir=save_dir, args=args)
 
 
@@ -174,8 +182,17 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'min', patience=10)
     #scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1, gamma=0.5)
     #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100, T_mult=2, eta_min=0)
-    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=5, gamma=0.5)
-
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=100, T_mult=2, eta_max=args.lr,  T_up=10, gamma=0.5)
+    """
+    #for one cycle scheduler 
+    steps_per_epoch = len(torch.utils.data.DataLoader(partition['train'],
+                                             batch_size=args.batch_size,
+                                             sampler=DistributedSampler(partition['train'], shuffle=True), 
+                                             shuffle=False,
+                                             drop_last = False,
+                                             num_workers=16))
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, epochs=args.epoch, steps_per_epoch=steps_per_epoch)
+    """
     # setting AMP gradient scaler 
     scaler = torch.cuda.amp.GradScaler()
 
@@ -184,18 +201,17 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
         last_epoch = 0 
     elif args.resume == True:  # loading last checkpoint 
         if args.checkpoint_dir != None:
-            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
+            net, optimizer, scheduler, last_epoch, optimizer.param_groups[0]['lr'], scaler = checkpoint_load(net=net, checkpoint_dir=args.checkpoint_dir, optimizer=optimizer, scheduler=scheduler, scaler=scaler, mode='pretrain')
             print('Training start from epoch {} and learning rate {}.'.format(last_epoch, optimizer.param_groups[0]['lr']))
         else: 
             raise ValueError('IF YOU WANT TO RESUME TRAINING FROM PREVIOUS STATE, YOU SHOULD SET THE FILE PATH AS AN OPTION. PLZ CHECK --checkpoint_dir OPTION')
-
-    if args.freeze_backbone: 
-        net = freeze_backbone(net)
-    
+   
     # attach network to cuda device. This line should come before wrapping the model with DDP 
     net.cuda()
 
     # setting DataParallel
+    if args.backbone_freeze:
+        net = freeze_backbone(net)
     net = torch.nn.parallel.DistributedDataParallel(net, device_ids = [args.gpu])
     
     # attach optimizer to cuda device.
@@ -215,15 +231,14 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
     if num_classes == 2:
         previous_performance['AUROC'] = [0.0]
 
-    # training
+
+    #### training
     for epoch in tqdm(range(last_epoch, last_epoch + args.epoch)):
         ts = time.time()
-        net, train_loss, train_performance = ViT_train(net, partition, optimizer, scaler, epoch, num_classes, args)
-        net, val_loss, val_performance = ViT_validation(net, partition, epoch, num_classes, args)
+        net, train_loss, train_performance = Swin_train(net, partition, optimizer, scaler, epoch, num_classes, args)
+        net, val_loss, val_performance = Swin_validation(net, partition, epoch, num_classes, args)
         
-        # store result per epoch 
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
+
         
         #scheduler.step(loss)
         scheduler.step()
@@ -232,30 +247,32 @@ def ViT_experiment(partition, num_classes, save_dir, args): #in_channels,out_dim
         # visualize the result and saving the checkpoint
         # saving model. When use DDP, if you do not indicate device ids, the number of saved checkpoint would be the same as the number of process.
         if args.gpu == 0:
+            # store result per epoch 
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
             print('Epoch {}. Train Loss: {:2.2f}. Validation Loss: {:2.2f}. \n Training Prediction Performance: {}. \n Validation Prediction Performance: {}. \n Current learning rate {}. Took {:2.2f} sec'.format(epoch+1, train_loss, val_loss, train_performance, val_performance, optimizer.param_groups[0]['lr'],te-ts))
             if 'ACC' or 'AUROC' in val_performance.keys():
-                if args._metric == 'ACC':
+                if args.metric == 'ACC':
                     previous_performance['ACC'].append(val_performance['ACC'])
                     if val_performance['ACC'] > max(previous_performance['ACC'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
                 elif args.metric == 'AUROC': 
                     previous_performance['AUROC'].append(val_performance['AUROC'])
                     if val_performance['AUROC'] > max(previous_performance['AUROC'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
             
             if 'abs_loss' or 'mse_loss' in val_performance.keys():
                 if args.metric == 'abs_loss': 
                     previous_performance['abs_loss'].append(val_performance['abs_loss'])
                     if val_performance['abs_loss'] < min(previous_performance['abs_loss'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
                 elif args.metric == 'mse_loss':
                     previous_performance['mse_loss'].append(val_performance['mse_loss'])
                     if val_performance['mse_loss'] < min(previous_performance['mse_loss'][:-1]):
-                        checkpoint_dir = checkpoint_save(net, optimizer, save_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
-  
-        torch.cuda.empty_cache()
-            
+                        checkpoint_save(net, optimizer, checkpoint_dir, epoch, scheduler, scaler, args, val_performance,mode='finetune')
 
+        torch.cuda.empty_cache()
+    
     # summarize results
     result = {}
     result['train_losses'] = train_losses
