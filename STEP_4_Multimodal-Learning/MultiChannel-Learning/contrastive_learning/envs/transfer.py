@@ -1,54 +1,72 @@
 import torch
 
 ## Main function that freezes layers & re-initialize FC layer
-def setting_transfer(args, net, num_unfrozen):
-    if num_unfrozen != '0':
-        num_unfrozen = int(num_unfrozen)
-        layers_total = []
+def setting_transfer(args, net, num_unfrozen_layers): #230316 set batch norm layer requires_grad=True while finetuning!
+    # freeze all of the model (for training FC layers only)
+    # or specified number of layers (for finetuning only rear parts of the model)
+    if num_unfrozen_layers.isnumeric(): # unfrozen_layers == 'feature_extractors':
+        num_unfrozen_layers = int(num_unfrozen_layers)
+    elif num_unfrozen_layers.lower() == 'all':
+        print("*** Didn't freeze anything (finetune all) ***")
+        return None
+    else:
+        raise ValueError("args.unfrozen_layers should be specified by the numbers of unfrozen layers")
+    
+    if num_unfrozen_layers == 0: # train FC only
+        frozen_layers = 0 
+        freeze_layers(net, frozen_layers)
+        if (args.init_unfrozen != ''):
+            initialize_weights(net, unfrozen_layers)
+            print("*** initializing unfrozen layers' weights & biases are done ***")
+    else: # train certain part of the model.
+        for i in range(net.len_feature_extractor):
+            frozen_layers, unfrozen_layers = get_freeze_criteria(net.feature_extractors[i], num_unfrozen_layers)
+            freeze_layers(net, frozen_layers)
+            if (args.init_unfrozen != ''):
+                initialize_weights(net, unfrozen_layers)
+                print("*** initializing unfrozen layers' weights & biases are done ***")
+    print("*** Freezing layers for [transfer learning / finetuning] are done ***")
+        
 
-        for name, module in net.features.named_modules():
-            if is_layer(name):
-                layers_total.append((name, module))
-                
-        num_layers = len(layers_total)
+def get_freeze_criteria(feature_extractor, num_unfrozen_layers):
+    layers_total = []
+    for name, module in feature_extractor.named_modules():
+        if is_depth1_layer(name):
+            layers_total.append((name, module))
+    num_layers = len(layers_total)
+    freeze_until = num_layers - num_unfrozen_layers
+    frozen_layers = layers_total[:freeze_until]
+    unfrozen_layers = layers_total[freeze_until:]
+    frozen_names = list(map(lambda x:x[0], frozen_layers))
+    unfrozen_names = list(map(lambda x:x[0], unfrozen_layers))
+    print(f"Frozen layers={frozen_names}\tUnfrozen layers={unfrozen_names}")
 
-        freeze_until = num_layers - num_unfrozen
-        frozen_layers = layers_total[:freeze_until]
-        unfrozen_layers = layers_total[freeze_until:]
-        
-    elif num_unfrozen == '0':
-        frozen_layers = 0
-        unfrozen_layers = 0
-        
-    freeze_layers(net, frozen_layers)
-
-    if (args.init_unfrozen != ''):
-        initialize_weights(net, unfrozen_layers)
+    return frozen_layers, unfrozen_layers
         
         
-def is_layer(module_name):
-    '''
-    Check whether a module is layer or not
-    ex) "Sequential" is a total Model, "relu0", "pool0" are not a layer, "denseblock1,2,3,4" are blocks(set of layers),
-    "transition1.conv", "transition1.norm", "denseblock1.denselayer1.conv0" and so on are sub-layers.
-    "conv0", "norm0" are layers. [transition1, denseblock1.denselayer1~6, denseblock2.denselayer1~12] are layers.
-    '''
-    if ((module_name.count(".") == 1 and "layer" in module_name) or
-        (('.' not in module_name) and (True in map(lambda x: x in module_name, ['conv','norm','transition'])))
-       ):
+def is_depth1_layer(module_name):
+    if module_name.count(".") == 0 and module_name:
         return True
     else:
         return False
-
     
 # freeze non-FC layers from last layer to first layer 
-def freeze_layers(net, frozen_layers):    
+def freeze_layers(net, frozen_layers, train_bn=True): 
     if frozen_layers == 0:
-        net.features.apply(freeze)
-    else:
-        for name, module in frozen_layers:
-            module.apply(freeze)
+        frozen_layers = [('feature_extractor', net.feature_extractors)]
+        
+    for name, module in frozen_layers:
+        module.apply(freeze)
+            
+    if train_bn:
+        net.apply(unfreeze_bn)
 
+    
+def unfreeze_bn(layer):
+    if isinstance(layer, torch.nn.BatchNorm3d):
+        for params in layer.parameters():
+            params.requires_grad = True
+            
             
 # freezing layer's parameters by setting requires_grad as False
 def freeze(layer):
@@ -89,4 +107,3 @@ def weight_init_kaiming_normal(layer):
         layer.weight.data.fill_(1.0)
         if layer.bias != None:
             layer.bias.data.zero_()
-    

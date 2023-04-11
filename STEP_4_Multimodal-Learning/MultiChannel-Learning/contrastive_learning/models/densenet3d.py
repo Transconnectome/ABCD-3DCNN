@@ -2,14 +2,12 @@
 ## ======= DenseNet ======= ##
 ## =================================== ##
 
+import collections
 # model
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-
-# utils
-import collections
 
 ## ========= DenseNet Model ========= #
 #(ref) explanation - https://wingnim.tistory.com/39
@@ -104,6 +102,8 @@ class DenseNet(nn.Module):
         
         self.n_input_channels = n_input_channels
         self.multi_channel = (len(self.brain_dtypes) > 1 and self.n_input_channels > 1)
+        self.multimodal = (len(self.brain_dtypes) > 1)
+        self.len_feature_extractor = len(self.brain_dtypes) if not self.multi_channel else 1
         self.conv1_t_size = conv1_t_size
         self.conv1_t_stride = conv1_t_stride
         self.growth_rate = growth_rate
@@ -112,7 +112,6 @@ class DenseNet(nn.Module):
         self.bn_size = bn_size
         self.drop_rate = drop_rate
 
-              
         self.feature_extractors = self._make_feature_extractors()
 
         # Linear layer
@@ -129,7 +128,7 @@ class DenseNet(nn.Module):
     
     def _make_feature_extractors(self):
         feature_extractors = []
-        for brain_dtype in self.brain_dtypes:
+        for _ in range(self.len_feature_extractor):
             # First convolution  
             feature_extractor = nn.Sequential(collections.OrderedDict([
                 ('conv0',nn.Conv3d(self.n_input_channels,
@@ -182,11 +181,10 @@ class DenseNet(nn.Module):
 
     def forward(self, images):            
         outs = []
-        results = {} if self.multi_channel else {'embeddings':[]}
-        for i, x in enumerate(images): # feed each brain modality into its own CNN
+        results = {}
+        for i in range(self.len_feature_extractor): # feed each brain modality into its own CNN
+            x = images[:,i]
             features = self.feature_extractors[i](x)
-            if not self.multi_channel:
-                results['embeddings'].append(torch.flatten(features, 1))
             out = F.adaptive_avg_pool3d(features, output_size=(1, 1, 1))
             out = F.relu(out, inplace=True)
             out = torch.flatten(out, 1)
@@ -198,34 +196,244 @@ class DenseNet(nn.Module):
             
         return results
 
+# reference: https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial6/Transformers_and_MHAttention.html
+class MHAEncoderBlock(nn.Module):
+    def __init__(self, input_dim=1024, num_heads=8, dim_feedforward=1024*2, dropout=0.0):
+        """
+        Inputs:
+            input_dim - Dimensionality of the input
+            num_heads - Number of heads to use in the attention block
+            dim_feedforward - Dimensionality of the hidden layer in the MLP
+            dropout - Dropout probability to use in the dropout layers
+        """
+        super().__init__()
+
+        # Attention layer
+        self.self_attn = nn.MultiheadAttention(embed_dim=input_dim, num_heads=num_heads,
+                                               dropout=dropout, bias=True, batch_first=True)
+
+        # Two-layer MLP
+        self.linear_net = nn.Sequential(collections.OrderedDict([
+            ('lin0', nn.Linear(input_dim, dim_feedforward)),
+            ('drop', nn.Dropout(dropout)),
+            ('relu0', nn.ReLU(inplace=True)),
+            ('lin1', nn.Linear(dim_feedforward, input_dim))
+        ]))
+
+        # Layers to apply in between the main layers
+        self.norm1 = nn.LayerNorm(input_dim)
+        self.norm2 = nn.LayerNorm(input_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        # Attention part
+        attn_out, attn_weights = self.self_attn(x,x,x,attn_mask=mask)
+        x = x + self.dropout(attn_out)
+        x = self.norm1(x)
+
+        # MLP part
+        linear_out = self.linear_net(x)
+        x = x + self.dropout(linear_out)
+        x = self.norm2(x)
+
+        return x
+
+
+class DenseNetAttn(DenseNet):
+    """Densenet-BC model class
+    Args:
+        growth_rate (int) - how many filters to add each layer (k in paper)
+        block_config (list of 4 ints) - how many layers in each pooling block
+        num_init_features (int) - the number of filters to learn in the first convolution layer
+        bn_size (int) - multiplicative factor for number of bottle neck layers
+          (i.e. bn_size * k features in the bottleneck layer)
+        drop_rate (float) - dropout rate after each dense layer
+        num_classes (int) - nu
+                self.subject_data = subject_data
+        self.brain_dtypes = args.data_type
+        self.cat_target = args.cat_target
+        self.num_target = args.num_target 
+        self.target = args.cat_target + args.num_target
+        
+        self.n_input_channels = n_input_channels
+        self.multi_channel = (len(self.brain_dtypes) > 1 and self.n_input_channels > 1)
+        self.conv1_t_size = conv1_t_size
+        self.conv1_t_stride = conv1_t_stride
+        self.growth_rate = growth_rate
+        self.block_config = block_config
+        self.num_init_features = num_init_features
+        self.bn_size = bn_size
+        self.drop_rate = drop_ratember of classification classes
+    """
+
+    def __init__(self, subject_data, args,
+                 n_input_channels=1,conv1_t_size=7,conv1_t_stride=2,no_max_pool=False,
+                 growth_rate=32,block_config=(6, 12, 24, 16),num_init_features=64,
+                 n_attn_blocks=3, bn_size=4,drop_rate=0,num_classes=1000):
+
+        super(DenseNetAttn, self).__init__(subject_data, args)
+#         self.subject_data = subject_data
+#         self.brain_dtypes = args.data_type
+#         self.cat_target = args.cat_target
+#         self.num_target = args.num_target 
+#         self.target = args.cat_target + args.num_target
+        
+#         self.n_input_channels = n_input_channels
+#         self.multi_channel = (len(self.brain_dtypes) > 1 and self.n_input_channels > 1)
+#         self.conv1_t_size = conv1_t_size
+#         self.conv1_t_stride = conv1_t_stride
+#         self.growth_rate = growth_rate
+#         self.block_config = block_config
+#         self.num_init_features = num_init_features
+#         self.bn_size = bn_size
+#         self.drop_rate = drop_rate
+#         self.feature_extractors = self._make_feature_extractors()
+        self.MHAEncoders = self._make_MHAEncoders(n_attn_blocks, input_dim=1024, num_heads=8,
+                                                  dim_feedforward=1024*2, dropout=self.drop_rate)
+#         # Linear layer
+#         self.FClayers = self._make_fclayers()
+        
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out',nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.LayerNorm):                 
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear) or isinstance(m, nn.modules.linear.NonDynamicallyQuantizableLinear):
+                nn.init.constant_(m.bias, 0)
+
+    def _make_MHAEncoders(self, n_attn_blocks, **block_args):
+        MHA_encoders = []
+        for _ in range(self.len_feature_extractor):
+            MHA_blocks = nn.Sequential()
+            for i in range(n_attn_blocks):
+                MHA_blocks.add_module(f'MHAblock{i+1}', MHAEncoderBlock(**block_args))
+            MHA_encoders.append(MHA_blocks)
+            
+        return nn.ModuleList(MHA_encoders)
+            
+    def forward(self, images):   
+        results={}
+        embeddings, outs = [], []
+        for i in range(self.len_feature_extractor): # feed each brain modality into its own CNN
+            x = images[:,i]
+            feature = self.feature_extractors[i](x)
+            embedding = feature.view(feature.shape[0], feature.shape[1], -1)
+            embedding = embedding.permute(0,2,1)
+            embeddings.append(embedding)
+        
+        for i, x in enumerate(embeddings):
+            out = self.MHAEncoders[i](x)
+            out = out.permute(0,2,1)
+            out = F.adaptive_avg_pool1d(out, output_size=1)
+            out = F.relu(out, inplace=True)
+            out = torch.flatten(out, 1)
+            outs.append(out)
+            
+        out = torch.cat(outs,1) # dimension option is important for keeping a shape of (BATCH_SIZE, NUMS OF IMAGE)
+        
+        for i in range(len(self.FClayers)):
+            results[self.target[i]] = self.FClayers[i](out)
+            
+        return results    
+    
+class DenseNetMM(DenseNet):
+    """Densenet-BC model class
+    Args:
+        growth_rate (int) - how many filters to add each layer (k in paper)
+        block_config (list of 4 ints) - how many layers in each pooling block
+        num_init_features (int) - the number of filters to learn in the first convolution layer
+        bn_size (int) - multiplicative factor for number of bottle neck layers
+          (i.e. bn_size * k features in the bottleneck layer)
+        drop_rate (float) - dropout rate after each dense layer
+        num_classes (int) - number of classification classes
+    """
+
+    def __init__(self, subject_data, args,
+                 n_input_channels=1,conv1_t_size=7,conv1_t_stride=2,no_max_pool=False,
+                 growth_rate=32,block_config=(6, 12, 24, 16),num_init_features=64,
+                 dim_proj=3,bn_size=4,drop_rate=0,num_classes=1000):
+
+        super(DenseNetMM, self).__init__(subject_data, args)
+        self.args = args
+        self.proj_head, self.FClayers = None, None
+        if args.mode == 'pretraining':
+            self.dim_proj = dim_proj
+            self.proj_heads = self._make_proj_heads()
+        elif args.mode == 'finetuning':
+            self.FClayers = self._make_fclayers()
+        
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out',nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.LayerNorm):                 
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.constant_(m.bias, 0)
+
+                
+    def _make_proj_heads(self):
+        proj_heads = nn.Sequential()
+        for i in range(len(self.brain_dtypes)):
+            proj_heads.add_module(f'head{i}',nn.Linear(self.num_features, self.dim_proj))
+
+        return nn.ModuleList(proj_heads)
+            
+        
+    def forward(self, images):  
+        outs = []
+        for i in range(images.shape[1]): # feed each brain modality into its own CNN encoder to make representation vectors
+            x = images[:,i]
+            feature = self.feature_extractors[i](x)
+            out = F.adaptive_avg_pool3d(feature, output_size=(1, 1, 1))
+            out = F.relu(out, inplace=True)
+            out = torch.flatten(out, 1)
+            out = F.normalize(out, dim=1) # normalize vector for vector dimension.
+            outs.append(out)
+        
+        if self.args.mode == 'pretraining':
+            results=[]
+            for i in range(len(self.proj_heads)): # projection heads of each multi-modal encoder
+                rep_vec = outs[i]
+                proj_vec = self.proj_heads[i](rep_vec)
+                proj_vec = F.normalize(proj_vec, dim=1)
+                results.append(proj_vec)
+                
+        elif self.args.mode == 'finetuning': # layers other than FClayers should be frozen !!
+            results={}
+            out = torch.cat(outs,1)
+            for i in range(len(self.FClayers)): # multi-target
+                results[self.target[i]] = self.FClayers[i](out)
+            
+        return results
+    
+    
 def generate_model(model_depth, subject_data, args, **kwargs):
     assert model_depth in [121, 169, 201, 264]
+    if 'MM' in args.model:
+        chosen_net = DenseNetMM
+    elif 'attn' in args.model:
+        chosen_net = DenseNetAttn
+    else:
+        chosen_net = DenseNet
 
     if model_depth == 121:
-        model = DenseNet(subject_data, args,
-                         num_init_features=64,
-                         growth_rate=32,
-                         block_config=(6, 12, 24, 16),
-                         **kwargs)
+        block_config=(6, 12, 24, 16)
     elif model_depth == 169:
-        model = DenseNet(subject_data, args,
-                         num_init_features=64,
-                         growth_rate=32,
-                         block_config=(6, 12, 32, 32),
-                         **kwargs)
+        block_config=(6, 12, 32, 32)
     elif model_depth == 201:
-        model = DenseNet(subject_data, args,
-                         num_init_features=64,
-                         growth_rate=32,
-                         block_config=(6, 12, 48, 32),
-                         **kwargs)
+        block_config=(6, 12, 48, 32)
     elif model_depth == 264:
-        model = DenseNet(subject_data, args,
-                         num_init_features=64,
-                         growth_rate=32,
-                         block_config=(6, 12, 64, 48),
-                         **kwargs)
+         block_config=(6, 12, 64, 48)
+        
+    model = chosen_net(subject_data, args,
+                     num_init_features=64,
+                     growth_rate=32,
+                     block_config=block_config,
+                     **kwargs)
     return model
+
 
 def densenet3D121(subject_data, args):
     model = generate_model(121, subject_data, args)

@@ -3,6 +3,7 @@ from itertools import repeat
 
 import numpy as np
 import pandas as pd
+import torch
 from torch.utils.data import Dataset
 
 from monai.config import DtypeLike
@@ -68,25 +69,28 @@ class MultiModalImageDataset(Dataset, Randomizable):
 
         # load data and optionally meta
         if self.image_only:
-            img = list(map(self.loader, self.image_files.iloc[index])) # modified
+            img = torch.stack(tuple(map(self.loader, self.image_files.iloc[index]))) # modified
             if self.seg_files is not None:
                 seg = self.loader(self.seg_files[index])
         else:
-            img, meta_data = list(map(self.loader, self.image_files.iloc[index])) # modified
+            raise NotImplementedError()
+            img, meta_data = torch.stack(tuple(map(self.loader, self.image_files.iloc[index]))) # modified
             if self.seg_files is not None:
                 seg, seg_meta_data = self.loader(self.seg_files[index])
 
         # apply the transforms
         if self.transform is not None:
             if isinstance(self.transform, Randomizable):
-                self.transform.set_random_state(seed=self._seed)
+                for curr_transform in self.transform:
+                    if isinstance(curr_transform, Randomizable):
+                        curr_transform.set_random_state(seed=self._seed)
 
             if self.transform_with_metadata:
-                img, meta_data = list(map(apply_transform, self.transform, img,
-                                     repeat(False), repeat(True))) # modified
+                img, meta_data =torch.stack((tuple(map(apply_transform, self.transform,
+                                                       img, repeat(False), repeat(True))))) # modified
             else:
-                img = list(map(apply_transform, self.transform, img, repeat(False))) # modified
-
+                img = torch.stack((tuple(map(apply_transform, self.transform, img, repeat(False)))))
+                
         if self.seg_files is not None and self.seg_transform is not None:
             if isinstance(self.seg_transform, Randomizable):
                 self.seg_transform.set_random_state(seed=self._seed)

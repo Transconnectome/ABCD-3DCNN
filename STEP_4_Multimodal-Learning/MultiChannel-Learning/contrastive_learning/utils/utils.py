@@ -1,8 +1,10 @@
 import os
+import random
 import json
 import argparse 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -19,19 +21,25 @@ def argument_setting():
     parser.add_argument("--model", type=str, required=True, help='Select model. e.g. densenet3D121, sfcn.',
                         choices=['simple3D', 'sfcn', 'vgg3D11', 'vgg3D13', 'vgg3D16', 'vgg3D19',
                                  'resnet3D50', 'resnet3D101', 'resnet3D152',
-                                 'densenet3D121', 'densenet3D169', 'densenet201', 'densenet264'])
+                                 'densenet3D121', 'densenet3D169', 'densenet201', 'densenet264',
+                                 'densenet3D121attn', 'densenet3D121MM'])
     parser.add_argument("--in_channels", default=1, type=int, help='')
 
     # Options for dataset and data type, split ratio, CV, resize, augmentation
-    parser.add_argument("--dataset", type=str, choices=['UKB','ABCD'], required=True, help='Selelct dataset')
+    parser.add_argument("--dataset", type=str, choices=['UKB','ABCD','CHA'], required=True, help='Selelct dataset')
     parser.add_argument("--data_type", nargs='+', type=str, help='Select data type(sMRI, dMRI)',
-                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'freesurfer_crop_resize128',
-                                 'FA_crop_resize128', 'FA_unwarpped_nii', 'FA_warpped_nii',
-                                 'MD_unwarpped_nii', 'MD_warpped_nii', 'RD_unwarpped_nii', 'RD_warpped_nii'])
+                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'freesurfer_crop_resize128','T1_MNI_resize128',
+                                 'FA_crop_resize128', 'FA_MNI_resize128', 'FA_wm_MNI_resize128',
+                                 'FA_unwarpped_nii', 'FA_warpped_nii',
+                                 'MD_unwarpped_nii', 'MD_warpped_nii', 'RD_unwarpped_nii', 'RD_warpped_nii',
+                                 'T1_MNI_resize_areamode', 'FA_MNI_resize_areamode'])
+    parser.add_argument("--phenotype", default='total' ,type=str, help='Selelct phenotype csv')
+    parser.add_argument("--balanced_split", default='', type=str, help='')
+    parser.add_argument("--N", default=None, type=int, help='')
     parser.add_argument("--tissue", default=None, type=str, help='Select tissue mask(Cortical grey matter, \
                         Sub-cortical grey matter, White matter, CSF, Pathological tissue)',
                         choices=['cgm', 'scgm', 'wm', 'csf', 'pt'])
-    parser.add_argument("--metric", default='cos', type=str, help='')
+    parser.add_argument("--metric", default='', type=str, help='')
     parser.add_argument("--val_size", default=0.1, type=float, help='')
     parser.add_argument("--test_size", default=0.1, type=float, help='')
     parser.add_argument("--cv", default=None, type=int, choices=[1,2,3,4,5], help="option for 5-fold CV. 1~5.")
@@ -66,22 +74,30 @@ def argument_setting():
     parser.add_argument("--confusion_matrix",  nargs='*', default=[], type=str, help='')
     parser.add_argument("--filter", nargs="*", default=[], type=str,
                         help='options for filter data by phenotype. usage: --filter abcd_site:10 sex:1')
+    parser.add_argument("--mode", default='pretraining', type=str,  choices=['pretraining','finetuning','transfer'],
+                        help='Option for learning from scratch')
     parser.add_argument("--load", default='', type=str, help='Load model weight that mathces {your_exp_dir}/result/*{load}*')
-    parser.add_argument("--scratch", default='', type=str, help='Option for learning from scratch')
-    parser.add_argument("--transfer", default='', type=str, choices=['sex','age','simclr','MAE'],
-                        help='Choose pretrained model according to your option')
-    parser.add_argument("--unfrozen_layer", default='0', type=str, help='Select the number of layers that would be unfrozen')
+    parser.add_argument("--unfrozen_layers", default='all', type=str, help='Select the number of layers that would be unfrozen')
     parser.add_argument("--init_unfrozen", default='', type=str, help='Initializes unfrozen layers')
     parser.add_argument("--debug", default='', type=str, help='')
         
     args = parser.parse_args()
-    if args.cat_target == args.num_target:
+    if ((args.cat_target + args.num_target) == []) and 'MM' not in args.model:
         raise ValueError('--num-target or --cat-target should be specified')
         
     print(f"*** Categorical target labels are {args.cat_target} and Numerical target labels are {args.num_target} *** \n")
 
     return args
 
+
+def seed_all(SEED):
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.backends.cudnn.deterministic = True
+
+    
 # Return a specific model based on argument setting
 def select_model(subject_data, args):
     # Simple CNN
@@ -109,7 +125,7 @@ def select_model(subject_data, args):
     elif args.model == 'resnet3D152':
         net = resnet3d.resnet3D152(subject_data, args)
     # DenseNet
-    elif args.model == 'densenet3D121':
+    elif 'densenet3D121' in args.model:
         net = densenet3d.densenet3D121(subject_data, args)
     elif args.model == 'densenet3D161':
         net = densenet3d.densenet3D161(subject_data, args) 
@@ -144,6 +160,8 @@ def CLIreporter(train_loss, train_acc, val_loss, val_acc):
 # define checkpoint-saving function
 def checkpoint_save(net, epoch, args):
     """checkpoint is saved only if validation performance for all target tasks are improved """
+    if args.debug=='1':
+        return None
     if os.path.isdir(os.path.join(args.save_dir, 'model')) == False:
         makedir(os.path.join(args.save_dir, 'model'))
     
@@ -154,26 +172,26 @@ def checkpoint_save(net, epoch, args):
 
     return checkpoint_dir
 
-sex_model_dir = '/scratch/connectome/dhkdgmlghks/3DCNN_test/3DCNN_hardparameter_sharing/result/model/UKB_sex_densenet3D121_6cbde7.pth'
-age_model_dir = '/scratch/connectome/dhkdgmlghks/UKB_sex_densenet3D121_6cbde7.pth'
-MAE_model_dir = '/scratch/connectome/dhkdgmlghks/3DCNN_test/3DCNN_hardparameter_sharing/result/model/densenet3D121_UKB_age_d167e4.pth'
-simclr_dir = '/scratch/connectome/jubin/Simclr_Contrastive_MRI_epoch_99.pth'
 
-def checkpoint_load(net, checkpoint_dir):
+def checkpoint_load(net, checkpoint_dir, args, test=False):
     if hasattr(net, 'module'):
         net = net.module
-        
-    if checkpoint_dir == 'sex':
-        checkpoint_dir = sex_model_dir
-    elif checkpoint_dir == 'age':
-        checkpoint_dir = age_model_dir
-    elif checkpoint_dir == 'simclr':
-        checkpoint_dir = simclr_dir
-    elif checkpoint_dir == 'MAE':
-        checkpoint_dir = MAE_model_dir
     
     model_state = torch.load(checkpoint_dir, map_location = 'cpu')
-    net.load_state_dict(model_state, strict=True)
+    if 'MM' in args.model and args.mode != 'pretraining' and test == False:
+        try:
+            net.load_state_dict(model_state, strict=True)
+        except:
+            extractor_state = OrderedDict()
+            for k, v in model_state.items():
+                if 'feature_extractors' not in k:
+                    break
+                new_k = '.'.join(k.split('.')[1:])
+                extractor_state[new_k] = model_state[k]
+            net.feature_extractors.load_state_dict(extractor_state)
+    else:
+        net.load_state_dict(model_state, strict=True)
+        
     print('The best checkpoint is loaded')
 
     return net
@@ -181,6 +199,8 @@ def checkpoint_load(net, checkpoint_dir):
     
 # define result-saving function
 def save_exp_result(setting, result):
+    if setting['debug']=='1':
+        return None
     makedir(setting['save_dir'])
     exp_name = setting['exp_name']
     del setting['epoch']
@@ -196,7 +216,3 @@ def save_exp_result(setting, result):
 def makedir(path):
     if not os.path.isdir(path):
         os.makedirs(path)
-
-
-
-
