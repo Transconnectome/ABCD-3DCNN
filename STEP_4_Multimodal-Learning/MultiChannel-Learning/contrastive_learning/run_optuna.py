@@ -7,6 +7,8 @@ import hashlib
 from copy import deepcopy
 from collections import defaultdict
 
+import optuna
+from optuna.trial import TrialState
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,9 +22,6 @@ from envs.transfer import setting_transfer
 
 import warnings
 warnings.filterwarnings("ignore")
-
-import torch.multiprocessing
-torch.multiprocessing.set_sharing_strategy('file_system') # to prevent "Too many open files" error.
 
 ## ========= Helper Functions =============== ##
 def setup_results(args):
@@ -67,16 +66,18 @@ def set_optimizer(args, net):
 def set_lr_scheduler(args, optimizer, len_dataloader):
     if args.scheduler == '':
         scheduler = None
-    elif args.scheduler == 'on':
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.2, min_lr=1e-7)
-    elif args.scheduler.lower() == 'cos':
-        scheduler = CosineAnnealingWarmupRestarts(optimizer, first_cycle_steps=40, cycle_mult=1,
+    elif 'on' in args.scheduler.lower() or args.scheduler == 'ReduceLROnPlateau':
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,'max', patience=10, factor=0.1, min_lr=1e-8)
+    elif args.scheduler.lower() == 'cos' or args.scheduler == 'ReduceLROnCosineAnnealingWarmupRestartsPlateau':
+        scheduler = CosineAnnealingWarmupRestarts(optimizer, first_cycle_steps=15, cycle_mult=2,
                                                   max_lr=args.lr, min_lr=1e-9, warmup_steps=10, gamma=0.75)
 #        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=2, eta_min=0)
-    elif 'step' in args.scheduler:
-        step_size = 80 if len(args.scheduler.split('_')) != 2 else int(args.scheduler.split('_')[1])        
+    elif args.scheduler == 'CosineAnnealingLR':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = args.epoch)
+    elif 'step' in args.scheduler or args.scheduler == 'StepLR':
+        step_size = 40 if len(args.scheduler.split('_')) != 2 else int(args.scheduler.split('_')[1])        
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size, gamma=0.1)
-    elif args.scheduler.lower() == 'onecycle':
+    elif args.scheduler == 'OneCycleLR':
         scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=args.lr, total_steps=args.epoch)
     else:
         raise Exception("Invalid scheduler option")
@@ -99,7 +100,13 @@ def add_epoch_result(result, train_loss, train_acc, val_loss, val_acc): #230313c
     return loss_acc_sum
 
     
-def run_experiment(args, net, partition, result, mode):
+def run_experiment(args, net, partition, result, mode, trial=None):
+    if trial:
+        # args.optim = trial.suggest_categorical("optimizer", ["AdamW", "SGD"])
+        args.weight_decay = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+        args.lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+        # args.scheduler = trial.suggest_categorical("scheduler", ["ReduceLROnPlateau", "ReduceLROnCosineAnnealingWarmupRestartsPlateau"])
+        
     epoch_exp = args.epoch if mode == 'ALL' else args.epoch_FC
     if args.mode != 'pretraining':
         unfrozen_layers = args.unfrozen_layers if mode == 'ALL' else '0' #230313change
@@ -138,6 +145,11 @@ def run_experiment(args, net, partition, result, mode):
         save_exp_result(vars(args).copy(), result) 
         CLIreporter(train_loss, train_acc, val_loss, val_acc)
         print(f"Epoch {epoch+1}. Current learning rate {curr_lr:.4e}. Took {te-ts:2.2f} sec. {is_best*'Best epoch'}")
+        
+        ## Optuna result report & prune        
+        trial.report(loss_acc_sum['val_loss'], epoch)
+        if trial.should_prune():
+            raise optuna.exceptions.TrialPruned()
 
         ## Early-Stopping
         if args.early_stopping != None and patience >= args.early_stopping and epoch >= 50:
@@ -157,7 +169,7 @@ def run_experiment(args, net, partition, result, mode):
 
 
 ## ========= Experiment =============== ##
-def experiment(partition, subject_data, args):
+def experiment(partition, subject_data, args, trial=None): # trial for optuna
     # selecting a model
     net = select_model(subject_data, args)
     
@@ -187,14 +199,14 @@ def experiment(partition, subject_data, args):
     print("*** Start training a model *** \n")
     if args.epoch_FC != 0:
         print("*** Transfer Learning - Training FC layers *** \n")
-        result, _ = run_experiment(args, net, partition, result, 'FC')
+        result, _ = run_experiment(args, net, partition, result, 'FC', trial)
                 
         print(f"Adjust learning rate for Training unfrozen layers from {args.lr} to {args.lr*args.lr_adjust}")
         args.lr *= args.lr_adjust
         result['lr_adjusted'] = args.lr
             
     print("*** Training unfrozen layers *** \n")
-    result, checkpoint_dir = run_experiment(args, net, partition, result, 'ALL')
+    result, checkpoint_dir = run_experiment(args, net, partition, result, 'ALL', trial)
                     
     # testing a model
     if args.debug:
@@ -220,11 +232,9 @@ def experiment(partition, subject_data, args):
         result['confusion_matrices'] = confusion_matrices
         
     return vars(args), result
-## ==================================== ##
 
-
-if __name__ == "__main__":
-    ## ========= Setting ========= ##
+def objective(trial):
+    ## ========= Args Setting ========= ##
     args = argument_setting()
     args.save_dir = os.getcwd() + '/result'
     
@@ -241,13 +251,42 @@ if __name__ == "__main__":
     # Run Experiment
     print(f"*** Experiment {args.exp_name} Start ***")
     partition, subject_data = make_dataset(args)
-    setting, result = experiment(partition, subject_data, deepcopy(args))
+    setting, result = experiment(partition, subject_data, deepcopy(args), trial) # change for optuna
     print("===== Experiment Setting Report =====")
     print(args)
     
-    # Save result
-    if args.debug:
-        quit()
-    
     save_exp_result(setting, result)
+    if 'test_acc' not in result:
+        pths_need_pruned = glob.glob(f'{args.save_dir}/model/{args.exp_name}*pth')
+        try:
+            list(map(lambda x: os.remove(x), pths_need_pruned))
+        except:
+            print('removing pruned pths failed')
     print("*** Experiment Done ***\n")
+    
+    return result['best_val_loss'] # for minimizing direction of optuna.create_study
+
+## ==================================== ##
+
+
+if __name__ == "__main__":
+    ## ========= Optuna Setting ========= ##
+    study = optuna.create_study(direction="minimize") # minimize loss
+    study.optimize(objective, n_trials=300)
+
+    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+    print("Study statistics: ")
+    print("  Number of finished trials: ", len(study.trials))
+    print("  Number of pruned trials: ", len(pruned_trials))
+    print("  Number of complete trials: ", len(complete_trials))
+
+    print("Best trial:")
+    trial = study.best_trial
+
+    print("  Value: ", trial.value)
+
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print("    {}: {}".format(key, value))
