@@ -14,11 +14,6 @@ from utils.optimizer import SGDW
 from envs.loss_functions import calculating_loss, calculating_eval_metrics, MixUp_loss, CutMix_loss, C_MixUp_loss
 from utils.utils import combine_pred_subjid, combine_emb_subjid
 
-import models.simple3d as simple3d #model script
-import models.vgg3d as vgg3d #model script
-import models.resnet3d as resnet3d #model script
-import models.densenet3d as densenet3d #model script
-import models.efficientnet3d as efficientnet3d
 from utils.utils import CLIreporter, checkpoint_save, checkpoint_load, MOPED_network
 from utils.lr_scheduler import *
 from utils.early_stopping import * 
@@ -323,6 +318,8 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
             net = flipout_densenet3d.densenet3D201(subject_data, args)
     # EfficientNet V1 
     elif args.model.find('efficientnet3D') != -1: 
+        import models.efficientnet3d as efficientnet3d
+        from envs.experiments import train, validate, test 
         net = efficientnet3d.efficientnet3D(subject_data,args)
 
     # load checkpoint
@@ -390,7 +387,7 @@ def experiment(partition, subject_data, save_dir, args): #in_channels,out_dim
     global_steps = 0
     for epoch in tqdm(range(args.epoch)):
         ts = time.time()
-        net, train_loss, train_acc, global_steps = train(net,partition,optimizer, global_steps, args)
+        net, train_loss, train_acc, global_steps = train(net, partition,optimizer, global_steps, args)
         torch.cuda.empty_cache()
         val_loss, val_acc = validate(net,partition,scheduler,args)
         te = time.time()
