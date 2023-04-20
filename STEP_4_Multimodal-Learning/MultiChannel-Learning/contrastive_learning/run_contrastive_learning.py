@@ -10,6 +10,7 @@ from collections import defaultdict
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import wandb
 from tqdm.auto import tqdm
 
 from utils.optimizer import CosineAnnealingWarmupRestarts
@@ -94,8 +95,9 @@ def add_epoch_result(result, train_loss, train_acc, val_loss, val_acc): #230313c
         if 'contrastive_loss' not in target_name:
             result['train_accs'][target_name].append(train_acc[target_name])
             result['val_accs'][target_name].append(val_acc[target_name])
+            loss_acc_sum['train_acc'] += train_acc[target_name]
             loss_acc_sum['val_acc'] += val_acc[target_name]
-            
+    
     return loss_acc_sum
 
     
@@ -116,14 +118,16 @@ def run_experiment(args, net, partition, result, mode):
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
-        curr_lr = optimizer.param_groups[0]['lr']
         ts = time.time()
+        curr_lr = optimizer.param_groups[0]['lr']
         net, train_loss, train_acc = train(net, trainloader, optimizer, scaler, args)
         val_loss, val_acc = validate(net, valloader, scheduler, args)
-        te = time.time()
 
         ## sorting the results
         loss_acc_sum = add_epoch_result(result, train_loss, train_acc, val_loss, val_acc) #230313change
+        if args.wandb:
+            wandb.log(data=loss_acc_sum, step=epoch+1)
+                  
         if val_metric == 'loss':
             is_best = (loss_acc_sum['val_loss'] < best_loss_acc['val_loss'])
         else:
@@ -133,10 +137,14 @@ def run_experiment(args, net, partition, result, mode):
         if is_best:
             result['best_epoch'] = epoch
             best_loss_acc.update(loss_acc_sum)
+            if args.wandb:
+                wandb.summary.update(best_loss_acc)
             checkpoint_dir = checkpoint_save(net, epoch, args)
         patience = (patience+1) * (not is_best)
         save_exp_result(vars(args).copy(), result) 
         CLIreporter(train_loss, train_acc, val_loss, val_acc)
+        
+        te = time.time()
         print(f"Epoch {epoch+1}. Current learning rate {curr_lr:.4e}. Took {te-ts:2.2f} sec. {is_best*'Best epoch'}")
 
         ## Early-Stopping
@@ -179,6 +187,8 @@ def experiment(partition, subject_data, args):
         raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
     net = nn.DataParallel(net, device_ids = devices)        
     net.to(f'cuda:{net.device_ids[0]}')
+    
+    wandb.watch(net)
     
     # setting for results' DataFrame
     result = setup_results(args)
@@ -238,6 +248,11 @@ if __name__ == "__main__":
     args.exp_name = args.exp_name + f'_{hash_key}'
 
     ## ========= Run Experiment and saving result ========= ##    
+    # Initialize wandb
+    if args.wandb:
+        wandb.init(project=f'{args.dataset}_{str(args.cat_target+args.num_target)}',
+               group=f'split-{args.balanced_split}', name=str(args.data_type), config=args)
+    
     # Run Experiment
     print(f"*** Experiment {args.exp_name} Start ***")
     partition, subject_data = make_dataset(args)

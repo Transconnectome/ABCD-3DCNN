@@ -35,7 +35,8 @@ ABCD_data_dir = {
     'MD_warpped_nii': f'{root_dir}/data/1.ABCD/3.4.MD_warpped_nii/',
     'RD_unwarpped_nii': f'{root_dir}/data/1.ABCD/3.5.RD_unwarpped_nii/',
     'RD_warpped_nii': f'{root_dir}/data/1.ABCD/3.6.RD_warpped_nii/',
-    '5tt_warped_nii': f'{root_dir}/data/1.ABCD/3.7.5tt_warped_nii/'
+    '5tt_warped_nii': f'{root_dir}/data/1.ABCD/3.7.5tt_warped_nii/',
+    'T1_fastsurfer_resize128': f'{root_dir}/data/1.ABCD/T1_fastsurfer_resize128/' # added T1 fastsurfer 128
 }
 ABCD_phenotype_dir = {
     'total': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_phenotype_total_balanced_multitarget.csv',

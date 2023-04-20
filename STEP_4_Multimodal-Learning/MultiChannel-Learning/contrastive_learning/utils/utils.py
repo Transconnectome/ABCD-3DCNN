@@ -26,12 +26,14 @@ def argument_setting():
     parser.add_argument("--in_channels", default=1, type=int, help='')
 
     # Options for dataset and data type, split ratio, CV, resize, augmentation
-    parser.add_argument("--dataset", type=str, choices=['UKB','ABCD','CHA'], required=True, help='Selelct dataset')#230315
+    parser.add_argument("--dataset", type=str, choices=['UKB','ABCD','CHA'], required=True, help='Select dataset') 
     parser.add_argument("--data_type", nargs='+', type=str, help='Select data type(sMRI, dMRI)',
-                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'freesurfer_crop_resize128','T1_MNI_resize128',
-                                 'T1_resize128', 'FA_crop_resize128', 'FA_MNI_resize128', 'FA_wm_MNI_resize128',
+                        choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'freesurfer_crop_resize128',
+                                 'T1_MNI_resize128', 'T1_resize128', 'T1_fastsurfer_resize128', # added T1 fastsurfer 128
+                                 'FA_crop_resize128','FA_MNI_resize128', 'FA_wm_MNI_resize128',
                                  'FA_unwarpped_nii', 'FA_warpped_nii',
-                                 'MD_unwarpped_nii', 'MD_warpped_nii', 'RD_unwarpped_nii', 'RD_warpped_nii',
+                                 'MD_unwarpped_nii', 'MD_warpped_nii',
+                                 'RD_unwarpped_nii', 'RD_warpped_nii',
                                  'T1_MNI_resize_areamode', 'FA_MNI_resize_areamode'])
     parser.add_argument("--phenotype", default='total', type=str, help='')
     parser.add_argument("--balanced_split", default='', type=str, help='')
@@ -65,9 +67,6 @@ def argument_setting():
     parser.add_argument("--test_batch_size", default=1, type=int, help='')
 
     # Options for experiment setting
-    parser.add_argument("--exp_name", type=str, required=True, help='')
-    parser.add_argument("--gpus", nargs='+', type=int, help='')
-    parser.add_argument("--sbatch", type=str, choices=['True', 'False'])
     parser.add_argument("--cat_target", nargs='+', default=[], type=str, help='')
     parser.add_argument("--num_target", nargs='+', default=[], type=str, help='')
     parser.add_argument("--num_normalize", type=str, default=True, help='')
@@ -79,6 +78,12 @@ def argument_setting():
     parser.add_argument("--load", default='', type=str, help='Load model weight that mathces {your_exp_dir}/result/*{load}*')
     parser.add_argument("--unfrozen_layers", default='all', type=str, help='Select the number of layers that would be unfrozen')
     parser.add_argument("--init_unfrozen", default='', type=str, help='Initializes unfrozen layers')
+    
+    # Options for environment setting
+    parser.add_argument("--exp_name", type=str, required=True, help='')
+    parser.add_argument("--wandb", type=str, default=None, help='')    
+    parser.add_argument("--gpus", nargs='+', type=int, help='')
+    parser.add_argument("--sbatch", type=str, choices=['True', 'False'])
     parser.add_argument("--debug", default='', type=str, help='')
         
     args = parser.parse_args()
