@@ -114,7 +114,7 @@ def run_experiment(args, net, partition, result, mode):
     trainloader, valloader = make_dataloaders(partition, args)
 
     val_metric = 'loss' if 'MM' in args.model else 'acc'
-    best_loss_acc = {'train_loss': float('inf'), 'val_loss': float('inf'), 'val_acc': -float('inf')}
+    best_loss_acc = {'train_loss': float('inf'), 'train_acc': -float('inf'), 'val_loss': float('inf'), 'val_acc': -float('inf')}
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
@@ -126,7 +126,7 @@ def run_experiment(args, net, partition, result, mode):
         ## sorting the results
         loss_acc_sum = add_epoch_result(result, train_loss, train_acc, val_loss, val_acc) #230313change
         if args.wandb:
-            wandb.log(data=loss_acc_sum, step=epoch+1)
+            wandb.log(data=(loss_acc_sum | {'learning_rate':curr_lr}), step=epoch+1)
                   
         if val_metric == 'loss':
             is_best = (loss_acc_sum['val_loss'] < best_loss_acc['val_loss'])
