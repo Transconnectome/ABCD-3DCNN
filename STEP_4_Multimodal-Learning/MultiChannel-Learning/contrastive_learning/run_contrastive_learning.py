@@ -86,7 +86,7 @@ def set_lr_scheduler(args, optimizer, len_dataloader):
     
     
 def add_epoch_result(result, train_loss, train_acc, val_loss, val_acc): #230313change
-    loss_acc_sum = {'train_loss':0, 'val_loss':0, 'val_acc':0}
+    loss_acc_sum = {'train_loss':0, 'val_loss':0, 'train_acc':0,'val_acc':0}
     for target_name in train_loss:
         result['train_losses'][target_name].append(train_loss[target_name])
         result['val_losses'][target_name].append(val_loss[target_name])
@@ -251,7 +251,8 @@ if __name__ == "__main__":
     # Initialize wandb
     if args.wandb:
         wandb.init(project=f'{args.dataset}_{str(args.cat_target+args.num_target)}',
-               group=f'split-{args.balanced_split}', name=str(args.data_type), config=args)
+                   group=f'modality-{str(args.data_type)}_split-{args.balanced_split}',
+                   name=args.exp_name, config=args)
     
     # Run Experiment
     print(f"*** Experiment {args.exp_name} Start ***")

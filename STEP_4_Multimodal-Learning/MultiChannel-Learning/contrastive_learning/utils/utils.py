@@ -31,8 +31,8 @@ def argument_setting():
                         choices=['fmriprep', 'freesurfer', 'freesurfer_256', 'freesurfer_crop_resize128',
                                  'T1_MNI_resize128', 'T1_resize128', 'T1_fastsurfer_resize128', # added T1 fastsurfer 128
                                  'FA_crop_resize128','FA_MNI_resize128', 'FA_wm_MNI_resize128',
-                                 'FA_unwarpped_nii', 'FA_warpped_nii',
-                                 'MD_unwarpped_nii', 'MD_warpped_nii',
+                                 'FA_unwarpped_nii', 'FA_warpped_nii', 'FA_hippo',
+                                 'MD_unwarpped_nii', 'MD_warpped_nii', 'MD_hippo',
                                  'RD_unwarpped_nii', 'RD_warpped_nii',
                                  'T1_MNI_resize_areamode', 'FA_MNI_resize_areamode'])
     parser.add_argument("--phenotype", default='total', type=str, help='')

@@ -2,10 +2,13 @@ import os
 import re
 import glob
 import random
+from collections import defaultdict
 
 import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
+from sklearn.preprocessing import OneHotEncoder 
+from skmultilearn.model_selection import IterativeStratification
 
 import torch
 from monai.transforms import (AddChannel, Compose, CenterSpatialCrop, Flip, RandAffine,
@@ -36,14 +39,16 @@ ABCD_data_dir = {
     'RD_unwarpped_nii': f'{root_dir}/data/1.ABCD/3.5.RD_unwarpped_nii/',
     'RD_warpped_nii': f'{root_dir}/data/1.ABCD/3.6.RD_warpped_nii/',
     '5tt_warped_nii': f'{root_dir}/data/1.ABCD/3.7.5tt_warped_nii/',
-    'T1_fastsurfer_resize128': f'{root_dir}/data/1.ABCD/T1_fastsurfer_resize128/' # added T1 fastsurfer 128
+    'T1_fastsurfer_resize128': f'{root_dir}/data/1.ABCD/T1_fastsurfer_resize128/', # added T1 fastsurfer 128
+    'FA_hippo': f'{root_dir}/data/1.ABCD/FA_hippo/',
+    'MD_hippo': f'{root_dir}/data/1.ABCD/MD_hippo/',    
 }
 ABCD_phenotype_dir = {
     'total': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_phenotype_total_balanced_multitarget.csv',
     'ADHD_case': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv',
     'ADHD_KSADS': f"{root_dir}/data/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS.csv",
     'ADHD_KSADS_CBCL': f"{root_dir}/data/1.ABCD/4.demo_qc/ABCD_ADHD_TotalSymp_and_KSADS_and_CBCL.csv",
-    'BMI': f'{root_dir}/data/1.ABCD/4.demo_qc/BMI_prediction/ABCD_phenotype_total.csv',
+    'BMI': f'{root_dir}/data/1.ABCD/4.demo_qc/BMI_prediction/ABCD_phenotype_total.csv', 
     'suicide_case': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_suicide_case.csv',
     'suicide_control': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_suicide_control.csv'
 }
@@ -120,6 +125,7 @@ def loading_phenotype(phenotype_dir, target_list, args):
 
     ## get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
+    raw_csv = subject_data.copy()
     subject_data = subject_data.loc[:,col_list]
     if 'Attention.Deficit.Hyperactivity.Disorder.x' in target_list:
         subject_data = get_available_subjects(subject_data, args)
@@ -133,11 +139,137 @@ def loading_phenotype(phenotype_dir, target_list, args):
     if args.num_normalize == True:
         subject_data = preprocessing_num(subject_data, args)
     
-    return subject_data
+    return subject_data, raw_csv
 
 
-def make_balanced_testset(il, num_total, args):
-    if 'multitarget' in args.balanced_split:
+def slice_index(array, n_chunks ):
+    partitioned_list = np.array_split(np.sort(array), n_chunks)
+    return [i[-1] for i in partitioned_list]
+    
+
+def multilabel_matrix_maker(df, binary_cols=None, multiclass_cols=None, continuous_cols=None, n_chunks=3) :
+    """
+    returns matrix that will be used for multilabel, taking into account columns that are either multiclass or continuous
+    * df : the dataframe to be split
+    * binary_cols : LIST of cols (str)just cols that will be used (binarized)
+    * multiclass_cols : LIST of the cols (str) that are multi class
+    * continuous_cols : LIST of the cols (str) that will be split (continouous)
+    * n_chunks : if using continouous cols are used, how many split?
+    
+    outputs matrix that has binarized binarized for all columns (only needs to be used during iskf to get the indices)
+    """
+    df = df.copy() #copy becasue we don't want to modify the original df
+    if binary_cols == multiclass_cols == continuous_cols == None : #i.e. if all are None
+        raise ValueError("at least one of the cols have to be put.. currently all cols are selected as None")
+    if type(binary_cols)!= list or type(multiclass_cols)!= list or type(continuous_cols)!= list: 
+        raise ValueError("the cols have to be lists!")
+    #checking if NaN exist => raise error (sanity check)\
+    if df[binary_cols+multiclass_cols+continuous_cols].isnull().values.any():
+        raise ValueError("Your provided df had some NaN in columns that you are wanting to do iskf on")    
+ 
+    #now adding binarized columns for each column types and aggregating them into total_cols
+    total_cols = []
+    if binary_cols : 
+        for col in binary_cols :
+            df[col] = pd.factorize(df[col], sort = True)[0] 
+            total_cols.append(df[col].values) #or single []?  ([[]] : df 로 만드는 것, [] : series로 만듬) 
+            
+    if multiclass_cols :
+        for col in multiclass_cols : 
+            df_col = df[[col]] #[[]] not [] because of dims 
+            ohe = OneHotEncoder()
+            ohe.fit(df_col)
+            binarized_col = ohe.transform(df_col).todense() 
+            total_cols.append(binarized_col)
+            
+    if continuous_cols: 
+        for col in continuous_cols:
+            df[col] = df[col].astype('float') #change to float when doing 
+            array = df[col].values
+            boundaries = slice_index(array, n_chunks)  
+            i_below = -np.infty
+            for i in boundaries:
+                extracted_df = (df[col]>i_below) & (df[col]<=i) 
+                i_below = i #update i_below
+                total_cols.append(extracted_df.values.astype(float))     
+    
+    #adding all together,
+    final_arr = np.column_stack(total_cols)
+    
+    return final_arr
+
+
+def get_info_fold(df, train_idx, valid_idx, test_idx, target_col):
+    """
+    * kf_split : the `kf.split(XX)`된것
+    * df : the dataframe with the metadata I will use
+    * target_col : the columns in the df that I'll take statistics of 
+    """
+    train_dict = defaultdict(list)
+    valid_dict = defaultdict(list)
+    test_dict = defaultdict(list)
+
+    label_train = df.iloc[train_idx]
+    label_valid = df.iloc[valid_idx]
+    label_test = df.iloc[test_idx]
+    
+    for col in target_col:
+        if df[col].nunique()<=10: # case: categorical variable
+            keys=list(map(lambda x: f'{col}[{x}]', label_train[col].unique()))
+            train_counts=label_train[col].value_counts()
+            valid_counts=label_valid[col].value_counts()
+            test_counts=label_test[col].value_counts()
+            for i, key in enumerate(keys):
+                train_dict[key].append(train_counts[train_counts.index[i]])
+                valid_dict[key].append(valid_counts[valid_counts.index[i]])
+                test_dict[key].append(test_counts[test_counts.index[i]])
+        else: # case: continuous variable
+            train_dict[f'{col}-mean/std'].append(f'{label_train[col].mean():.2f} / {label_train[col].std():.2f}')
+            valid_dict[f'{col}-mean/std'].append(f'{label_valid[col].mean():.2f} / {label_valid[col].std():.2f}')
+            test_dict[f'{col}-mean/std'].append(f'{label_test[col].mean():.2f} / {label_test[col].std():.2f}')
+                    
+    print("=== Fold-wise categorical values information of training set ===")
+    print(pd.DataFrame(train_dict))
+    print("=== Fold-wise categorical values information of validation set ===")
+    print(pd.DataFrame(valid_dict))
+    print("=== Fold-wise categorical values information of test set ===")
+    print(pd.DataFrame(test_dict))    
+
+
+def iterative_stratification(imageFiles_labels, raw_merged, num_total, args):
+    if args.val_size % args.test_size != 0:
+        print("Validation size & Test size aren't matched to make folds. change val size to test size")
+        args.val_size = args.test_size
+
+    binary_target = list(set(['sex']+args.cat_target))
+    continuous_target = list(set(['age']+args.num_target))
+    floatized_arr = multilabel_matrix_maker(raw_merged, n_chunks=10,
+                                            binary_cols=binary_target,
+                                            multiclass_cols=[],
+                                            continuous_cols=continuous_target)
+    skf_target = [floatized_arr, floatized_arr]        
+    args.num_folds = int(1/args.test_size)
+    kf = IterativeStratification(n_splits=args.num_folds, order=10, random_state = np.random.seed(0))
+    folds = [*kf.split(*skf_target)]
+    indices = [ x[1] for x in folds ] 
+
+    # split dataset
+    n_test_folds, n_val_folds = int(args.num_folds*args.test_size), int(args.num_folds*args.val_size)
+    test_idx, val_idx, train_idx = [ np.concatenate(idx) for idx in np.split(indices, [n_test_folds, n_test_folds+n_val_folds])]
+    get_info_fold(raw_merged, train_idx, val_idx, test_idx, binary_target+continuous_target)
+
+    num_train, num_val =len(train_idx), len(val_idx)
+    new_idx = np.concatenate([train_idx, val_idx, test_idx])
+    imageFiles_labels = imageFiles_labels.iloc[new_idx]
+        
+    return num_train, num_val, imageFiles_labels
+
+
+def make_balanced_testset(il, raw_merged, num_total, args):
+    if 'iter_strat' in args.balanced_split:
+        num_train, num_val, imageFiles_labels = iterative_stratification(il, raw_merged, num_total, args)
+        
+    elif 'multitarget' in args.balanced_split:
         num_train, num_val = il['split'].value_counts()[['train','val']]
         splits = [il[il['split']=='train'], il[il['split']=='val'], il[il['split']=='test']]
         imageFiles_labels = pd.concat(splits)
@@ -173,11 +305,12 @@ def make_balanced_testset(il, num_total, args):
 
 
 # defining train,val, test set splitting function
-def partition_dataset(imageFiles_labels, target_list, args):
+def partition_dataset(imageFiles_labels, raw_merged, target_list, args):
     ## Random shuffle according to args.seed -> Disable.
 #     imageFiles_labels = imageFiles_labels.sample(frac=1).reset_index(drop=True)
     if args.N != None:
         imageFiles_labels = imageFiles_labels.sample(n=args.N).reset_index(drop=True)
+        raw_merged = pd.merge(raw_merged, imageFiles_labels, on=subjectkey, how='right',suffixes=('','x'))
     ## Dataset split    
     num_total = len(imageFiles_labels) 
     num_train = int(num_total*(1 - args.val_size - args.test_size))
@@ -185,7 +318,7 @@ def partition_dataset(imageFiles_labels, target_list, args):
     num_test = int(num_total*args.test_size)
         
     if args.balanced_split:
-        num_train, num_val, imageFiles_labels = make_balanced_testset(imageFiles_labels, num_total, args)
+        num_train, num_val, imageFiles_labels = make_balanced_testset(imageFiles_labels, raw_merged, num_total, args)
     images = imageFiles_labels[args.data_type]
     labels = imageFiles_labels[target_list].to_dict('records')
     
@@ -264,16 +397,17 @@ def make_dataset(args):
     target_list = args.cat_target + args.num_target
     
     image_files = loading_images(image_dir, args)
-    subject_data = loading_phenotype(phenotype_dir, target_list, args)
+    subject_data, raw_csv = loading_phenotype(phenotype_dir, target_list, args)
 
     # combining image files & labels
+    raw_merged = pd.merge(raw_csv, image_files, how='inner', on=subjectkey)
     if 'multitarget' in args.balanced_split:
         imageFiles_labels = (pd.merge(subject_data, image_files, how='left', on=subjectkey)).dropna()
     else:
         imageFiles_labels = pd.merge(subject_data, image_files, how='inner', on=subjectkey)
 
     # partitioning dataset and preprocessing (change the range of categorical variables and standardize numerical variables)
-    partition = partition_dataset(imageFiles_labels, target_list, args)
+    partition = partition_dataset(imageFiles_labels, raw_merged, target_list, args)
     print("*** Making a dataset is completed *** \n")
     
     return partition, subject_data
