@@ -10,6 +10,17 @@ from sklearn.metrics import confusion_matrix
 
 from envs.loss_functions import calculating_loss_acc, calc_acc_auroc, calc_R2, calc_MAE_MSE_R2
 
+
+def set_result(args):
+    keys = ['loss']
+    if args.cat_target:
+        keys.extend(['acc','auroc'])
+    if args.num_target:
+        keys.extend(['abs_loss','mse_loss','r_square'])
+    result = defaultdict(defaultdict, { k:defaultdict(list) for k in keys})
+    
+    return result
+
 ### ========= Train,Validate, and Test ========= ###
 '''The process of calcuating loss and accuracy metrics is as follows.
    1) sequentially calculate loss and accuracy metrics of target labels with for loop.
@@ -22,15 +33,14 @@ from envs.loss_functions import calculating_loss_acc, calc_acc_auroc, calc_R2, c
 # define training step
 def train(net, trainloader, optimizer, scaler, args):
     net.train()
-    train_loss = defaultdict(list)
-    train_acc =  defaultdict(list)
+    train_result = set_result(args)
     
     for i, data in enumerate(trainloader,0):
         image, targets = data if len(data) == 2 else (data, []) #230313change
         image = image.to(f'cuda:{net.device_ids[0]}')
         with torch.cuda.amp.autocast():
             output = net(image)
-            loss = calculating_loss_acc(targets, output, train_loss, train_acc, net, args)
+            loss = calculating_loss_acc(targets, output, train_result, net, args)
             loss = loss / args.accumulation_steps if args.accumulation_steps else loss
         
         optimizer.zero_grad(set_to_none=True)
@@ -44,17 +54,16 @@ def train(net, trainloader, optimizer, scaler, args):
             scaler.update()
 
     # calculating total loss and acc of separate mini-batch
-    for target in train_loss:
-        train_loss[target] = np.mean(train_loss[target])
-        train_acc[target] = np.mean(train_acc[target])
+    for target in train_result['loss']:
+        for k in train_result:
+            train_result[k][target] = np.mean(train_result[k][target])
 
-    return net, train_loss, train_acc
+    return net, train_result
 
 
 # define validation step
 def validate(net, valloader, scheduler, args):
-    val_loss = defaultdict(list)
-    val_acc = defaultdict(list)
+    val_result = set_result(args)
 
     net.eval()
     with torch.no_grad():
@@ -63,20 +72,24 @@ def validate(net, valloader, scheduler, args):
             image = image.to(f'cuda:{net.device_ids[0]}')
             with torch.cuda.amp.autocast():
                 output = net(image)
-                loss = calculating_loss_acc(targets, output, val_loss, val_acc, net, args)
+                loss = calculating_loss_acc(targets, output, val_result, net, args)
 
-    for target in val_loss:
-        val_loss[target] = np.mean(val_loss[target])
-        val_acc[target] = np.mean(val_acc[target])
+    for target in val_result['loss']:
+        for k in val_result:
+            val_result[k][target] = np.mean(val_result[k][target])
 
     # learning rate scheduler
+    for k in val_result:
+        if 'loss' not in k:
+            val_acc=val_result[k]
+            
     if scheduler:
         if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step(sum(val_acc.values()))
         else:
             scheduler.step()
 
-    return val_loss, val_acc
+    return val_result
 
 
 def calc_confusion_matrix(confusion_matrices, curr_target, output, y_true):
@@ -112,8 +125,7 @@ def test(net, partition, args):
     
     outputs = defaultdict(list)
     y_true = defaultdict(list)
-    test_loss = defaultdict(list) 
-    test_acc = defaultdict(list)
+    test_result = set_result(args)
     confusion_matrices = defaultdict(defaultdict)
 
     with torch.no_grad():
@@ -126,11 +138,11 @@ def test(net, partition, args):
                     outputs[curr_target].append(output[curr_target].cpu())
                     y_true[curr_target].append(targets[curr_target].cpu())
             else:
-                loss = calculating_loss_acc(targets, outputs, test_loss, test_acc, net, args)
+                loss = calculating_loss_acc(targets, outputs, test_result, net, args)
     
     # caculating ACC and R2 at once  
     if 'MM' in args.model and args.mode == 'pretraining':
-        test_acc = np.mean(test_loss[args.metric])
+        test_acc = np.mean(test_result['loss'][args.metric])
         return test_acc, None
 
     for curr_target in outputs:
@@ -139,12 +151,13 @@ def test(net, partition, args):
             
         acc_func = calc_acc_auroc if curr_target in args.cat_target else calc_MAE_MSE_R2
         curr_acc = acc_func(outputs[curr_target], y_true[curr_target], args, None)
-        test_acc[curr_target].append(curr_acc)
+        for k in curr_acc:
+            test_result[k][curr_target].append(curr_acc[k])
         
         if curr_target in args.confusion_matrix:
             calc_confusion_matrix(confusion_matrices, curr_target,
                                   outputs[curr_target], y_true[curr_target])
 
-    return test_acc, confusion_matrices
+    return test_result, confusion_matrices
 
 ## ============================================ ##

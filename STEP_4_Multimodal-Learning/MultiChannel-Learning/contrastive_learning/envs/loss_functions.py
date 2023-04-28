@@ -71,14 +71,14 @@ class NTXentLoss(torch.nn.Module):
         return alpha * loss_a + (1 - alpha) * loss_b
 
 
-def contrastive_loss(output, loss_dict, metric='cos'):
+def contrastive_loss(output, result, metric='cos'):
     # << should be implemented later >> case where len(args.data_type) >= 3 
     loss_name = 'contrastive_loss_'+metric
     embedding_1, embedding_2 = output  
     if metric == 'NTXent':
         criterion_ssim = NTXentLoss(device='cuda', temperature=0.5, alpha_weight=0.5)
         loss = criterion_ssim(embedding_1, embedding_2, norm=False) # vectors are already normalized in densenet3DMM
-        loss_dict[loss_name].append(loss.item())
+        result['loss'][loss_name].append(loss.item())
     
     else:
         embedding_2_rolled = embedding_2.roll(1,0)        
@@ -88,13 +88,13 @@ def contrastive_loss(output, loss_dict, metric='cos'):
             label_negative = -torch.ones(embedding_1.shape[0], device='cuda:0')
             loss_positive = criterion_ssim(embedding_1, embedding_2, label_positive)
             loss_negative = criterion_ssim(embedding_1, embedding_2_rolled, label_negative)
-            loss_dict[f'{loss_name}_positive'].append(loss_positive.item())
-            loss_dict[f'{loss_name}_negative'].append(loss_negative.item())
+            result['loss'][f'{loss_name}_positive'].append(loss_positive.item())
+            result['loss'][f'{loss_name}_negative'].append(loss_negative.item())
             loss = (loss_positive + loss_negative)/2
         elif metric.upper() == 'L2':
             criterion_ssim = nn.MSELoss()
             loss = criterion_ssim(embedding_1, embedding_2)
-            loss_dict[loss_name].append(loss.item())            
+            result['loss'][loss_name].append(loss.item())            
         
     return loss
     
@@ -105,7 +105,7 @@ def calc_acc(tmp_output, label, args, tmp_loss=None):
     total = label.size(0)
     acc = (100 * correct / total)
 
-    return acc
+    return {'acc': acc}
 
 
 def calc_acc_auroc(tmp_output, label, args, tmp_loss=None):
@@ -127,7 +127,7 @@ def calc_R2(tmp_output, y_true, args, tmp_loss=None): #230313change
     y_var = torch.var(y_true, unbiased=False)
     r_square = 1 - (tmp_loss / y_var)
                     
-    return r_square.item()
+    return {'r_square': r_square.item()}
 
 
 def calc_MAE_MSE_R2(tmp_output, y_true, args, tmp_loss=None):
@@ -145,7 +145,7 @@ def calc_MAE_MSE_R2(tmp_output, y_true, args, tmp_loss=None):
     return result
 
 
-def calculating_loss_acc(targets, output, loss_dict, acc_dict, net, args):
+def calculating_loss_acc(targets, output, result, net, args):
     '''define calculating loss and accuracy function used during training and validation step'''
     # << should be implemented later >> how to set ssim_weight?
     if targets != []:
@@ -155,7 +155,7 @@ def calculating_loss_acc(targets, output, loss_dict, acc_dict, net, args):
     
     # calculate constrastive_loss
     if args.metric and (len(args.data_type) > 1 and args.in_channels == 1):
-        loss = contrastive_loss(output, loss_dict, args.metric)
+        loss = contrastive_loss(output, result, args.metric)
         
     # calculate target_losses & accuracies
     for curr_target in targets:
@@ -174,11 +174,12 @@ def calculating_loss_acc(targets, output, loss_dict, acc_dict, net, args):
         # Loss
         tmp_loss = criterion(tmp_output.float(), tmp_label)
         loss += tmp_loss * weight
-        loss_dict[curr_target].append(tmp_loss.item())
+        result['loss'][curr_target].append(tmp_loss.item())
         
         # Acc
         acc_func = calc_acc if curr_target in args.cat_target else calc_R2
         acc = acc_func(tmp_output, label, args, tmp_loss)
-        acc_dict[curr_target].append(acc) 
+        for k, v in acc.items():
+            result[k][curr_target].append(v) 
             
     return loss

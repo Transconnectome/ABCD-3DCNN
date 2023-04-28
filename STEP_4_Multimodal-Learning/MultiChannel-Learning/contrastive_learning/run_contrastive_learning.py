@@ -27,16 +27,11 @@ torch.multiprocessing.set_sharing_strategy('file_system') # to prevent "Too many
 
 ## ========= Helper Functions =============== ##
 def setup_results(args):
-    train_losses = defaultdict(list)
-    train_accs = defaultdict(list)
-    val_losses = defaultdict(list)
-    val_accs = defaultdict(list)
-
-    result = {}
-    result['train_losses'] = train_losses
-    result['train_accs'] = train_accs
-    result['val_losses'] = val_losses
-    result['val_accs'] = val_accs
+    result = defaultdict(list)
+    result['train_losses'] = defaultdict(list)
+    result['train_accs'] = defaultdict(list)
+    result['val_losses'] = defaultdict(list)
+    result['val_accs'] = defaultdict(list)
     
     return result
 
@@ -85,18 +80,25 @@ def set_lr_scheduler(args, optimizer, len_dataloader):
     return scheduler
     
     
-def add_epoch_result(result, train_loss, train_acc, val_loss, val_acc): #230313change
-    loss_acc_sum = {'train_loss':0, 'val_loss':0, 'train_acc':0,'val_acc':0}
-    for target_name in train_loss:
-        result['train_losses'][target_name].append(train_loss[target_name])
-        result['val_losses'][target_name].append(val_loss[target_name])
-        loss_acc_sum['train_loss'] += train_loss[target_name]
-        loss_acc_sum['val_loss'] += val_loss[target_name]
-        if 'contrastive_loss' not in target_name:
-            result['train_accs'][target_name].append(train_acc[target_name])
-            result['val_accs'][target_name].append(val_acc[target_name])
-            loss_acc_sum['train_acc'] += train_acc[target_name]
-            loss_acc_sum['val_acc'] += val_acc[target_name]
+def add_epoch_result(result, train_result, val_result): #230313change
+    loss_acc_sum = defaultdict(int)
+    for target_name in train_result['loss']:
+        result['train_losses'][target_name].append(train_result['loss'][target_name])
+        result['val_losses'][target_name].append(val_result['loss'][target_name])
+        loss_acc_sum['train_loss'] += train_result['loss'][target_name]
+        loss_acc_sum['val_loss'] += val_result['loss'][target_name]
+        acc_done=0
+        for acc in train_result:
+            if 'MM' in args.model and 'contrastive_loss' in target_name:
+                loss_acc_sum[f'val_metric'] += -val_result[acc][target_name]
+            if ('contrastive_loss' not in target_name) and acc != 'loss':
+                loss_acc_sum[f'train_{acc}'] += train_result[acc][target_name]
+                loss_acc_sum[f'val_{acc}'] += val_result[acc][target_name]
+                if acc_done == 0:
+                    loss_acc_sum[f'val_metric'] += val_result[acc][target_name]
+                    result[f'train_accs'][target_name].append(train_result[acc][target_name])
+                    result[f'val_accs'][target_name].append(val_result[acc][target_name])
+                    acc_done=1
     
     return loss_acc_sum
 
@@ -113,36 +115,34 @@ def run_experiment(args, net, partition, result, mode):
     
     trainloader, valloader = make_dataloaders(partition, args)
 
-    val_metric = 'loss' if 'MM' in args.model else 'acc'
-    best_loss_acc = {'train_loss': float('inf'), 'train_acc': -float('inf'), 'val_loss': float('inf'), 'val_acc': -float('inf')}
+    best_loss_acc = {'train_loss': float('inf'), 'val_loss': float('inf'), 'val_metric': -float('inf')}
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
         ts = time.time()
         curr_lr = optimizer.param_groups[0]['lr']
-        net, train_loss, train_acc = train(net, trainloader, optimizer, scaler, args)
-        val_loss, val_acc = validate(net, valloader, scheduler, args)
+        net, train_result = train(net, trainloader, optimizer, scaler, args)
+        val_result = validate(net, valloader, scheduler, args)
 
         ## sorting the results
-        loss_acc_sum = add_epoch_result(result, train_loss, train_acc, val_loss, val_acc) #230313change
+        loss_acc_sum = add_epoch_result(result, train_result, val_result)
         if args.wandb:
             wandb.log(data=(loss_acc_sum | {'learning_rate':curr_lr}), step=epoch+1)
-                  
-        if val_metric == 'loss':
-            is_best = (loss_acc_sum['val_loss'] < best_loss_acc['val_loss'])
-        else:
-            is_best = (loss_acc_sum['val_acc'] > best_loss_acc['val_acc']) 
         
         ## Check if best epoch, save the checkpoint and results, visualize the result.
-        if is_best:
+        is_best = is_best_metric = (loss_acc_sum['val_metric'] > best_loss_acc['val_metric'])
+        is_best_loss = (loss_acc_sum['val_loss'] < best_loss_acc['val_loss'])
+        if is_best_metric:
             result['best_epoch'] = epoch
             best_loss_acc.update(loss_acc_sum)
             if args.wandb:
-                wandb.summary.update(best_loss_acc)
+                wandb.summary.update({'best_'+k:v for k, v in best_loss_acc.items()})
             checkpoint_dir = checkpoint_save(net, epoch, args)
         patience = (patience+1) * (not is_best)
         save_exp_result(vars(args).copy(), result) 
-        CLIreporter(train_loss, train_acc, val_loss, val_acc)
+        metric = list(filter(lambda x: 'loss' not in x, train_result.keys()))[0]
+        CLIreporter(train_result['loss'], train_result[metric],
+                    val_result['loss'], val_result[metric])
         
         te = time.time()
         print(f"Epoch {epoch+1}. Current learning rate {curr_lr:.4e}. Took {te-ts:2.2f} sec. {is_best*'Best epoch'}")
@@ -223,6 +223,8 @@ def experiment(partition, subject_data, args):
     result['test_acc'] = test_acc
     print(f"===== Test result for {args.exp_name} =====") 
     print(test_acc)
+    if args.wandb:
+            wandb.log(data=test_acc, step=0)
 
     if confusion_matrices != None:
         print("===== Confusion Matrices =====")

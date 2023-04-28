@@ -9,6 +9,7 @@ from collections import defaultdict
 
 import optuna
 from optuna.trial import TrialState
+import wandb
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -131,6 +132,8 @@ def run_experiment(args, net, partition, result, mode, trial=None):
 
         ## sorting the results
         loss_acc_sum = add_epoch_result(result, train_loss, train_acc, val_loss, val_acc) #230313change
+        if args.wandb:
+            wandb.log(data=(loss_acc_sum | {'learning_rate':curr_lr}), step=epoch+1)
         if val_metric == 'loss':
             is_best = (loss_acc_sum['val_loss'] < best_loss_acc['val_loss'])
         else:
@@ -140,6 +143,8 @@ def run_experiment(args, net, partition, result, mode, trial=None):
         if is_best:
             result['best_epoch'] = epoch
             best_loss_acc.update(loss_acc_sum)
+            if args.wandb:
+                wandb.summary.update({'best_'+k:v for k, v in best_loss_acc.items()})
             checkpoint_dir = checkpoint_save(net, epoch, args)
         patience = (patience+1) * (not is_best)
         save_exp_result(vars(args).copy(), result) 
@@ -191,6 +196,7 @@ def experiment(partition, subject_data, args, trial=None): # trial for optuna
         raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
     net = nn.DataParallel(net, device_ids = devices)        
     net.to(f'cuda:{net.device_ids[0]}')
+    wandb.watch(net)
     
     # setting for results' DataFrame
     result = setup_results(args)
@@ -249,6 +255,11 @@ def objective(trial):
 
     ## ========= Run Experiment and saving result ========= ##    
     # Run Experiment
+    if args.wandb:
+        wandb.init(project=f'{args.dataset}_{str(args.cat_target+args.num_target)}',
+                   group=f'modality-{str(args.data_type)}_split-{args.balanced_split}_{trial.number}',
+                   name=args.exp_name, config=args)
+        
     print(f"*** Experiment {args.exp_name} Start ***")
     partition, subject_data = make_dataset(args)
     setting, result = experiment(partition, subject_data, deepcopy(args), trial) # change for optuna

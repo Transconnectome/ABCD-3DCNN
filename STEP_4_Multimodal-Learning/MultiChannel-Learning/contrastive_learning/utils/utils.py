@@ -44,7 +44,7 @@ def argument_setting():
     parser.add_argument("--metric", default='', type=str, help='')
     parser.add_argument("--val_size", default=0.1, type=float, help='')
     parser.add_argument("--test_size", default=0.1, type=float, help='')
-    parser.add_argument("--cv", default=None, type=int, choices=[1,2,3,4,5], help="option for 5-fold CV. 1~5.")
+    parser.add_argument("--cv", default=None, type=str, help="option for K-fold CV. format is K_valfold_testfold.")
     parser.add_argument("--resize", nargs="*", default=(96, 96, 96), type=int, help='')
     parser.add_argument("--transform", nargs="*", default=[], type=str, choices=['crop'],
                         help="option for additional transform - [crop] are available")

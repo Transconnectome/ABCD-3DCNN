@@ -34,6 +34,7 @@ ABCD_data_dir = {
     'FA_wm_MNI_resize128': f'{root_dir}/data/1.ABCD/FA_wm_MNI_resize128/',
     'FA_unwarpped_nii': f'{root_dir}/data/1.ABCD/3.1.FA_unwarpped_nii/',
     'FA_warpped_nii': f'{root_dir}/data/1.ABCD/3.2.FA_warpped_nii/',
+    'FA_crop_resize128': f'{root_dir}/data/1.ABCD/FA_crop_resize128/',
     'MD_unwarpped_nii': f'{root_dir}/data/1.ABCD/3.3.MD_unwarpped_nii/',
     'MD_warpped_nii': f'{root_dir}/data/1.ABCD/3.4.MD_warpped_nii/',
     'RD_unwarpped_nii': f'{root_dir}/data/1.ABCD/3.5.RD_unwarpped_nii/',
@@ -58,7 +59,7 @@ UKB_phenotype_dir = {'total': f'{root_dir}/data/2.UKB/2.demo_qc/UKB_phenotype.cs
 
 CHA_data_dir = {'freesurfer_256': f'{root_dir}/data/CHA_bigdata/sMRI_brain/',
                 'T1_resize128': f'{root_dir}/data/CHA_bigdata/sMRI_resize128/'}
-CHA_phenotype_dir = {'total': f'{root_dir}/data/CHA_bigdata/metadata/CHA_sMRI_brain.csv',
+CHA_phenotype_dir = {'total': f'{root_dir}/data/CHA_bigdata/metadata/sMRI_BSID_imputed.csv',
                      'ASDvsGDD': f'{root_dir}/data/CHA_bigdata/metadata/CHA_psm_split.csv',
                      'psm2': f'{root_dir}/data/CHA_bigdata/metadata/CHA_psm2.csv',}
 
@@ -118,6 +119,17 @@ def filter_phenotype(subject_data, filters):
     return subject_data
 
 
+def split_cv(subject_data, args):    
+    assert len(args.cv.split('_')) == 3, "args.cv should NumFold_ValFold_TestFold form"
+    subject_data['split']=None
+    N, val, test = [ int(x) for x in args.cv.split('_') ]
+    subject_data.loc[~subject_data['fold'].isin([test,val]),'split'] = 'train'
+    subject_data.loc[subject_data['fold']==val,'split'] = 'val'
+    subject_data.loc[subject_data['fold']==test,'split'] = 'test'
+    
+    return subject_data
+
+
 def loading_phenotype(phenotype_dir, target_list, args):
     col_list = target_list + [subjectkey]
     if 'multitarget' in args.balanced_split:
@@ -125,6 +137,8 @@ def loading_phenotype(phenotype_dir, target_list, args):
 
     ## get subject ID and target variables
     subject_data = pd.read_csv(phenotype_dir)
+    if args.cv != None:
+        subject_data = split_cv(subject_data, args)
     raw_csv = subject_data.copy()
     subject_data = subject_data.loc[:,col_list]
     if 'Attention.Deficit.Hyperactivity.Disorder.x' in target_list:
@@ -314,7 +328,7 @@ def partition_dataset(imageFiles_labels, raw_merged, target_list, args):
     ## Dataset split    
     num_total = len(imageFiles_labels) 
     num_train = int(num_total*(1 - args.val_size - args.test_size))
-    num_val = int(num_total*args.val_size) if args.cv == None else int((num_total-num_test)/5)
+    num_val = int(num_total*args.val_size) #if args.cv == None else int((num_total-num_test)/5)
     num_test = int(num_total*args.test_size)
         
     if args.balanced_split:
@@ -323,16 +337,16 @@ def partition_dataset(imageFiles_labels, raw_merged, target_list, args):
     labels = imageFiles_labels[target_list].to_dict('records')
     
     ## split dataset by 5-fold cv or given split size
-    if args.cv == None:
-        images_train, images_val, images_test = np.split(images, [num_train, num_train+num_val]) # revising
-        labels_train, labels_val, labels_test = np.split(labels, [num_train, num_train+num_val])
-    else:
-        split_points = [num_val, 2*num_val, 3*num_val, 4*num_val, num_total-num_test]
-        images_total, labels_total = np.split(images, split_points), np.split(labels, split_points)
-        images_test, labels_test = images_total.pop(), labels_total.pop()
-        images_val, labels_val = images_total.pop(args.cv-1), labels_total.pop(args.cv-1)
-        images_train, labels_train = np.concatenate(images_total), np.concatenate(labels_total)
-        num_train, num_val = images_train.shape[0], images_val.shape[0]
+    # if args.cv == None:
+    images_train, images_val, images_test = np.split(images, [num_train, num_train+num_val]) # revising
+    labels_train, labels_val, labels_test = np.split(labels, [num_train, num_train+num_val])
+    # else:
+    #     split_points = [num_val, 2*num_val, 3*num_val, 4*num_val, num_total-num_test]
+    #     images_total, labels_total = np.split(images, split_points), np.split(labels, split_points)
+    #     images_test, labels_test = images_total.pop(), labels_total.pop()
+    #     images_val, labels_val = images_total.pop(args.cv-1), labels_total.pop(args.cv-1)
+    #     images_train, labels_train = np.concatenate(images_total), np.concatenate(labels_total)
+    #     num_train, num_val = images_train.shape[0], images_val.shape[0]
 
     if target_list == []:
         label, labels_train, labels_val, labels_test = None, None, None, None
