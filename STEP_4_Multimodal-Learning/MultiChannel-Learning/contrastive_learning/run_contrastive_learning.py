@@ -116,6 +116,7 @@ def run_experiment(args, net, partition, result, mode):
     trainloader, valloader = make_dataloaders(partition, args)
 
     best_loss_acc = {'train_loss': float('inf'), 'val_loss': float('inf'), 'val_metric': -float('inf')}
+    checkpoint_dir = None
     patience = 0
 
     for epoch in tqdm(range(epoch_exp)):
@@ -127,7 +128,7 @@ def run_experiment(args, net, partition, result, mode):
         ## sorting the results
         loss_acc_sum = add_epoch_result(result, train_result, val_result)
         if args.wandb:
-            wandb.log(data=(dict(loss_acc_sum) | {'learning_rate':curr_lr}), step=epoch+1)
+            wandb.log(data=dict(loss_acc_sum, **{'learning_rate':curr_lr}), step=epoch+1)
         
         ## Check if best epoch, save the checkpoint and results, visualize the result.
         is_best = is_best_metric = (loss_acc_sum['val_metric'] > best_loss_acc['val_metric'])

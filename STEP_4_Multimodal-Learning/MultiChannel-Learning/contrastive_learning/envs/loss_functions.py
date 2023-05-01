@@ -177,7 +177,7 @@ def calculating_loss_acc(targets, output, result, net, args):
         result['loss'][curr_target].append(tmp_loss.item())
         
         # Acc
-        acc_func = calc_acc if curr_target in args.cat_target else calc_R2
+        acc_func = calc_acc_auroc if curr_target in args.cat_target else calc_MAE_MSE_R2
         acc = acc_func(tmp_output, label, args, tmp_loss)
         for k, v in acc.items():
             result[k][curr_target].append(v) 

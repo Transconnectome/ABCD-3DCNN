@@ -44,6 +44,9 @@ ABCD_data_dir = {
     'FA_hippo': f'{root_dir}/data/1.ABCD/FA_hippo/',
     'MD_hippo': f'{root_dir}/data/1.ABCD/MD_hippo/',    
 }
+if os.uname()[1] in ['node1', 'node3']:
+    ABCD_data_dir['FA_crop_resize128'] = '/home/connectome/jubin/3DCNN/ABCD/FA_crop_resize128/'
+
 ABCD_phenotype_dir = {
     'total': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_phenotype_total_balanced_multitarget.csv',
     'ADHD_case': f'{root_dir}/data/1.ABCD/4.demo_qc/ABCD_ADHD.csv',
