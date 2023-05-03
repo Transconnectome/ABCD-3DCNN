@@ -271,8 +271,9 @@ def iterative_stratification(imageFiles_labels, raw_merged, num_total, args):
     indices = [ x[1] for x in folds ] 
 
     # split dataset
-    n_test_folds, n_val_folds = int(args.num_folds*args.test_size), int(args.num_folds*args.val_size)
-    test_idx, val_idx, train_idx = [ np.concatenate(idx) for idx in np.split(indices, [n_test_folds, n_test_folds+n_val_folds])]
+    fold_test, fold_val = int(args.num_folds*args.test_size), int(args.num_folds*args.val_size)
+    split_indices = indices[:fold_test], indices[fold_test:fold_test+fold_val], indices[fold_test+fold_val:]
+    test_idx, val_idx, train_idx = [ np.concatenate(idx) for idx in split_indices ]
     get_info_fold(raw_merged, train_idx, val_idx, test_idx, binary_target+continuous_target)
 
     num_train, num_val =len(train_idx), len(val_idx)
@@ -370,11 +371,13 @@ def partition_dataset(imageFiles_labels, raw_merged, target_list, args):
         dMRI_transform += default_transforms
         
     aug_transforms = []
-    if 'shift' in args.augmentation:
-        aug_transforms.append(RandAffine(prob=0.1, translate_range=(0, args.resize[0]//50),
-                                         padding_mode='zeros', spatial_size=args.resize, cache_grid=True))
+    if 'affine' in args.augmentation:
+        aug_transforms.append(RandAffine(prob=0.2, padding_mode='zeros',
+                                         translate_range=(int(resize[0]*0.1),)*3,
+                                         rotate_range=(np.pi/36,)*3,
+                                         spatial_size=args.resize, cache_grid=True))
     elif 'flip' in args.augmentation:
-        aug_transforms.append(RandFlip(prob=0.1, spatial_axis=0))
+        aug_transforms.append(RandFlip(prob=0.2, spatial_axis=0))
     
     train_transforms, val_transforms, test_transforms = [], [], []
     for brain_modality in args.data_type:

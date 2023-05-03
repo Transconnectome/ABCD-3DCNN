@@ -48,8 +48,8 @@ def argument_setting():
     parser.add_argument("--resize", nargs="*", default=(96, 96, 96), type=int, help='')
     parser.add_argument("--transform", nargs="*", default=[], type=str, choices=['crop'],
                         help="option for additional transform - [crop] are available")
-    parser.add_argument("--augmentation", nargs="*", default=[], type=str, choices=['shift','flip'],
-                        help="Data augmentation - [shift, flip] are available")
+    parser.add_argument("--augmentation", nargs="*", default=[], type=str, choices=['affine','flip'],
+                        help="Data augmentation - [affine, flip] are available")
 
     # Hyperparameters for model training
     parser.add_argument("--lr", default=0.01, type=float, help='')

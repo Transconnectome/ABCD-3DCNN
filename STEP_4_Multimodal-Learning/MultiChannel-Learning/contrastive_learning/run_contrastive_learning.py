@@ -94,7 +94,7 @@ def add_epoch_result(result, train_result, val_result): #230313change
             if ('contrastive_loss' not in target_name) and acc != 'loss':
                 loss_acc_sum[f'train_{acc}'] += train_result[acc][target_name]
                 loss_acc_sum[f'val_{acc}'] += val_result[acc][target_name]
-                if acc_done == 0:
+                if acc_done == 0 and 'loss' not in acc:
                     loss_acc_sum[f'val_metric'] += val_result[acc][target_name]
                     result[f'train_accs'][target_name].append(train_result[acc][target_name])
                     result[f'val_accs'][target_name].append(val_result[acc][target_name])
