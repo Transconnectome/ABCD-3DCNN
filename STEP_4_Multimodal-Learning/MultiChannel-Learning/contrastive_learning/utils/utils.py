@@ -46,8 +46,8 @@ def argument_setting():
     parser.add_argument("--test_size", default=0.1, type=float, help='')
     parser.add_argument("--cv", default=None, type=str, help="option for K-fold CV. format is K_valfold_testfold.")
     parser.add_argument("--resize", nargs="*", default=(96, 96, 96), type=int, help='')
-    parser.add_argument("--transform", nargs="*", default=[], type=str, choices=['crop'],
-                        help="option for additional transform - [crop] are available")
+    parser.add_argument("--transform", nargs="*", default=[], type=str, choices=['crop','no_resize'],
+                        help="option for additional transform - [crop, no_resize] are available")
     parser.add_argument("--augmentation", nargs="*", default=[], type=str, choices=['affine','flip'],
                         help="Data augmentation - [affine, flip] are available")
 

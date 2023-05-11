@@ -360,11 +360,15 @@ def partition_dataset(imageFiles_labels, raw_merged, target_list, args):
 
     ## Define transform function
     resize = tuple(args.resize)
+    spatial_size = resize
     default_transforms = [ScaleIntensity(), AddChannel(), Resize(resize), ToTensor()] 
     
+    if 'no_resize' in args.transform:
+        default_transforms.pop(2)
+        spatial_size = (256,256,256) if 'hippo' not in args.data_type[0] else (134, 167, 141)
     if 'resize128' in args.data_type[0]:
         default_transforms.pop(2)
-        args.resize = (128,128,128)
+        spatial_size = (128,128,128)
     if 'crop' in args.transform:
         default_transforms.insert(2, CenterSpatialCrop(192))
     if args.tissue:
@@ -374,9 +378,9 @@ def partition_dataset(imageFiles_labels, raw_merged, target_list, args):
     aug_transforms = []
     if 'affine' in args.augmentation:
         aug_transforms.append(RandAffine(prob=0.2, padding_mode='zeros',
-                                         translate_range=(int(resize[0]*0.1),)*3,
+                                         translate_range=(int(spatial_size[0]*0.1),)*3,
                                          rotate_range=(np.pi/36,)*3,
-                                         spatial_size=args.resize, cache_grid=True))
+                                         spatial_size=spatial_size, cache_grid=True))
     elif 'flip' in args.augmentation:
         aug_transforms.append(RandFlip(prob=0.2, spatial_axis=0))
     
