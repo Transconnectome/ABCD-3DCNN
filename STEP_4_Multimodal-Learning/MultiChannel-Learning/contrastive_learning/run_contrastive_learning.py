@@ -7,11 +7,12 @@ import hashlib
 from copy import deepcopy
 from collections import defaultdict
 
+import wandb
+from tqdm.auto import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import wandb
-from tqdm.auto import tqdm
+from adabelief_pytorch import AdaBelief
 
 from utils.optimizer import CosineAnnealingWarmupRestarts
 from utils.utils import argument_setting, seed_all, select_model, CLIreporter, save_exp_result, checkpoint_save, checkpoint_load
@@ -54,6 +55,12 @@ def set_optimizer(args, net):
     elif args.optim == 'AdamW':
         optimizer = optim.AdamW(params = filter(lambda p: p.requires_grad, net.parameters()),
                                 lr=init_lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.weight_decay)
+    elif args.optim == 'AdaBelief':   
+        optimizer = AdaBelief(params = filter(lambda p: p.requires_grad, net.parameters()),
+                              lr=init_lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=args.weight_decay,
+                              amsgrad=False, weight_decouple=True, fixed_decay=False, rectify=False,
+                              degenerated_to_sgd=True, print_change_log=True)
+        
     else:
         raise ValueError('Invalid optimizer choice')
         
@@ -188,7 +195,8 @@ def experiment(partition, subject_data, args):
         raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
     net = nn.DataParallel(net, device_ids = devices)        
     net.to(f'cuda:{net.device_ids[0]}')
-    
+    if '2.0' in torch.__version__:
+        net = torch.compile(net)
     wandb.watch(net)
     
     # setting for results' DataFrame

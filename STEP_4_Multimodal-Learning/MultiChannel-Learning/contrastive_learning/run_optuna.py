@@ -196,6 +196,8 @@ def experiment(partition, subject_data, args, trial=None): # trial for optuna
         raise ValueError("GPU DEVICE IDS SHOULD BE ASSIGNED")
     net = nn.DataParallel(net, device_ids = devices)        
     net.to(f'cuda:{net.device_ids[0]}')
+    if '2.0' in torch.__version__:
+        net = torch.compile(net)
     wandb.watch(net)
     
     # setting for results' DataFrame

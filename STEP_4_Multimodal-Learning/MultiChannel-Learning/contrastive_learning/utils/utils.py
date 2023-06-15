@@ -56,7 +56,7 @@ def argument_setting():
     parser.add_argument("--lr_adjust", default=0.01, type=float, help='')
     parser.add_argument("--epoch", type=int, required=True, help='')
     parser.add_argument("--epoch_FC", type=int, default=0, help='Option for training only FC layer')
-    parser.add_argument("--optim", default='Adam', type=str, choices=['Adam','SGD','RAdam','AdamW'], help='')
+    parser.add_argument("--optim", default='Adam', type=str, choices=['Adam','SGD','RAdam','AdamW','AdaBelief'], help='')
     parser.add_argument("--weight_decay", default=0.01, type=float, help='')
     parser.add_argument("--scheduler", default='', type=str, help='') 
     parser.add_argument("--early_stopping", default=None, type=int, help='')
