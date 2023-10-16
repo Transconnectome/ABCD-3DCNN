@@ -59,8 +59,13 @@ Finetuning Vision Transformer for downstream tasks.
 **Furthermore, you should set either ```--cat_target``` or ```--num_target```.**   
 **If you want to predict categorical variable, you should set ```--cat_target```.**   
 **If you want to predict continuous variable, you should set ```--num_target```.**  
+In case of finetuning Vision Transformer,
 ```
-torchrun --standalone --nnodes=1 --nproc_per_node=2 --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitBASE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
+torchrun --standalone --nnodes=1 --nproc_per_node=2 finetune_ViT.py --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_vit_base_patch16_3D_vitBASE_MAE_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
+```
+In case of finetuning Swin Transformer, 
+```
+torchrun --standalone --nnodes=1 --nproc_per_node=2 finetune_Swin.py --model swiin_small_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --pretrained_model /scratch/connectome/dhkdgmlghks/3DCNN_test/MAE_DDP/result/model/mae_swin_small_3D_swinSMALL_simmim_MaskRatio0.75_Batch1024_8cfcfa.pth --num_target age --gradient_clipping
 ```
   
 You can use kernel fusion by activate ```--torchscript``` (Kernel fusion need pytoch version >= 1.2).  
@@ -76,7 +81,20 @@ In default, positional encoding is the zero-filled parameters update during trai
 ### Swin Transformer specific parameters 
 If you want to change the size of window, setting ```--windw_size {int}```. 
   
-  
+
+## Training from scratch for classification
+Training model from scratch for classification.
+In case of finetuning Vision Transformer,
+```
+torchrun --standalone --nnodes=1 --nproc_per_node=2 finetune_ViT.py --model vit_base_patch16_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --num_target age --gradient_clipping
+```
+In case of finetuning Swin Transformer, 
+```
+torchrun --standalone --nnodes=1 --nproc_per_node=2 finetune_Swin.py --model swiin_small_3D --optim AdamW --lr 1e-4 --epoch 1000 --exp_name finetuning_test  --sbatch  --batch_size 32  --accumulation_steps 32 --num_target age --gradient_clipping
+```
+
+
+
 ## Inferece 
 Please specify ```CUDA_VISIBLE_DEVICES``` for run inference on speicific gpu id.  
 You should specify ```--checkpoint_dir``` for load pretrained model for which you want to run inference. 
